@@ -5,7 +5,6 @@ import (
 	"net"
 	"os/exec"
 	"strconv"
-	"time"
 )
 
 func ForceClosePortConnections(addr string) (err error) {
@@ -33,26 +32,12 @@ func ForceClosePortConnections(addr string) (err error) {
 		return nil
 	}
 
-	cmd := exec.Command("tcpkill", "-i", "any", "port", fmt.Sprintf("%d", port))
-	if err := cmd.Start(); err != nil {
-		fmt.Printf("⚠️ 启动 tcpkill 失败: %v\n", err)
+	cmd := exec.Command("ss", "-K", "sport", "=", fmt.Sprintf(":%d", port))
+	if output, err := cmd.CombinedOutput(); err != nil {
+		fmt.Printf("⚠️ ss -K 断开连接失败: %v, output: %s\n", err, string(output))
 		return nil
 	}
 
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				fmt.Printf("⚠️ tcpkill goroutine panic recovered: %v\n", r)
-			}
-		}()
-		time.Sleep(2 * time.Second)
-		if cmd.Process != nil {
-			if err := cmd.Process.Kill(); err != nil {
-				fmt.Printf("⚠️ 终止 tcpkill 失败: %v\n", err)
-			}
-		}
-	}()
-
-	fmt.Printf("✅ 正在断开端口 %d 上的所有连接...\n", port)
+	fmt.Printf("✅ 已断开端口 %d 上的所有连接\n", port)
 	return nil
 }

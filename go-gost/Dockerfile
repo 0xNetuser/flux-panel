@@ -8,10 +8,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o /
 
 FROM alpine:latest
 
-RUN echo "@testing https://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories && \
-    apk add --no-cache \
-    ca-certificates \
-    dsniff@testing
+RUN apk add --no-cache ca-certificates
 
 WORKDIR /etc/gost
 

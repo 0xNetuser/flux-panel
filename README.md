@@ -108,7 +108,7 @@ docker compose up -d
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<后端端口> \
   -e SECRET=<节点密钥> \
-  bqlpfy/gost-node:1.4.3
+  0xnetuser/gost-node:1.4.3
 ```
 
 也可以使用 docker-compose，参考项目中的 `docker-compose-node.yml`：
@@ -116,7 +116,7 @@ docker run -d --network=host --restart=unless-stopped --name gost-node \
 ```yaml
 services:
   gost-node:
-    image: bqlpfy/gost-node:1.4.3
+    image: 0xnetuser/gost-node:1.4.3
     container_name: gost-node
     network_mode: host
     restart: unless-stopped

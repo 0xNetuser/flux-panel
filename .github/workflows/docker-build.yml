@@ -150,8 +150,8 @@ jobs:
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --push \
-            -t bqlpfy/vite-frontend:latest \
-            -t bqlpfy/vite-frontend:${VERSION} \
+            -t 0xnetuser/vite-frontend:latest \
+            -t 0xnetuser/vite-frontend:${VERSION} \
             ./vite-frontend
 
   build-java:
@@ -194,8 +194,8 @@ jobs:
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --push \
-            -t bqlpfy/springboot-backend:latest \
-            -t bqlpfy/springboot-backend:${VERSION} \
+            -t 0xnetuser/springboot-backend:latest \
+            -t 0xnetuser/springboot-backend:${VERSION} \
             ./springboot-backend
 
   build-gost-node:
@@ -221,8 +221,8 @@ jobs:
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --push \
-            -t bqlpfy/gost-node:latest \
-            -t bqlpfy/gost-node:${VERSION} \
+            -t 0xnetuser/gost-node:latest \
+            -t 0xnetuser/gost-node:${VERSION} \
             -f go-gost/Dockerfile \
             ./go-gost
 
@@ -249,8 +249,8 @@ jobs:
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --push \
-            -t bqlpfy/gost-binary:latest \
-            -t bqlpfy/gost-binary:${VERSION} \
+            -t 0xnetuser/gost-binary:latest \
+            -t 0xnetuser/gost-binary:${VERSION} \
             -f go-gost/Dockerfile.binary \
             ./go-gost
 

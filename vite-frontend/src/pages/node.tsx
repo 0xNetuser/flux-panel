@@ -13,12 +13,13 @@ import toast from 'react-hot-toast';
 import axios from 'axios';
 
 
-import { 
-  createNode, 
-  getNodeList, 
-  updateNode, 
+import {
+  createNode,
+  getNodeList,
+  updateNode,
   deleteNode,
-  getNodeInstallCommand
+  getNodeInstallCommand,
+  getNodeDockerCommand
 } from "@/api";
 
 interface Node {
@@ -86,7 +87,10 @@ export default function NodePage() {
   // 安装命令相关状态
   const [installCommandModal, setInstallCommandModal] = useState(false);
   const [installCommand, setInstallCommand] = useState('');
+  const [dockerCommand, setDockerCommand] = useState('');
   const [currentNodeName, setCurrentNodeName] = useState('');
+  const [installTab, setInstallTab] = useState<'script' | 'docker'>('script');
+  const [installLoading, setInstallLoading] = useState(false);
   
   const websocketRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -468,42 +472,45 @@ export default function NodePage() {
     }
   };
 
-  // 复制安装命令
+  // 打开安装命令模态框
   const handleCopyInstallCommand = async (node: Node) => {
-    setNodeList(prev => prev.map(n => 
-      n.id === node.id ? { ...n, copyLoading: true } : n
-    ));
-    
+    setCurrentNodeName(node.name);
+    setInstallCommand('');
+    setDockerCommand('');
+    setInstallTab('script');
+    setInstallCommandModal(true);
+    setInstallLoading(true);
+
     try {
-      const res = await getNodeInstallCommand(node.id);
-      if (res.code === 0 && res.data) {
-        try {
-          await navigator.clipboard.writeText(res.data);
-          toast.success('安装命令已复制到剪贴板');
-        } catch (copyError) {
-          // 复制失败，显示安装命令模态框
-          setInstallCommand(res.data);
-          setCurrentNodeName(node.name);
-          setInstallCommandModal(true);
-        }
+      const [shellRes, dockerRes] = await Promise.all([
+        getNodeInstallCommand(node.id),
+        getNodeDockerCommand(node.id)
+      ]);
+
+      if (shellRes.code === 0 && shellRes.data) {
+        setInstallCommand(shellRes.data);
       } else {
-        toast.error(res.msg || '获取安装命令失败');
+        setInstallCommand('获取失败: ' + (shellRes.msg || '未知错误'));
+      }
+
+      if (dockerRes.code === 0 && dockerRes.data) {
+        setDockerCommand(dockerRes.data);
+      } else {
+        setDockerCommand('获取失败: ' + (dockerRes.msg || '未知错误'));
       }
     } catch (error) {
-      toast.error('获取安装命令失败');
+      setInstallCommand('获取安装命令失败，请重试');
+      setDockerCommand('获取安装命令失败，请重试');
     } finally {
-      setNodeList(prev => prev.map(n => 
-        n.id === node.id ? { ...n, copyLoading: false } : n
-      ));
+      setInstallLoading(false);
     }
   };
 
-  // 手动复制安装命令
-  const handleManualCopy = async () => {
+  // 复制指定命令
+  const handleCopyCommand = async (command: string) => {
     try {
-      await navigator.clipboard.writeText(installCommand);
-      toast.success('安装命令已复制到剪贴板');
-      setInstallCommandModal(false);
+      await navigator.clipboard.writeText(command);
+      toast.success('命令已复制到剪贴板');
     } catch (error) {
       toast.error('复制失败，请手动选择文本复制');
     }
@@ -793,7 +800,6 @@ export default function NodePage() {
                         variant="flat"
                         color="success"
                         onPress={() => handleCopyInstallCommand(node)}
-                        isLoading={node.copyLoading}
                         className="flex-1 min-h-8"
                       >
                         安装
@@ -1039,46 +1045,82 @@ export default function NodePage() {
         </Modal>
 
         {/* 安装命令模态框 */}
-        <Modal 
-          isOpen={installCommandModal} 
+        <Modal
+          isOpen={installCommandModal}
           onClose={() => setInstallCommandModal(false)}
           size="2xl"
-        scrollBehavior="outside"
-        backdrop="blur"
-        placement="center"
+          scrollBehavior="outside"
+          backdrop="blur"
+          placement="center"
         >
           <ModalContent>
-            <ModalHeader>安装命令 - {currentNodeName}</ModalHeader>
+            <ModalHeader>安装节点 - {currentNodeName}</ModalHeader>
             <ModalBody>
               <div className="space-y-4">
-                <p className="text-sm text-default-600">
-                  请复制以下安装命令到服务器上执行：
-                </p>
-                <div className="relative">
-                  <Textarea
-                    value={installCommand}
-                    readOnly
-                    variant="bordered"
-                    minRows={6}
-                    maxRows={10}
-                    className="font-mono text-sm"
-                    classNames={{
-                      input: "font-mono text-sm"
-                    }}
-                  />
+                {/* 标签切换 */}
+                <div className="flex gap-2">
                   <Button
                     size="sm"
-                    color="primary"
-                    variant="flat"
-                    className="absolute top-2 right-2"
-                    onPress={handleManualCopy}
+                    variant={installTab === 'script' ? 'solid' : 'flat'}
+                    color={installTab === 'script' ? 'primary' : 'default'}
+                    onPress={() => setInstallTab('script')}
                   >
-                    复制
+                    脚本安装
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={installTab === 'docker' ? 'solid' : 'flat'}
+                    color={installTab === 'docker' ? 'primary' : 'default'}
+                    onPress={() => setInstallTab('docker')}
+                  >
+                    Docker安装
                   </Button>
                 </div>
-                <div className="text-xs text-default-500">
-                  💡 提示：如果复制按钮失效，请手动选择上方文本进行复制
-                </div>
+
+                {installLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Spinner size="sm" />
+                    <span className="ml-2 text-default-600">获取命令中...</span>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-default-600">
+                      {installTab === 'script'
+                        ? '请复制以下安装命令到服务器上执行：'
+                        : '请复制以下 Docker 命令到服务器上执行：'}
+                    </p>
+                    <div className="relative">
+                      <Textarea
+                        value={installTab === 'script' ? installCommand : dockerCommand}
+                        readOnly
+                        variant="bordered"
+                        minRows={4}
+                        maxRows={10}
+                        className="font-mono text-sm"
+                        classNames={{
+                          input: "font-mono text-sm"
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        color="primary"
+                        variant="flat"
+                        className="absolute top-2 right-2"
+                        onPress={() => handleCopyCommand(installTab === 'script' ? installCommand : dockerCommand)}
+                      >
+                        复制
+                      </Button>
+                    </div>
+                    {installTab === 'docker' && (
+                      <div className="text-xs text-default-500">
+                        需要服务器已安装 Docker。使用 host 网络模式，支持动态端口转发。
+                      </div>
+                    )}
+                    <div className="text-xs text-default-500">
+                      如果复制按钮失效，请手动选择上方文本进行复制
+                    </div>
+                  </>
+                )}
               </div>
             </ModalBody>
             <ModalFooter>

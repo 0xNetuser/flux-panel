@@ -360,21 +360,73 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
         ViteConfig viteConfig = viteConfigService.getOne(new QueryWrapper<ViteConfig>().eq("name", "ip"));
         if (viteConfig == null) return R.err("请先前往网站配置中设置ip");
 
-        StringBuilder command = new StringBuilder();
-        
-        // 第一部分：下载安装脚本  
-        command.append("curl -L https://github.com/bqlpfy/flux-panel/releases/download/1.4.3/install.sh")
-               .append(" -o ./install.sh && chmod +x ./install.sh && ");
-        
         // 处理服务器地址，如果是IPv6需要添加方括号
         String processedServerAddr = processServerAddress(viteConfig.getValue());
-        
-        // 第二部分：执行安装脚本（去掉-u参数）
+
+        // 构建面板 HTTP 基础地址（安装脚本会自动去掉 http:// 写入 config.json）
+        String panelUrl = ensureHttpPrefix(processedServerAddr);
+
+        StringBuilder command = new StringBuilder();
+
+        // 第一部分：从面板下载安装脚本
+        command.append("curl -fL '").append(panelUrl).append("/node-install/script'")
+               .append(" -o ./install.sh && chmod +x ./install.sh && ");
+
+        // 第二部分：执行安装脚本
         command.append("./install.sh")
-               .append(" -a ").append(processedServerAddr)  // 服务器地址
-               .append(" -s ").append(node.getSecret());    // 节点密钥
-        
+               .append(" -a '").append(panelUrl).append("'")           // 面板地址
+               .append(" -s '").append(node.getSecret()).append("'");  // 节点密钥
+
         return R.ok(command.toString());
+    }
+
+    /**
+     * 获取节点Docker安装命令
+     *
+     * @param id 节点ID
+     * @return 包含Docker安装命令的响应对象
+     */
+    @Override
+    public R getDockerCommand(Long id) {
+        Node node = this.getById(id);
+        if (node == null) {
+            return R.err(ERROR_NODE_NOT_FOUND);
+        }
+        return buildDockerCommand(node);
+    }
+
+    /**
+     * 构建节点Docker安装命令
+     *
+     * @param node 节点对象
+     * @return 格式化的Docker安装命令
+     */
+    private R buildDockerCommand(Node node) {
+        ViteConfig viteConfig = viteConfigService.getOne(new QueryWrapper<ViteConfig>().eq("name", "ip"));
+        if (viteConfig == null) return R.err("请先前往网站配置中设置ip");
+
+        String processedServerAddr = processServerAddress(viteConfig.getValue());
+
+        // 带 http:// 前缀，docker-entrypoint.sh 会自动去掉写入 config.json
+        String panelUrl = ensureHttpPrefix(processedServerAddr);
+
+        StringBuilder command = new StringBuilder();
+        command.append("docker run -d --network=host --restart=unless-stopped --name gost-node")
+               .append(" -e 'PANEL_ADDR=").append(panelUrl).append("'")
+               .append(" -e 'SECRET=").append(node.getSecret()).append("'")
+               .append(" bqlpfy/gost-node:1.4.3");
+
+        return R.ok(command.toString());
+    }
+
+    /**
+     * 确保地址带有 http:// 前缀
+     */
+    private String ensureHttpPrefix(String addr) {
+        if (addr != null && !addr.startsWith("http://") && !addr.startsWith("https://")) {
+            return "http://" + addr;
+        }
+        return addr;
     }
 
     /**

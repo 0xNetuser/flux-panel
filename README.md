@@ -41,21 +41,28 @@
 ```bash
 curl -L https://raw.githubusercontent.com/bqlpfy/flux-panel/refs/heads/main/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
 ```
-节点端(稳定版)：
-```bash
-curl -L https://raw.githubusercontent.com/bqlpfy/flux-panel/refs/heads/main/install.sh -o install.sh && chmod +x install.sh && ./install.sh
-
-```
 
 面板端(开发版)：
 ```bash
 curl -L https://raw.githubusercontent.com/bqlpfy/flux-panel/refs/heads/beta/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
 ```
-节点端(开发版)：
-```bash
-curl -L https://raw.githubusercontent.com/bqlpfy/flux-panel/refs/heads/beta/install.sh -o install.sh && chmod +x install.sh && ./install.sh
 
+节点端安装（安装完面板后，在面板「节点管理」页面点击「安装」按钮可直接获取已填好参数的命令）：
+
+脚本安装：
+```bash
+curl -fL http://面板IP:6365/node-install/script -o install.sh && chmod +x install.sh && ./install.sh -a http://面板IP:6365 -s 节点密钥
 ```
+
+Docker安装：
+```bash
+docker run -d --network=host --restart=unless-stopped --name gost-node \
+  -e PANEL_ADDR=http://面板IP:6365 \
+  -e SECRET=节点密钥 \
+  bqlpfy/gost-node:1.4.3
+```
+
+> 脚本和节点二进制均由面板托管，无需访问 GitHub。面板部署后需将节点二进制文件（gost-amd64/gost-arm64）放入 `node_binary` 卷中。
 
 #### 默认管理员账号
 

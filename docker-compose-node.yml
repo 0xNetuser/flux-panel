@@ -1,0 +1,9 @@
+services:
+  gost-node:
+    image: bqlpfy/gost-node:1.4.3
+    container_name: gost-node
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - PANEL_ADDR=http://面板IP:6365
+      - SECRET=节点密钥

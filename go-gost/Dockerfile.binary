@@ -1,0 +1,11 @@
+FROM golang:1.23-alpine AS builder
+
+WORKDIR /src
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /output/gost-amd64
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o /output/gost-arm64
+
+FROM alpine:latest
+COPY --from=builder /output/ /binaries/
+# 启动时将二进制复制到挂载目录（覆盖旧版本）
+CMD ["sh", "-c", "cp /binaries/* /data/node/ && ls -la /data/node/ && echo 'Node binaries ready'"]

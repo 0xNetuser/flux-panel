@@ -41,6 +41,10 @@ mybatis-plus:
 jwt-secret: ${JWT_SECRET}
 log-dir: ${LOG_DIR}
 
+node:
+  binary:
+    dir: ${NODE_BINARY_DIR:/data/node}
+
 
 captcha:
   init-default-resource: true

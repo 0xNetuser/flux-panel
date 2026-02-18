@@ -8,9 +8,9 @@ export LC_ALL=C
 
 
 # 全局下载地址配置
-DOCKER_COMPOSEV4_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.4.4/docker-compose-v4.yml"
-DOCKER_COMPOSEV6_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.4.4/docker-compose-v6.yml"
-GOST_SQL_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.4.4/gost.sql"
+DOCKER_COMPOSEV4_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.4.5/docker-compose-v4.yml"
+DOCKER_COMPOSEV6_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.4.5/docker-compose-v6.yml"
+GOST_SQL_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.4.5/gost.sql"
 
 COUNTRY=$(curl -s https://ipinfo.io/country)
 if [ "$COUNTRY" = "CN" ]; then
@@ -175,11 +175,8 @@ get_config_params() {
 
 
 
-  read -p "前端端口（默认 6366）: " FRONTEND_PORT
-  FRONTEND_PORT=${FRONTEND_PORT:-6366}
-
-  read -p "后端端口（默认 6365）: " BACKEND_PORT
-  BACKEND_PORT=${BACKEND_PORT:-6365}
+  read -p "面板端口（默认 6366）: " PANEL_PORT
+  PANEL_PORT=${PANEL_PORT:-6366}
 
   DB_NAME=$(generate_random)
   DB_USER=$(generate_random)
@@ -218,15 +215,14 @@ DB_NAME=$DB_NAME
 DB_USER=$DB_USER
 DB_PASSWORD=$DB_PASSWORD
 JWT_SECRET=$JWT_SECRET
-FRONTEND_PORT=$FRONTEND_PORT
-BACKEND_PORT=$BACKEND_PORT
+PANEL_PORT=$PANEL_PORT
 EOF
 
   echo "🚀 启动 docker 服务..."
   $DOCKER_CMD up -d
 
   echo "🎉 部署完成"
-  echo "🌐 访问地址: http://服务器IP:$FRONTEND_PORT"
+  echo "🌐 访问地址: http://服务器IP:$PANEL_PORT"
   echo "📖 部署完成后请阅读下使用文档，求求了啊，不要上去就是一顿操作"
   echo "📚 文档地址: https://tes.cc/guide.html"
   echo "💡 默认管理员账号: admin_user / admin_user"

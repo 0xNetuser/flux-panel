@@ -414,7 +414,7 @@ public class NodeServiceImpl extends ServiceImpl<NodeMapper, Node> implements No
         command.append("docker run -d --network=host --restart=unless-stopped --name gost-node")
                .append(" -e 'PANEL_ADDR=").append(panelUrl).append("'")
                .append(" -e 'SECRET=").append(node.getSecret()).append("'")
-               .append(" 0xnetuser/gost-node:1.4.4");
+               .append(" 0xnetuser/gost-node:1.4.5");
 
         return R.ok(command.toString());
     }

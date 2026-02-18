@@ -130,7 +130,7 @@ get_config_params() {
     echo "请输入配置参数："
 
     if [[ -z "$SERVER_ADDR" ]]; then
-      read -p "面板地址(如 http://1.2.3.4:6365): " SERVER_ADDR
+      read -p "面板地址(如 http://1.2.3.4:6366): " SERVER_ADDR
     fi
 
     if [[ -z "$SECRET" ]]; then
@@ -270,7 +270,7 @@ update_gost() {
   load_existing_config
 
   if [[ -z "$SERVER_ADDR" ]]; then
-    read -p "面板地址(如 http://1.2.3.4:6365): " SERVER_ADDR
+    read -p "面板地址(如 http://1.2.3.4:6366): " SERVER_ADDR
     if [[ -z "$SERVER_ADDR" ]]; then
       echo "面板地址不能为空。"
       return 1

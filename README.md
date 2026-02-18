@@ -38,13 +38,13 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 ```bash
 # 下载 docker-compose 配置文件（二选一）
 # IPv4 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.4/docker-compose-v4.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.5/docker-compose-v4.yml -o docker-compose.yml
 
 # IPv6 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.4/docker-compose-v6.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.5/docker-compose-v6.yml -o docker-compose.yml
 
 # 下载数据库初始化文件
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.4/gost.sql -o gost.sql
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.5/gost.sql -o gost.sql
 ```
 
 **2. 创建环境变量文件**
@@ -56,8 +56,7 @@ DB_NAME=gost_db
 DB_USER=gost_user
 DB_PASSWORD=请替换为随机密码
 JWT_SECRET=请替换为随机密码
-FRONTEND_PORT=6366
-BACKEND_PORT=6365
+PANEL_PORT=6366
 ```
 
 > 可使用 `openssl rand -base64 16` 生成随机密码。
@@ -106,9 +105,9 @@ docker compose up -d
 
 ```bash
 docker run -d --network=host --restart=unless-stopped --name gost-node \
-  -e PANEL_ADDR=http://<面板IP>:<后端端口> \
+  -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.4.4
+  0xnetuser/gost-node:1.4.5
 ```
 
 也可以使用 docker-compose，参考项目中的 `docker-compose-node.yml`：
@@ -116,12 +115,12 @@ docker run -d --network=host --restart=unless-stopped --name gost-node \
 ```yaml
 services:
   gost-node:
-    image: 0xnetuser/gost-node:1.4.4
+    image: 0xnetuser/gost-node:1.4.5
     container_name: gost-node
     network_mode: host
     restart: unless-stopped
     environment:
-      - PANEL_ADDR=http://面板IP:6365
+      - PANEL_ADDR=http://面板IP:6366
       - SECRET=节点密钥
 ```
 
@@ -130,7 +129,7 @@ services:
 安装脚本和节点二进制均从面板下载，无需访问 GitHub：
 
 ```bash
-curl -fL http://<面板IP>:<后端端口>/node-install/script -o install.sh && chmod +x install.sh && ./install.sh -a 'http://<面板IP>:<后端端口>' -s '<节点密钥>'
+curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && chmod +x install.sh && ./install.sh -a 'http://<面板IP>:<面板端口>' -s '<节点密钥>'
 ```
 
 - 安装后以 systemd 服务运行，开机自启
@@ -142,15 +141,18 @@ curl -fL http://<面板IP>:<后端端口>/node-install/script -o install.sh && c
 | 参数 | 说明 | 示例 |
 |------|------|------|
 | `面板IP` | 面板服务器的公网 IP 或域名 | `203.0.113.1` |
-| `后端端口` | 面板后端服务端口（默认 `6365`） | `6365` |
+| `面板端口` | 面板服务端口（默认 `6366`） | `6366` |
 | `节点密钥` | 在面板添加节点后自动生成的密钥 | `a1b2c3d4e5f6...` |
 
 ---
 
 ## 更新日志
 
-### v1.4.4
+### v1.4.5
 
+- 前端/后端合并为单一端口（`PANEL_PORT`，默认 6366），通过 Nginx 反向代理转发后端请求
+- 面板地址配置支持自动获取当前浏览器地址
+- 节点端支持 HTTPS 面板地址（`use_tls` 自动检测）
 - CI/CD 新增 `gost-node` 和 `gost-binary` Docker 镜像自动构建推送
 - Docker 镜像仓库迁移至 `0xnetuser/`
 - 节点端 `tcpkill` 替换为 `ss -K`（iproute2），解决 Alpine 不再提供 dsniff 的问题

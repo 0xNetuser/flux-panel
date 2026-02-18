@@ -30,7 +30,7 @@ else
   if [ ! -f "$CONFIG_FILE" ]; then
     echo "错误: 未设置 PANEL_ADDR/SECRET 环境变量，且 $CONFIG_FILE 不存在。"
     echo "请通过以下方式之一提供配置："
-    echo "  1. 设置环境变量: -e PANEL_ADDR=http://面板IP:6365 -e SECRET=节点密钥"
+    echo "  1. 设置环境变量: -e PANEL_ADDR=http://面板IP:6366 -e SECRET=节点密钥"
     echo "  2. 挂载配置文件: -v ./config.json:/etc/gost/config.json"
     exit 1
   fi

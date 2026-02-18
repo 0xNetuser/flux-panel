@@ -46,9 +46,9 @@ interface ConfigItem {
 const CONFIG_ITEMS: ConfigItem[] = [
   {
     key: 'ip',
-    label: '面板后端地址',
-    placeholder: '请输入面板后端IP:PORT',
-    description: '格式“ip:port”,用于对接节点时使用,ip是你安装面板服务器的公网ip,端口是安装脚本内输入的后端端口。不要套CDN,不支持https,通讯数据有加密',
+    label: '面板地址',
+    placeholder: '请输入面板IP:PORT',
+    description: '格式"ip:port",用于对接节点时使用,ip是你安装面板服务器的公网ip,端口是面板端口(默认6366)。支持https,不要套CDN,通讯数据有加密',
     type: 'input'
   },
   {
@@ -152,13 +152,22 @@ export default function ConfigPage() {
     try {
       const configData = await getCachedConfigs();
       
+      // 如果面板地址为空，自动填充当前浏览器地址
+      const autoFilled = !configData.ip;
+      if (autoFilled) {
+        configData.ip = window.location.host;
+      }
+
       // 只有在数据有变化时才更新
       const hasDataChanged = JSON.stringify(configData) !== JSON.stringify(configsToCompare);
       if (hasDataChanged) {
+        const originalData = { ...configData };
+        if (autoFilled) {
+          originalData.ip = '';  // 保留原始空值，让变更检测提醒用户保存
+        }
         setConfigs(configData);
-        setOriginalConfigs({ ...configData });
-        setHasChanges(false);
-      } else {
+        setOriginalConfigs(originalData);
+        setHasChanges(autoFilled);
       }
     } catch (error) {
       // 只有在没有缓存数据时才显示错误

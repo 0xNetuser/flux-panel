@@ -26,14 +26,14 @@ services:
       retries: 10
 
   gost-binary-init:
-    image: 0xnetuser/gost-binary:1.4.4
+    image: 0xnetuser/gost-binary:1.4.5
     container_name: gost-binary-init
     volumes:
       - node_binary:/data/node
     restart: "no"
 
   backend:
-    image: 0xnetuser/springboot-backend:1.4.4
+    image: 0xnetuser/springboot-backend:1.4.5
     container_name: springboot-backend
     restart: unless-stopped
     environment:
@@ -44,8 +44,8 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       LOG_DIR: /app/logs
       JAVA_OPTS: "-Xms256m -Xmx512m -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
-    ports:
-      - "${BACKEND_PORT}:6365"
+    expose:
+      - "6365"
     volumes:
       - backend_logs:/app/logs
       - node_binary:/data/node
@@ -64,11 +64,11 @@ services:
       start_period: 90s
 
   frontend:
-    image: 0xnetuser/vite-frontend:1.4.4
+    image: 0xnetuser/vite-frontend:1.4.5
     container_name: vite-frontend
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT}:80"
+      - "${PANEL_PORT:-6366}:80"
     depends_on:
       backend:
         condition: service_healthy

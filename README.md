@@ -146,6 +146,71 @@ curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && c
 
 ---
 
+## 更新说明
+
+### 更新面板端
+
+#### 脚本部署更新
+
+重新运行安装脚本，选择「更新面板」：
+
+```bash
+curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
+```
+
+脚本会自动拉取最新镜像、执行数据库迁移并重启服务，`.env` 配置保持不变。
+
+#### Docker Compose 手动更新
+
+```bash
+# 下载最新 docker-compose 配置（覆盖旧文件）
+# IPv4 环境：
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.6/docker-compose-v4.yml -o docker-compose.yml
+
+# IPv6 环境：
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.6/docker-compose-v6.yml -o docker-compose.yml
+
+# 拉取最新镜像并重启
+docker compose pull && docker compose up -d
+```
+
+> `.env` 和 `gost.sql` 无需重新下载，数据库数据保留在 Docker 卷中。
+
+---
+
+### 更新节点端
+
+#### Docker 部署更新
+
+```bash
+# 停止并删除旧容器
+docker stop gost-node && docker rm gost-node
+
+# 拉取最新镜像并启动
+docker run -d --network=host --restart=unless-stopped --name gost-node \
+  -e PANEL_ADDR=http://<面板IP>:<面板端口> \
+  -e SECRET=<节点密钥> \
+  0xnetuser/gost-node:1.4.6
+```
+
+如果使用 docker-compose 部署，更新 `docker-compose-node.yml` 中的镜像版本后：
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+#### 脚本部署更新
+
+重新运行安装脚本，选择「更新」：
+
+```bash
+curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && chmod +x install.sh && ./install.sh
+```
+
+脚本会自动从面板下载最新二进制文件并重启服务，配置文件保持不变。
+
+---
+
 ## 更新日志
 
 ### v1.4.6

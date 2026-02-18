@@ -8,8 +8,12 @@ GOST_CONFIG="/etc/gost/gost.json"
 if [ -n "$PANEL_ADDR" ] && [ -n "$SECRET" ]; then
   echo "使用环境变量生成配置文件..."
 
-  # gost 内部会拼接 ws:// 前缀，addr 必须是 host:port 格式
+  # 检测是否使用 HTTPS
   ADDR_VALUE="$PANEL_ADDR"
+  USE_TLS=false
+  case "$ADDR_VALUE" in
+    https://*) USE_TLS=true ;;
+  esac
   ADDR_VALUE="${ADDR_VALUE#http://}"
   ADDR_VALUE="${ADDR_VALUE#https://}"
   ADDR_VALUE="${ADDR_VALUE%/}"
@@ -17,7 +21,8 @@ if [ -n "$PANEL_ADDR" ] && [ -n "$SECRET" ]; then
   cat > "$CONFIG_FILE" <<EOF
 {
   "addr": "$ADDR_VALUE",
-  "secret": "$SECRET"
+  "secret": "$SECRET",
+  "use_tls": $USE_TLS
 }
 EOF
 else

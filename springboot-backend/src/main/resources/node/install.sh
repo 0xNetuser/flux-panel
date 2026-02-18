@@ -191,8 +191,11 @@ install_gost() {
   echo "gost 版本：$($INSTALL_DIR/gost -V)"
 
   # 写入 config.json (安装时总是创建新的)
-  # gost 内部会拼接 ws:// 前缀，addr 必须是 host:port 格式
   CONFIG_ADDR="$SERVER_ADDR"
+  USE_TLS=false
+  case "$CONFIG_ADDR" in
+    https://*) USE_TLS=true ;;
+  esac
   CONFIG_ADDR="${CONFIG_ADDR#http://}"
   CONFIG_ADDR="${CONFIG_ADDR#https://}"
   CONFIG_ADDR="${CONFIG_ADDR%/}"
@@ -202,7 +205,8 @@ install_gost() {
   cat > "$CONFIG_FILE" <<EOF
 {
   "addr": "$CONFIG_ADDR",
-  "secret": "$SECRET"
+  "secret": "$SECRET",
+  "use_tls": $USE_TLS
 }
 EOF
 

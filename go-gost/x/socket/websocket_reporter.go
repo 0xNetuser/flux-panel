@@ -90,6 +90,7 @@ type WebSocketReporter struct {
 	addr           string // 保存服务器地址
 	secret         string // 保存密钥
 	version        string // 保存版本号
+	useTLS         bool   // 是否使用 TLS (wss/https)
 	conn           *websocket.Conn
 	reconnectTime  time.Duration
 	pingInterval   time.Duration
@@ -213,7 +214,11 @@ func (w *WebSocketReporter) connect() error {
 	}
 
 	// 使用最新的配置重新构建 URL
-	currentURL := "ws://" + w.addr + "/system-info?type=1&secret=" + w.secret + "&version=" + w.version +
+	wsScheme := "ws"
+	if w.useTLS {
+		wsScheme = "wss"
+	}
+	currentURL := wsScheme + "://" + w.addr + "/system-info?type=1&secret=" + w.secret + "&version=" + w.version +
 		"&http=" + strconv.Itoa(cfg.Http) + "&tls=" + strconv.Itoa(cfg.Tls) + "&socks=" + strconv.Itoa(cfg.Socks)
 
 	u, err := url.Parse(currentURL)
@@ -1040,18 +1045,23 @@ func getMemoryInfo() MemoryInfo {
 }
 
 // StartWebSocketReporterWithConfig 使用配置字段启动WebSocket报告器
-func StartWebSocketReporterWithConfig(addr string, secret string, http int, tls int, socks int, version string) *WebSocketReporter {
+func StartWebSocketReporterWithConfig(addr string, secret string, http int, tls int, socks int, version string, useTLS bool) *WebSocketReporter {
 
 	// 构建初始 WebSocket URL
-	fullURL := "ws://" + addr + "/system-info?type=1&secret=" + secret + "&version=" + version + "&http=" + strconv.Itoa(http) + "&tls=" + strconv.Itoa(tls) + "&socks=" + strconv.Itoa(socks)
+	wsScheme := "ws"
+	if useTLS {
+		wsScheme = "wss"
+	}
+	fullURL := wsScheme + "://" + addr + "/system-info?type=1&secret=" + secret + "&version=" + version + "&http=" + strconv.Itoa(http) + "&tls=" + strconv.Itoa(tls) + "&socks=" + strconv.Itoa(socks)
 
 	fmt.Printf("🔗 WebSocket连接URL: %s\n", fullURL)
 
 	reporter := NewWebSocketReporter(fullURL, secret)
-	// 保存 addr, secret, version 供重连时使用
+	// 保存 addr, secret, version, useTLS 供重连时使用
 	reporter.addr = addr
 	reporter.secret = secret
 	reporter.version = version
+	reporter.useTLS = useTLS
 	reporter.Start()
 	return reporter
 }

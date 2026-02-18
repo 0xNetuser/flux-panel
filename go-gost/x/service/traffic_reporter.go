@@ -26,9 +26,13 @@ type TrafficReportItem struct {
 	D int64  `json:"d"` // 下行流量（down缩写）
 }
 
-func SetHTTPReportURL(addr string, secret string) {
-	httpReportURL = "http://" + addr + "/flow/upload?secret=" + secret
-	configReportURL = "http://" + addr + "/flow/config?secret=" + secret
+func SetHTTPReportURL(addr string, secret string, useTLS bool) {
+	scheme := "http"
+	if useTLS {
+		scheme = "https"
+	}
+	httpReportURL = scheme + "://" + addr + "/flow/upload?secret=" + secret
+	configReportURL = scheme + "://" + addr + "/flow/config?secret=" + secret
 
 	// 创建 AES 加密器
 	var err error

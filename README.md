@@ -147,6 +147,38 @@ curl -fL http://<面板IP>:<后端端口>/node-install/script -o install.sh && c
 
 ---
 
+## 更新日志
+
+### v1.4.4
+
+- CI/CD 新增 `gost-node` 和 `gost-binary` Docker 镜像自动构建推送
+- Docker 镜像仓库迁移至 `0xnetuser/`
+- 节点端 `tcpkill` 替换为 `ss -K`（iproute2），解决 Alpine 不再提供 dsniff 的问题
+- 后端启动时自动建表（`CREATE TABLE IF NOT EXISTS`），无需依赖 MySQL 首次初始化
+- 修复 vite-frontend `npm install` 依赖冲突
+- 移除 docker-compose 固定子网配置，避免网络地址冲突
+- 更新所有仓库引用至 `0xNetuser/flux-panel`
+
+### v1.4.3
+
+- 增加节点端 Docker 部署支持（`docker-compose-node.yml`）
+- 安装脚本和二进制由面板自托管，节点部署无需访问 GitHub
+- 重写 README 部署文档
+
+### v1.4.2
+
+- 增加稳定版 ARM64 架构支持
+- 修复面板显示屏蔽协议状态不一致问题
+- 添加版本管理
+
+### v1.4.1
+
+- 添加屏蔽协议配置到面板
+- 修复屏蔽协议引发的 UDP 不通问题
+- 随机构造自签证书信息
+
+---
+
 ## 免责声明
 
 本项目仅供个人学习与研究使用，基于开源项目进行二次开发。

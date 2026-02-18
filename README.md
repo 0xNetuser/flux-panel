@@ -38,13 +38,13 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 ```bash
 # 下载 docker-compose 配置文件（二选一）
 # IPv4 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.5/docker-compose-v4.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.6/docker-compose-v4.yml -o docker-compose.yml
 
 # IPv6 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.5/docker-compose-v6.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.6/docker-compose-v6.yml -o docker-compose.yml
 
 # 下载数据库初始化文件
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.5/gost.sql -o gost.sql
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.6/gost.sql -o gost.sql
 ```
 
 **2. 创建环境变量文件**
@@ -107,7 +107,7 @@ docker compose up -d
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.4.5
+  0xnetuser/gost-node:1.4.6
 ```
 
 也可以使用 docker-compose，参考项目中的 `docker-compose-node.yml`：
@@ -115,7 +115,7 @@ docker run -d --network=host --restart=unless-stopped --name gost-node \
 ```yaml
 services:
   gost-node:
-    image: 0xnetuser/gost-node:1.4.5
+    image: 0xnetuser/gost-node:1.4.6
     container_name: gost-node
     network_mode: host
     restart: unless-stopped
@@ -148,10 +148,15 @@ curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && c
 
 ## 更新日志
 
+### v1.4.6
+
+- 面板地址配置自动获取当前浏览器地址（含协议），首次部署无需手动填写
+- 面板地址支持 `https://` 前缀，配合 HTTPS 部署时节点自动使用加密连接
+- 更新面板地址配置描述，移除不必要的 CDN 限制
+
 ### v1.4.5
 
 - 前端/后端合并为单一端口（`PANEL_PORT`，默认 6366），通过 Nginx 反向代理转发后端请求
-- 面板地址配置支持自动获取当前浏览器地址
 - 节点端支持 HTTPS 面板地址（`use_tls` 自动检测）
 - CI/CD 新增 `gost-node` 和 `gost-binary` Docker 镜像自动构建推送
 - Docker 镜像仓库迁移至 `0xnetuser/`

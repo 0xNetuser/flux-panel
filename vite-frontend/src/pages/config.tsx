@@ -48,7 +48,7 @@ const CONFIG_ITEMS: ConfigItem[] = [
     key: 'ip',
     label: '面板地址',
     placeholder: '请输入面板IP:PORT',
-    description: '格式"ip:port",用于对接节点时使用,ip是你安装面板服务器的公网ip,端口是面板端口(默认6366)。支持https,不要套CDN,通讯数据有加密',
+    description: '用于对接节点,格式如 http://1.2.3.4:6366 或 https://域名,通讯数据有加密',
     type: 'input'
   },
   {
@@ -155,7 +155,7 @@ export default function ConfigPage() {
       // 如果面板地址为空，自动填充当前浏览器地址
       const autoFilled = !configData.ip;
       if (autoFilled) {
-        configData.ip = window.location.host;
+        configData.ip = window.location.origin;
       }
 
       // 只有在数据有变化时才更新

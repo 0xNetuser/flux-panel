@@ -34,20 +34,15 @@ jobs:
             echo "Tag ${{ env.VERSION }} already exists"
             echo "tag_exists=true" >> $GITHUB_OUTPUT
             echo "should_build=false" >> $GITHUB_OUTPUT
-            
-            # 检查从tag到现在，go-gost目录下的文件是否有变化
+
             TAG_COMMIT=$(git rev-list -n 1 "${{ env.VERSION }}")
             echo "Tag commit: $TAG_COMMIT"
             echo "Current HEAD: $(git rev-parse HEAD)"
-            
-            # 检查 go-gost 目录下是否有实际的文件内容变化
-            # 使用 --ignore-all-space 和 --ignore-blank-lines 来忽略空白差异
-            # 使用 --exit-code: 0表示无差异，1表示有差异
+
             if git diff --quiet --ignore-all-space --ignore-blank-lines $TAG_COMMIT HEAD -- go-gost/ 2>/dev/null; then
               echo "✅ GOST files unchanged since tag (no content changes)"
               echo "should_build_gost=false" >> $GITHUB_OUTPUT
             else
-              # 显示差异以便调试
               echo "🔄 Detected changes in go-gost directory:"
               git diff --stat $TAG_COMMIT HEAD -- go-gost/ || true
               echo "should_build_gost=true" >> $GITHUB_OUTPUT
@@ -58,6 +53,10 @@ jobs:
             echo "should_build_gost=true" >> $GITHUB_OUTPUT
             echo "tag_exists=false" >> $GITHUB_OUTPUT
           fi
+
+  # ============================================================
+  # 原生编译阶段 — 在宿主机直接编译，避免 QEMU 模拟
+  # ============================================================
 
   build-gost:
     name: Build & Compress GOST Binary
@@ -70,7 +69,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.23'
 
       - name: Cache Go modules
         uses: actions/cache@v3
@@ -78,36 +77,32 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-gost-${{ hashFiles('go-gost/go.sum') }}
           restore-keys: |
-            ${{ runner.os }}-go-
+            ${{ runner.os }}-go-gost-
 
       - name: Install UPX
         run: |
-          wget https://github.com/upx/upx/releases/download/v4.2.1/upx-4.2.1-amd64_linux.tar.xz
+          wget -q https://github.com/upx/upx/releases/download/v4.2.1/upx-4.2.1-amd64_linux.tar.xz
           tar -xf upx-4.2.1-amd64_linux.tar.xz
           sudo mv upx-4.2.1-amd64_linux/upx /usr/local/bin/
           rm -rf upx-4.2.1-amd64_linux*
 
       - name: Build GOST binary (AMD64)
         working-directory: ./go-gost
-        run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o gost-amd64
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o gost-amd64
 
       - name: Build GOST binary (ARM64)
         working-directory: ./go-gost
-        run: |
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o gost-arm64
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o gost-arm64
 
       - name: Compress with UPX (AMD64)
         working-directory: ./go-gost
-        run: |
-          upx --best --lzma gost-amd64
+        run: upx --best --lzma gost-amd64
 
       - name: Compress with UPX (ARM64)
         working-directory: ./go-gost
-        run: |
-          upx --best --lzma gost-arm64
+        run: upx --best --lzma gost-arm64
 
       - name: Upload GOST AMD64 artifact
         uses: actions/upload-artifact@v4
@@ -121,13 +116,95 @@ jobs:
           name: gost-binary-arm64
           path: ./go-gost/gost-arm64
 
-  build-nextjs-frontend:
-    name: Build & Push Next.js Frontend
+  build-go-backend-binary:
+    name: Build Go Backend Binary
     needs: check-version
     if: needs.check-version.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.23'
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-backend-${{ hashFiles('go-backend/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-backend-
+
+      - name: Build go-backend (AMD64)
+        working-directory: ./go-backend
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o app-amd64
+
+      - name: Build go-backend (ARM64)
+        working-directory: ./go-backend
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o app-arm64
+
+      - name: Upload go-backend AMD64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-backend-amd64
+          path: ./go-backend/app-amd64
+
+      - name: Upload go-backend ARM64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-backend-arm64
+          path: ./go-backend/app-arm64
+
+  build-nextjs:
+    name: Build Next.js Static Output
+    needs: check-version
+    if: needs.check-version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: nextjs-frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./nextjs-frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: ./nextjs-frontend
+        run: npm run build
+
+      - name: Upload static output
+        uses: actions/upload-artifact@v4
+        with:
+          name: nextjs-out
+          path: ./nextjs-frontend/out
+
+  # ============================================================
+  # Docker 镜像构建阶段 — 只做 COPY，不再编译
+  # ============================================================
+
+  build-nextjs-frontend:
+    name: Build & Push Next.js Frontend
+    needs: [check-version, build-nextjs]
+    if: needs.check-version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Download Next.js build output
+        uses: actions/download-artifact@v4
+        with:
+          name: nextjs-out
+          path: ./nextjs-frontend/out
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -144,17 +221,31 @@ jobs:
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --push \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
             -t 0xnetuser/nextjs-frontend:latest \
             -t 0xnetuser/nextjs-frontend:${VERSION} \
             ./nextjs-frontend
 
   build-go-backend:
     name: Build & Push Go Backend
-    needs: check-version
+    needs: [check-version, build-go-backend-binary]
     if: needs.check-version.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
+      - name: Download go-backend AMD64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: go-backend-amd64
+          path: ./go-backend
+
+      - name: Download go-backend ARM64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: go-backend-arm64
+          path: ./go-backend
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -171,17 +262,31 @@ jobs:
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --push \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
             -t 0xnetuser/go-backend:latest \
             -t 0xnetuser/go-backend:${VERSION} \
             ./go-backend
 
   build-gost-node:
     name: Build & Push GOST Node Image
-    needs: check-version
+    needs: [check-version, build-gost]
     if: needs.check-version.outputs.should_build_gost == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
+      - name: Download GOST AMD64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: gost-binary-amd64
+          path: ./go-gost
+
+      - name: Download GOST ARM64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: gost-binary-arm64
+          path: ./go-gost
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -198,6 +303,8 @@ jobs:
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --push \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
             -t 0xnetuser/gost-node:latest \
             -t 0xnetuser/gost-node:${VERSION} \
             -f go-gost/Dockerfile \
@@ -205,11 +312,23 @@ jobs:
 
   build-gost-binary:
     name: Build & Push GOST Binary Image
-    needs: check-version
+    needs: [check-version, build-gost]
     if: needs.check-version.outputs.should_build_gost == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
+      - name: Download GOST AMD64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: gost-binary-amd64
+          path: ./go-gost
+
+      - name: Download GOST ARM64 binary
+        uses: actions/download-artifact@v4
+        with:
+          name: gost-binary-arm64
+          path: ./go-gost
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -226,10 +345,16 @@ jobs:
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --push \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
             -t 0xnetuser/gost-binary:latest \
             -t 0xnetuser/gost-binary:${VERSION} \
             -f go-gost/Dockerfile.binary \
             ./go-gost
+
+  # ============================================================
+  # Release 阶段
+  # ============================================================
 
   create-release:
     name: Create Release and Tag
@@ -263,16 +388,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${{ needs.check-version.outputs.version }}"
-          
+
           # 创建并推送 tag
           git tag "${VERSION}" ${{ github.sha }}
           git push origin "${VERSION}"
-          
+
           # 获取 commit 信息
           COMMIT_MSG=$(git log -1 --pretty=format:"%s")
           COMMIT_AUTHOR=$(git log -1 --pretty=format:"%an")
           COMMIT_DATE=$(git log -1 --pretty=format:"%ai")
-          
+
           # 创建 release
           gh release create "${VERSION}" \
             --title "Release ${VERSION}" \
@@ -282,23 +407,23 @@ jobs:
           - **Date**: ${COMMIT_DATE}
           - **Commit**: [\`${GITHUB_SHA:0:7}\`](https://github.com/${{ github.repository }}/commit/${{ github.sha }})" \
             --repo ${{ github.repository }}
-          
+
           # 上传所有文件到 release
           echo "📤 上传 GOST 二进制文件..."
           gh release upload "${VERSION}" ./artifacts/gost-amd64 --clobber
           gh release upload "${VERSION}" ./artifacts/gost-arm64 --clobber
-          
+
           echo "📤 上传安装脚本..."
           gh release upload "${VERSION}" ./install.sh --clobber
           gh release upload "${VERSION}" ./panel_install.sh --clobber
-          
+
           echo "📤 上传 Docker Compose 配置文件..."
           gh release upload "${VERSION}" ./docker-compose-v4.yml --clobber
           gh release upload "${VERSION}" ./docker-compose-v6.yml --clobber
-          
+
           echo "📤 上传数据库初始化文件..."
           gh release upload "${VERSION}" ./gost.sql --clobber
-          
+
           echo "✅ 所有文件已上传到 Release ${VERSION}"
 
   update-release-gost:
@@ -333,12 +458,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION="${{ needs.check-version.outputs.version }}"
-          
+
           echo "🔄 更新 Release ${VERSION} 中的 GOST 二进制文件..."
-          
+
           gh release upload "${VERSION}" ./artifacts/gost-amd64 --clobber
           gh release upload "${VERSION}" ./artifacts/gost-arm64 --clobber
-          
+
           echo "✅ GOST 二进制文件更新完成！"
           echo "ℹ️ Docker 镜像未重新构建"
-

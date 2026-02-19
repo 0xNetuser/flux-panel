@@ -38,4 +38,10 @@ public class Node extends BaseEntity {
 
     private Integer socks;
 
+    private Integer xrayEnabled;
+
+    private String xrayVersion;
+
+    private Integer xrayStatus;
+
 }

@@ -64,8 +64,8 @@ services:
       start_period: 90s
 
   frontend:
-    image: 0xnetuser/vite-frontend:1.4.6
-    container_name: vite-frontend
+    image: 0xnetuser/nextjs-frontend:1.4.6
+    container_name: nextjs-frontend
     restart: unless-stopped
     ports:
       - "${PANEL_PORT:-6366}:80"

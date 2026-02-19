@@ -8,6 +8,7 @@ import com.admin.common.task.CheckGostConfigAsync;
 import com.admin.common.utils.AESCrypto;
 import com.admin.common.utils.GostUtil;
 import com.admin.entity.*;
+import com.admin.service.XrayClientService;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -64,6 +65,9 @@ public class FlowController extends BaseController {
 
     @Resource
     CheckGostConfigAsync checkGostConfigAsync;
+
+    @Resource
+    XrayClientService xrayClientService;
 
     /**
      * 加密消息包装器
@@ -156,6 +160,84 @@ public class FlowController extends BaseController {
         log.info("节点上报流量数据{}", flowDataList);
         // 4. 处理流量数据
         return processFlowData(flowDataList);
+    }
+
+    /**
+     * Xray 流量数据上报
+     */
+    @RequestMapping("/xray-upload")
+    @LogAnnotation
+    public String uploadXrayFlowData(@RequestBody String rawData, String secret) {
+        if (!isValidNode(secret)) {
+            return SUCCESS_RESPONSE;
+        }
+
+        String decryptedData = decryptIfNeeded(rawData, secret);
+
+        try {
+            JSONObject json = JSON.parseObject(decryptedData);
+            com.alibaba.fastjson.JSONArray clients = json.getJSONArray("clients");
+            if (clients == null || clients.isEmpty()) {
+                return SUCCESS_RESPONSE;
+            }
+
+            for (int i = 0; i < clients.size(); i++) {
+                JSONObject clientData = clients.getJSONObject(i);
+                String email = clientData.getString("email");
+                long up = clientData.getLongValue("u");
+                long down = clientData.getLongValue("d");
+
+                if (email == null || (up == 0 && down == 0)) continue;
+
+                // 查找 xray_client 记录
+                com.admin.entity.XrayClient xrayClient = xrayClientService.getOne(
+                        new QueryWrapper<com.admin.entity.XrayClient>().eq("email", email));
+                if (xrayClient == null) continue;
+
+                // 原子更新 xray_client 流量
+                com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<com.admin.entity.XrayClient> clientUpdate =
+                        new com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper<>();
+                clientUpdate.eq("id", xrayClient.getId());
+                clientUpdate.setSql("up_traffic = up_traffic + " + up);
+                clientUpdate.setSql("down_traffic = down_traffic + " + down);
+                xrayClientService.update(null, clientUpdate);
+
+                // 同时更新 user 流量（GOST + Xray 共享用户流量池）
+                synchronized (getUserLock(xrayClient.getUserId().toString())) {
+                    UpdateWrapper<User> userUpdate = new UpdateWrapper<>();
+                    userUpdate.eq("id", xrayClient.getUserId());
+                    userUpdate.setSql("in_flow = in_flow + " + down);
+                    userUpdate.setSql("out_flow = out_flow + " + up);
+                    userService.update(null, userUpdate);
+                }
+
+                // 检查流量限额
+                if (xrayClient.getTotalTraffic() > 0) {
+                    // 重新查询最新流量
+                    com.admin.entity.XrayClient updated = xrayClientService.getById(xrayClient.getId());
+                    if (updated != null && updated.getUpTraffic() + updated.getDownTraffic() >= xrayClient.getTotalTraffic()) {
+                        // 超限，禁用客户端
+                        updated.setEnable(0);
+                        xrayClientService.updateById(updated);
+                        log.info("Xray 客户端 {} 流量超限，已禁用", email);
+                    }
+                }
+
+                // 检查用户总流量限制
+                User user = userService.getById(xrayClient.getUserId());
+                if (user != null) {
+                    long userFlowLimit = user.getFlow() * BYTES_TO_GB;
+                    long userCurrentFlow = user.getInFlow() + user.getOutFlow();
+                    if (userFlowLimit < userCurrentFlow) {
+                        log.info("用户 {} 总流量超限", xrayClient.getUserId());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            log.error("处理 Xray 流量上报失败: {}", e.getMessage());
+        }
+
+        return SUCCESS_RESPONSE;
     }
 
     /**

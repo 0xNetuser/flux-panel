@@ -1,0 +1,310 @@
+package service
+
+import (
+	"encoding/json"
+	"flux-panel/go-backend/dto"
+	"flux-panel/go-backend/model"
+	"flux-panel/go-backend/pkg"
+	"fmt"
+	"log"
+	"math"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+)
+
+const bytesToGB = 1024 * 1024 * 1024
+
+var (
+	userLocks    sync.Map
+	tunnelLocks  sync.Map
+	forwardLocks sync.Map
+	cryptoCache  sync.Map
+)
+
+func getUserLock(id string) *sync.Mutex {
+	v, _ := userLocks.LoadOrStore(id, &sync.Mutex{})
+	return v.(*sync.Mutex)
+}
+
+func getTunnelLock(id string) *sync.Mutex {
+	v, _ := tunnelLocks.LoadOrStore(id, &sync.Mutex{})
+	return v.(*sync.Mutex)
+}
+
+func getForwardLock(id string) *sync.Mutex {
+	v, _ := forwardLocks.LoadOrStore(id, &sync.Mutex{})
+	return v.(*sync.Mutex)
+}
+
+func ProcessFlowUpload(rawData, secret string) string {
+	// Validate node
+	var nodeCount int64
+	DB.Model(&model.Node{}).Where("secret = ?", secret).Count(&nodeCount)
+	if nodeCount == 0 {
+		return "ok"
+	}
+
+	// Decrypt if needed
+	decrypted := decryptIfNeeded(rawData, secret)
+
+	var flowData dto.FlowDto
+	if err := json.Unmarshal([]byte(decrypted), &flowData); err != nil {
+		return "ok"
+	}
+
+	if flowData.N == "web_api" {
+		return "ok"
+	}
+
+	log.Printf("节点上报流量数据 %+v", flowData)
+	return processFlowData(flowData)
+}
+
+func ProcessFlowConfig(rawData, secret string) string {
+	var node model.Node
+	if err := DB.Where("secret = ?", secret).First(&node).Error; err != nil {
+		return "ok"
+	}
+
+	decrypted := decryptIfNeeded(rawData, secret)
+
+	var gostConfig dto.GostConfigDto
+	if err := json.Unmarshal([]byte(decrypted), &gostConfig); err != nil {
+		log.Printf("解析节点配置失败: %v", err)
+		return "ok"
+	}
+
+	go CleanNodeConfigs(fmt.Sprintf("%d", node.ID), gostConfig)
+	return "ok"
+}
+
+func ProcessXrayFlowUpload(rawData, secret string) string {
+	var nodeCount int64
+	DB.Model(&model.Node{}).Where("secret = ?", secret).Count(&nodeCount)
+	if nodeCount == 0 {
+		return "ok"
+	}
+
+	decrypted := decryptIfNeeded(rawData, secret)
+
+	var data struct {
+		Clients []struct {
+			Email string `json:"email"`
+			U     int64  `json:"u"`
+			D     int64  `json:"d"`
+		} `json:"clients"`
+	}
+	if err := json.Unmarshal([]byte(decrypted), &data); err != nil {
+		return "ok"
+	}
+
+	for _, client := range data.Clients {
+		if client.Email == "" || (client.U == 0 && client.D == 0) {
+			continue
+		}
+
+		var xrayClient model.XrayClient
+		if err := DB.Where("email = ?", client.Email).First(&xrayClient).Error; err != nil {
+			continue
+		}
+
+		// Atomic update xray_client traffic
+		DB.Model(&model.XrayClient{}).Where("id = ?", xrayClient.ID).
+			UpdateColumns(map[string]interface{}{
+				"up_traffic":   DB.Raw("up_traffic + ?", client.U),
+				"down_traffic": DB.Raw("down_traffic + ?", client.D),
+			})
+
+		// Update user flow
+		lock := getUserLock(fmt.Sprintf("%d", xrayClient.UserId))
+		lock.Lock()
+		DB.Model(&model.User{}).Where("id = ?", xrayClient.UserId).
+			UpdateColumns(map[string]interface{}{
+				"in_flow":  DB.Raw("in_flow + ?", client.D),
+				"out_flow": DB.Raw("out_flow + ?", client.U),
+			})
+		lock.Unlock()
+
+		// Check traffic limit
+		if xrayClient.TotalTraffic > 0 {
+			var updated model.XrayClient
+			DB.First(&updated, xrayClient.ID)
+			if updated.UpTraffic+updated.DownTraffic >= xrayClient.TotalTraffic {
+				DB.Model(&updated).Update("enable", 0)
+				log.Printf("Xray 客户端 %s 流量超限，已禁用", client.Email)
+			}
+		}
+	}
+
+	return "ok"
+}
+
+func processFlowData(flowData dto.FlowDto) string {
+	parts := strings.Split(flowData.N, "_")
+	if len(parts) < 3 {
+		return "ok"
+	}
+	forwardId := parts[0]
+	userId := parts[1]
+	userTunnelId := parts[2]
+
+	// Get forward and tunnel for flow type and ratio
+	var forward model.Forward
+	if err := DB.First(&forward, forwardId).Error; err != nil {
+		return "ok"
+	}
+
+	flowType := 2
+	var trafficRatio float64 = 1.0
+	var tunnel model.Tunnel
+	if err := DB.First(&tunnel, forward.TunnelId).Error; err == nil {
+		flowType = tunnel.Flow
+		trafficRatio = tunnel.TrafficRatio
+	}
+
+	// Apply traffic ratio and flow type
+	d := int64(math.Floor(float64(flowData.D) * trafficRatio * float64(flowType)))
+	u := int64(math.Floor(float64(flowData.U) * trafficRatio * float64(flowType)))
+
+	// Update forward flow
+	fwdLock := getForwardLock(forwardId)
+	fwdLock.Lock()
+	DB.Model(&model.Forward{}).Where("id = ?", forwardId).
+		UpdateColumns(map[string]interface{}{
+			"in_flow":  DB.Raw("in_flow + ?", d),
+			"out_flow": DB.Raw("out_flow + ?", u),
+		})
+	fwdLock.Unlock()
+
+	// Update user flow
+	uLock := getUserLock(userId)
+	uLock.Lock()
+	DB.Model(&model.User{}).Where("id = ?", userId).
+		UpdateColumns(map[string]interface{}{
+			"in_flow":  DB.Raw("in_flow + ?", d),
+			"out_flow": DB.Raw("out_flow + ?", u),
+		})
+	uLock.Unlock()
+
+	// Update user_tunnel flow
+	if userTunnelId != "0" {
+		tLock := getTunnelLock(userTunnelId)
+		tLock.Lock()
+		DB.Model(&model.UserTunnel{}).Where("id = ?", userTunnelId).
+			UpdateColumns(map[string]interface{}{
+				"in_flow":  DB.Raw("in_flow + ?", d),
+				"out_flow": DB.Raw("out_flow + ?", u),
+			})
+		tLock.Unlock()
+	}
+
+	// Check limits (non-admin forwards only)
+	serviceName := forwardId + "_" + userId + "_" + userTunnelId
+	if userTunnelId != "0" {
+		checkUserLimits(userId, serviceName)
+		checkUserTunnelLimits(userTunnelId, serviceName, userId)
+	}
+
+	return "ok"
+}
+
+func checkUserLimits(userId, serviceName string) {
+	var user model.User
+	if err := DB.First(&user, userId).Error; err != nil {
+		return
+	}
+
+	userFlowLimit := user.Flow * bytesToGB
+	userCurrentFlow := user.InFlow + user.OutFlow
+	if userFlowLimit < userCurrentFlow {
+		pauseAllUserServices(userId, serviceName)
+		return
+	}
+
+	if user.ExpTime > 0 && user.ExpTime <= time.Now().UnixMilli() {
+		pauseAllUserServices(userId, serviceName)
+		return
+	}
+
+	if user.Status != 1 {
+		pauseAllUserServices(userId, serviceName)
+	}
+}
+
+func checkUserTunnelLimits(userTunnelId, serviceName, userId string) {
+	utId, _ := strconv.ParseInt(userTunnelId, 10, 64)
+	var ut model.UserTunnel
+	if err := DB.First(&ut, utId).Error; err != nil {
+		return
+	}
+
+	flow := ut.InFlow + ut.OutFlow
+	if flow >= ut.Flow*bytesToGB {
+		pauseSpecificForward(ut.TunnelId, serviceName, userId)
+		return
+	}
+
+	if ut.ExpTime > 0 && ut.ExpTime <= time.Now().UnixMilli() {
+		pauseSpecificForward(ut.TunnelId, serviceName, userId)
+		return
+	}
+
+	if ut.Status != 1 {
+		pauseSpecificForward(ut.TunnelId, serviceName, userId)
+	}
+}
+
+func pauseAllUserServices(userId, serviceName string) {
+	var forwards []model.Forward
+	DB.Where("user_id = ?", userId).Find(&forwards)
+	pauseForwardServices(forwards, serviceName)
+}
+
+func pauseSpecificForward(tunnelId int64, serviceName, userId string) {
+	var forwards []model.Forward
+	DB.Where("tunnel_id = ? AND user_id = ?", tunnelId, userId).Find(&forwards)
+	pauseForwardServices(forwards, serviceName)
+}
+
+func pauseForwardServices(forwards []model.Forward, serviceName string) {
+	for _, fwd := range forwards {
+		var tunnel model.Tunnel
+		if err := DB.First(&tunnel, fwd.TunnelId).Error; err != nil {
+			continue
+		}
+		pkg.PauseService(tunnel.InNodeId, serviceName)
+		if tunnel.Type == 2 {
+			pkg.PauseRemoteService(tunnel.OutNodeId, serviceName)
+		}
+		DB.Model(&fwd).Update("status", 0)
+	}
+}
+
+func decryptIfNeeded(rawData, secret string) string {
+	if rawData == "" {
+		return rawData
+	}
+
+	var enc pkg.EncryptedMessage
+	if err := json.Unmarshal([]byte(rawData), &enc); err != nil {
+		return rawData
+	}
+
+	if !enc.Encrypted || enc.Data == "" {
+		return rawData
+	}
+
+	crypto := pkg.GetOrCreateCrypto(secret)
+	if crypto == nil {
+		return rawData
+	}
+
+	decrypted, err := crypto.Decrypt(enc.Data)
+	if err != nil {
+		log.Printf("数据解密失败: %v", err)
+		return rawData
+	}
+	return decrypted
+}

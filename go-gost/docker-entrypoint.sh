@@ -42,5 +42,16 @@ if [ ! -f "$GOST_CONFIG" ]; then
   echo "{}" > "$GOST_CONFIG"
 fi
 
+# Xray 配置
+if [ "$XRAY_ENABLE" = "true" ] || [ "$XRAY_ENABLE" = "1" ]; then
+  echo "Xray 已启用，检查 xray 二进制..."
+  if [ -x /usr/local/bin/xray ]; then
+    XRAY_VERSION=$(/usr/local/bin/xray version 2>/dev/null | head -1 || echo "unknown")
+    echo "Xray 版本: $XRAY_VERSION"
+  else
+    echo "警告: Xray 二进制不存在或不可执行，Xray 功能将不可用"
+  fi
+fi
+
 echo "启动 gost..."
 exec /etc/gost/gost

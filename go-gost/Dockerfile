@@ -8,7 +8,18 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -ldflags="-s -w" -o /
 
 FROM alpine:latest
 
-RUN apk add --no-cache ca-certificates iproute2
+ARG TARGETARCH
+ARG XRAY_VERSION=1.8.24
+
+RUN apk add --no-cache ca-certificates iproute2 wget unzip
+
+# Install Xray binary (optional, controlled by XRAY_ENABLE at runtime)
+RUN XRAY_ARCH=$(case ${TARGETARCH} in amd64) echo "64";; arm64) echo "arm64-v8a";; *) echo "64";; esac) && \
+    wget -q "https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/Xray-linux-${XRAY_ARCH}.zip" -O /tmp/xray.zip && \
+    unzip -q /tmp/xray.zip -d /tmp/xray && \
+    mv /tmp/xray/xray /usr/local/bin/xray && \
+    chmod +x /usr/local/bin/xray && \
+    rm -rf /tmp/xray /tmp/xray.zip || true
 
 WORKDIR /etc/gost
 

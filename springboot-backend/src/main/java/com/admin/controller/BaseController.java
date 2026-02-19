@@ -23,4 +23,13 @@ public class BaseController {
     @Autowired
     ViteConfigService viteConfigService;
 
+    @Autowired
+    XrayInboundService xrayInboundService;
+
+    @Autowired
+    XrayClientService xrayClientService;
+
+    @Autowired
+    XrayTlsCertService xrayTlsCertService;
+
 }

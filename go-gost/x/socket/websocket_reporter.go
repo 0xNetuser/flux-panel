@@ -16,6 +16,7 @@ import (
 	"github.com/go-gost/x/config"
 	"github.com/go-gost/x/internal/util/crypto"
 	"github.com/go-gost/x/service"
+	"github.com/go-gost/x/xray"
 	"github.com/gorilla/websocket"
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/host"
@@ -101,6 +102,8 @@ type WebSocketReporter struct {
 	connecting     bool              // 新增：正在连接状态
 	connMutex      sync.Mutex        // 新增：连接状态锁
 	aesCrypto      *crypto.AESCrypto // 新增：AES加密器
+	xrayManager    *xray.XrayManager        // Xray 进程管理
+	xrayTraffic    *xray.TrafficReporter    // Xray 流量上报
 }
 
 // NewWebSocketReporter 创建一个新的WebSocket报告器
@@ -558,6 +561,45 @@ func (w *WebSocketReporter) routeCommand(cmd CommandMessage) {
 		err = w.handleSetProtocol(cmd.Data)
 		response.Type = "SetProtocolResponse"
 
+	// Xray commands
+	case "XrayStart":
+		err = w.handleXrayStart(cmd.Data)
+		response.Type = "XrayStartResponse"
+	case "XrayStop":
+		err = w.handleXrayStop(cmd.Data)
+		response.Type = "XrayStopResponse"
+	case "XrayRestart":
+		err = w.handleXrayRestart(cmd.Data)
+		response.Type = "XrayRestartResponse"
+	case "XrayStatus":
+		var statusData map[string]interface{}
+		statusData, err = w.handleXrayStatus(cmd.Data)
+		response.Type = "XrayStatusResponse"
+		response.Data = statusData
+	case "XrayAddInbound":
+		err = w.handleXrayAddInbound(cmd.Data)
+		response.Type = "XrayAddInboundResponse"
+	case "XrayRemoveInbound":
+		err = w.handleXrayRemoveInbound(cmd.Data)
+		response.Type = "XrayRemoveInboundResponse"
+	case "XrayAddClient":
+		err = w.handleXrayAddClient(cmd.Data)
+		response.Type = "XrayAddClientResponse"
+	case "XrayRemoveClient":
+		err = w.handleXrayRemoveClient(cmd.Data)
+		response.Type = "XrayRemoveClientResponse"
+	case "XrayGetTraffic":
+		var trafficData interface{}
+		trafficData, err = w.handleXrayGetTraffic(cmd.Data)
+		response.Type = "XrayGetTrafficResponse"
+		response.Data = trafficData
+	case "XrayApplyConfig":
+		err = w.handleXrayApplyConfig(cmd.Data)
+		response.Type = "XrayApplyConfigResponse"
+	case "XrayDeployCert":
+		err = w.handleXrayDeployCert(cmd.Data)
+		response.Type = "XrayDeployCertResponse"
+
 	default:
 		err = fmt.Errorf("未知命令类型: %s", cmd.Type)
 		response.Type = "UnknownCommandResponse"
@@ -876,6 +918,198 @@ func updateLocalConfigJSON(httpVal int, tlsVal int, socksVal int) error {
 		return err
 	}
 	return os.WriteFile(path, data, 0644)
+}
+
+// InitXray initializes the Xray manager for this reporter
+func (w *WebSocketReporter) InitXray(binaryPath, configPath, grpcAddr string) {
+	w.xrayManager = xray.NewXrayManager(binaryPath, configPath, grpcAddr)
+	fmt.Printf("🔧 Xray manager initialized (binary=%s, grpc=%s)\n", binaryPath, grpcAddr)
+}
+
+// StartXrayTrafficReporter starts the Xray traffic reporter
+func (w *WebSocketReporter) StartXrayTrafficReporter(panelAddr string) {
+	if w.xrayManager == nil {
+		return
+	}
+	w.xrayTraffic = xray.NewTrafficReporter(
+		w.xrayManager.GetGrpcAddr(),
+		panelAddr,
+		w.secret,
+		w.useTLS,
+	)
+	w.xrayTraffic.Start()
+	fmt.Printf("📊 Xray traffic reporter started\n")
+}
+
+func (w *WebSocketReporter) getOrInitXrayManager() *xray.XrayManager {
+	if w.xrayManager == nil {
+		w.xrayManager = xray.NewXrayManager("xray", "xray_config.json", "127.0.0.1:10085")
+	}
+	return w.xrayManager
+}
+
+func (w *WebSocketReporter) handleXrayStart(data interface{}) error {
+	mgr := w.getOrInitXrayManager()
+	return mgr.Start()
+}
+
+func (w *WebSocketReporter) handleXrayStop(data interface{}) error {
+	mgr := w.getOrInitXrayManager()
+	return mgr.Stop()
+}
+
+func (w *WebSocketReporter) handleXrayRestart(data interface{}) error {
+	mgr := w.getOrInitXrayManager()
+	return mgr.Restart()
+}
+
+func (w *WebSocketReporter) handleXrayStatus(data interface{}) (map[string]interface{}, error) {
+	mgr := w.getOrInitXrayManager()
+	result := map[string]interface{}{
+		"running": mgr.IsRunning(),
+		"version": mgr.GetVersion(),
+	}
+	return result, nil
+}
+
+func (w *WebSocketReporter) handleXrayAddInbound(data interface{}) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("序列化数据失败: %v", err)
+	}
+
+	var inbound xray.InboundConfig
+	if err := json.Unmarshal(jsonData, &inbound); err != nil {
+		return fmt.Errorf("解析入站配置失败: %v", err)
+	}
+
+	// Adding inbound requires config rewrite + restart
+	mgr := w.getOrInitXrayManager()
+	return mgr.ApplyConfig([]xray.InboundConfig{inbound})
+}
+
+func (w *WebSocketReporter) handleXrayRemoveInbound(data interface{}) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("序列化数据失败: %v", err)
+	}
+
+	var req struct {
+		Tag string `json:"tag"`
+	}
+	if err := json.Unmarshal(jsonData, &req); err != nil {
+		return fmt.Errorf("解析删除入站请求失败: %v", err)
+	}
+
+	fmt.Printf("🗑️ Xray remove inbound: tag=%s\n", req.Tag)
+	// Config sync will be handled by XrayApplyConfig
+	return nil
+}
+
+func (w *WebSocketReporter) handleXrayAddClient(data interface{}) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("序列化数据失败: %v", err)
+	}
+
+	var req struct {
+		InboundTag     string `json:"inboundTag"`
+		Email          string `json:"email"`
+		UuidOrPassword string `json:"uuidOrPassword"`
+		Flow           string `json:"flow"`
+		AlterId        int    `json:"alterId"`
+		Protocol       string `json:"protocol"`
+	}
+	if err := json.Unmarshal(jsonData, &req); err != nil {
+		return fmt.Errorf("解析添加客户端请求失败: %v", err)
+	}
+
+	mgr := w.getOrInitXrayManager()
+	grpcClient := xray.NewXrayGrpcClient(mgr.GetGrpcAddr())
+	return grpcClient.AddUser(req.InboundTag, req.Email, req.UuidOrPassword, req.Flow, req.Protocol, req.AlterId)
+}
+
+func (w *WebSocketReporter) handleXrayRemoveClient(data interface{}) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("序列化数据失败: %v", err)
+	}
+
+	var req struct {
+		InboundTag string `json:"inboundTag"`
+		Email      string `json:"email"`
+	}
+	if err := json.Unmarshal(jsonData, &req); err != nil {
+		return fmt.Errorf("解析删除客户端请求失败: %v", err)
+	}
+
+	mgr := w.getOrInitXrayManager()
+	grpcClient := xray.NewXrayGrpcClient(mgr.GetGrpcAddr())
+	return grpcClient.RemoveUser(req.InboundTag, req.Email)
+}
+
+func (w *WebSocketReporter) handleXrayGetTraffic(data interface{}) (interface{}, error) {
+	mgr := w.getOrInitXrayManager()
+	grpcClient := xray.NewXrayGrpcClient(mgr.GetGrpcAddr())
+
+	stats, err := grpcClient.QueryTraffic(true)
+	if err != nil {
+		return nil, err
+	}
+
+	return map[string]interface{}{
+		"clients": stats,
+	}, nil
+}
+
+func (w *WebSocketReporter) handleXrayApplyConfig(data interface{}) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("序列化数据失败: %v", err)
+	}
+
+	var req struct {
+		Inbounds []xray.InboundConfig `json:"inbounds"`
+	}
+	if err := json.Unmarshal(jsonData, &req); err != nil {
+		return fmt.Errorf("解析配置失败: %v", err)
+	}
+
+	mgr := w.getOrInitXrayManager()
+	return mgr.ApplyConfig(req.Inbounds)
+}
+
+func (w *WebSocketReporter) handleXrayDeployCert(data interface{}) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("序列化数据失败: %v", err)
+	}
+
+	var req struct {
+		Domain     string `json:"domain"`
+		PublicKey  string `json:"publicKey"`
+		PrivateKey string `json:"privateKey"`
+	}
+	if err := json.Unmarshal(jsonData, &req); err != nil {
+		return fmt.Errorf("解析证书部署请求失败: %v", err)
+	}
+
+	// Write cert files to disk
+	certDir := "certs"
+	os.MkdirAll(certDir, 0755)
+
+	certPath := fmt.Sprintf("%s/%s.crt", certDir, req.Domain)
+	keyPath := fmt.Sprintf("%s/%s.key", certDir, req.Domain)
+
+	if err := os.WriteFile(certPath, []byte(req.PublicKey), 0644); err != nil {
+		return fmt.Errorf("写入证书文件失败: %v", err)
+	}
+	if err := os.WriteFile(keyPath, []byte(req.PrivateKey), 0600); err != nil {
+		return fmt.Errorf("写入私钥文件失败: %v", err)
+	}
+
+	fmt.Printf("📜 TLS cert deployed for domain: %s\n", req.Domain)
+	return nil
 }
 
 // handleCall 处理服务端的call回调消息

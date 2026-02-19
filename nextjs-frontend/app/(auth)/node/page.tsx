@@ -235,27 +235,28 @@ export default function NodePage() {
                 <Input value={form.portEnd} onChange={e => setForm(p => ({ ...p, portEnd: e.target.value }))} placeholder="60000" />
               </div>
             </div>
-            {!editingNode && (
-              <div className="space-y-2">
-                <Label>通信密钥</Label>
-                <div className="relative">
-                  <Input
-                    type={showSecret ? 'text' : 'password'}
-                    value={form.secret}
-                    onChange={e => setForm(p => ({ ...p, secret: e.target.value }))}
-                    placeholder="留空自动生成"
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0"
-                    onClick={() => setShowSecret(!showSecret)}
-                  >
-                    {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
+            <div className="space-y-2">
+              <Label>通信密钥</Label>
+              <div className="relative">
+                <Input
+                  type={showSecret ? 'text' : 'password'}
+                  value={form.secret}
+                  onChange={e => setForm(p => ({ ...p, secret: e.target.value }))}
+                  placeholder="留空自动生成"
+                  readOnly={!!editingNode}
+                  className={editingNode ? 'bg-muted' : ''}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-0 top-0"
+                  onClick={() => setShowSecret(!showSecret)}
+                >
+                  {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
               </div>
-            )}
+              {editingNode && <p className="text-xs text-muted-foreground">密钥不可修改</p>}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>

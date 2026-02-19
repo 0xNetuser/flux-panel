@@ -51,6 +51,7 @@ func GetAllNodes() dto.R {
 			"serverIp":    n.ServerIp,
 			"portSta":     n.PortSta,
 			"portEnd":     n.PortEnd,
+			"secret":      n.Secret,
 			"version":     n.Version,
 			"http":        n.Http,
 			"tls":         n.Tls,

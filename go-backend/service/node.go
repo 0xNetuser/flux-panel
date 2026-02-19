@@ -145,14 +145,13 @@ func GetNodeById(id int64) *model.Node {
 	return &node
 }
 
-func GenerateInstallCommand(id int64) dto.R {
+func GenerateInstallCommand(id int64, clientAddr string) dto.R {
 	var node model.Node
 	if err := DB.First(&node, id).Error; err != nil {
 		return dto.Err("节点不存在")
 	}
 
-	// Get panel address from vite_config
-	panelAddr := getPanelAddress()
+	panelAddr := getPanelAddress(clientAddr)
 
 	cmd := fmt.Sprintf("curl -fsSL %s/node-install/script | bash -s -- %d %s %s",
 		panelAddr, node.ID, node.Secret, panelAddr)
@@ -160,13 +159,13 @@ func GenerateInstallCommand(id int64) dto.R {
 	return dto.Ok(cmd)
 }
 
-func GenerateDockerInstallCommand(id int64) dto.R {
+func GenerateDockerInstallCommand(id int64, clientAddr string) dto.R {
 	var node model.Node
 	if err := DB.First(&node, id).Error; err != nil {
 		return dto.Err("节点不存在")
 	}
 
-	panelAddr := getPanelAddress()
+	panelAddr := getPanelAddress(clientAddr)
 	wsAddr := strings.Replace(strings.Replace(panelAddr, "https://", "wss://", 1), "http://", "ws://", 1)
 
 	cmd := fmt.Sprintf(`docker run -d --name gost-node --restart unless-stopped --network host -e NODE_ID=%d -e NODE_SECRET=%s -e WS_ADDR=%s/system-info -e FLOW_ADDR=%s 0xnetuser/gost-node:latest`,
@@ -175,10 +174,17 @@ func GenerateDockerInstallCommand(id int64) dto.R {
 	return dto.Ok(cmd)
 }
 
-func getPanelAddress() string {
+// getPanelAddress returns the panel address with priority:
+// 1. vite_config panel_addr (admin explicitly configured)
+// 2. clientAddr from frontend (window.location.origin)
+// 3. fallback to localhost
+func getPanelAddress(clientAddr string) string {
 	var cfg model.ViteConfig
 	if err := DB.Where("name = ?", "panel_addr").First(&cfg).Error; err == nil && cfg.Value != "" {
 		return cfg.Value
+	}
+	if clientAddr != "" {
+		return clientAddr
 	}
 	return fmt.Sprintf("http://127.0.0.1:%d", config.Cfg.Port)
 }

@@ -43,22 +43,24 @@ func NodeDelete(c *gin.Context) {
 
 func NodeInstall(c *gin.Context) {
 	var d struct {
-		ID int64 `json:"id" binding:"required"`
+		ID        int64  `json:"id" binding:"required"`
+		PanelAddr string `json:"panelAddr"`
 	}
 	if err := c.ShouldBindJSON(&d); err != nil {
 		c.JSON(http.StatusOK, dto.Err("参数错误"))
 		return
 	}
-	c.JSON(http.StatusOK, service.GenerateInstallCommand(d.ID))
+	c.JSON(http.StatusOK, service.GenerateInstallCommand(d.ID, d.PanelAddr))
 }
 
 func NodeInstallDocker(c *gin.Context) {
 	var d struct {
-		ID int64 `json:"id" binding:"required"`
+		ID        int64  `json:"id" binding:"required"`
+		PanelAddr string `json:"panelAddr"`
 	}
 	if err := c.ShouldBindJSON(&d); err != nil {
 		c.JSON(http.StatusOK, dto.Err("参数错误"))
 		return
 	}
-	c.JSON(http.StatusOK, service.GenerateDockerInstallCommand(d.ID))
+	c.JSON(http.StatusOK, service.GenerateDockerInstallCommand(d.ID, d.PanelAddr))
 }

@@ -31,6 +31,7 @@ func Setup(r *gin.Engine) {
 	// Flow upload (node calls, secret-based auth)
 	r.POST("/flow/upload", handler.FlowUpload)
 	r.POST("/flow/config", handler.FlowConfig)
+	r.GET("/flow/test", handler.FlowTest)
 	r.POST("/flow/test", handler.FlowTest)
 	r.POST("/flow/xray-upload", handler.FlowXrayUpload)
 

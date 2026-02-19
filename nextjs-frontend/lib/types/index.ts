@@ -15,10 +15,10 @@ export interface User {
 export interface Node {
   id: number;
   name: string;
+  ip?: string;
   serverIp: string;
   portSta: number;
   portEnd: number;
-  secret: string;
   status: number;
   http: number;
   tls: number;
@@ -27,11 +27,11 @@ export interface Node {
   xrayVersion: string | null;
   xrayStatus: number;
   version: string;
-  uptime: number;
-  cpuUsage: number;
-  memoryUsage: number;
-  bytesReceived: number;
-  bytesTransmitted: number;
+  uptime?: number;
+  cpuUsage?: number;
+  memUsage?: number;
+  bytesReceived?: number;
+  bytesTransmitted?: number;
   createdTime: number;
   updatedTime: number;
 }
@@ -71,7 +71,7 @@ export interface Forward {
   tunnelName: string;
   inIp: string;
   outIp: string | null;
-  type: number;
+  tunnelType: number;
   protocol: string;
   createdTime: number;
   updatedTime: number;

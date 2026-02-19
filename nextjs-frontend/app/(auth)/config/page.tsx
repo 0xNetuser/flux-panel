@@ -58,7 +58,8 @@ export default function ConfigPage() {
     'tg_bot_token': 'Telegram Bot Token',
     'tg_admin_id': 'Telegram 管理员ID',
     'reg_enable': '开放注册',
-    'captcha_enable': '验证码开关',
+    'captcha_enabled': '验证码开关',
+    'app_name': '应用名称',
   };
 
   const getConfigLabel = (key: string) => {

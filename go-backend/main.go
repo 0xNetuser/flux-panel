@@ -94,13 +94,13 @@ func main() {
 			updates["version"] = version
 		}
 		if http != "" {
-			updates["http_port"] = http
+			updates["http"] = http
 		}
 		if tls != "" {
-			updates["tls_port"] = tls
+			updates["tls"] = tls
 		}
 		if socks != "" {
-			updates["socks_port"] = socks
+			updates["socks"] = socks
 		}
 		db.Model(&model.Node{}).Where("id = ?", nodeId).Updates(updates)
 		log.Printf("Node %d online (version=%s)", nodeId, version)
@@ -110,7 +110,10 @@ func main() {
 	}
 
 	pkg.WS.OnNodeOffline = func(nodeId int64) {
-		db.Model(&model.Node{}).Where("id = ?", nodeId).Update("status", 0)
+		db.Model(&model.Node{}).Where("id = ?", nodeId).Updates(map[string]interface{}{
+			"status":      0,
+			"xray_status": 0,
+		})
 		log.Printf("Node %d offline", nodeId)
 	}
 

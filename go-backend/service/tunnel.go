@@ -27,6 +27,9 @@ func CreateTunnel(d dto.TunnelDto) dto.R {
 		if d.OutNodeId == nil {
 			return dto.Err("隧道转发必须指定出口节点")
 		}
+		if *d.OutNodeId == d.InNodeId {
+			return dto.Err("隧道转发的入口节点和出口节点不能相同")
+		}
 		outNodeId = *d.OutNodeId
 		outNode := GetNodeById(outNodeId)
 		if outNode == nil {

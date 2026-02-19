@@ -92,6 +92,10 @@ export default function TunnelPage() {
       return;
     }
     const typeInt = form.type === 'tunnel' ? 2 : (typeof form.type === 'number' ? form.type : 1);
+    if (typeInt === 2 && form.inNodeId === form.outNodeId) {
+      toast.error('隧道转发的入口节点和出口节点不能相同');
+      return;
+    }
     const data: any = {
       name: form.name,
       inNodeId: parseInt(form.inNodeId),

@@ -1003,21 +1003,21 @@ func updateGostServices(forward *model.Forward, tunnel *model.Tunnel, limiter *i
 }
 
 func deleteGostServices(tunnel *model.Tunnel, inNode *model.Node, outNode *model.Node, serviceName string) string {
-	// Delete main service
+	// Delete main service (ignore "not found" — already gone)
 	serviceResult := pkg.DeleteService(inNode.ID, serviceName)
-	if !isGostSuccess(serviceResult) {
+	if !isGostSuccess(serviceResult) && !strings.Contains(serviceResult.Msg, gostNotFoundMsg) {
 		return serviceResult.Msg
 	}
 
 	// Tunnel forward: also delete chains and remote service
 	if tunnel.Type == tunnelTypeTunnelForward {
 		chainResult := pkg.DeleteChains(inNode.ID, serviceName)
-		if !isGostSuccess(chainResult) {
+		if !isGostSuccess(chainResult) && !strings.Contains(chainResult.Msg, gostNotFoundMsg) {
 			return chainResult.Msg
 		}
 		if outNode != nil {
 			remoteResult := pkg.DeleteRemoteService(outNode.ID, serviceName)
-			if !isGostSuccess(remoteResult) {
+			if !isGostSuccess(remoteResult) && !strings.Contains(remoteResult.Msg, gostNotFoundMsg) {
 				return remoteResult.Msg
 			}
 		}

@@ -89,7 +89,7 @@ func ForwardResume(c *gin.Context) {
 
 func ForwardDiagnose(c *gin.Context) {
 	var d struct {
-		ID int64 `json:"id" binding:"required"`
+		ID int64 `json:"forwardId" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&d); err != nil {
 		c.JSON(http.StatusOK, dto.Err("参数错误"))

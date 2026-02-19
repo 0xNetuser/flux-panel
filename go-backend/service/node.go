@@ -201,8 +201,12 @@ func GenerateDockerInstallCommand(id int64, clientAddr string) dto.R {
 	panelAddr := getPanelAddress(clientAddr)
 	wsAddr := strings.Replace(strings.Replace(panelAddr, "https://", "wss://", 1), "http://", "ws://", 1)
 
-	cmd := fmt.Sprintf(`docker run -d --name gost-node --restart unless-stopped --network host -e NODE_ID=%d -e NODE_SECRET=%s -e WS_ADDR=%s/system-info -e FLOW_ADDR=%s 0xnetuser/gost-node:latest`,
-		node.ID, node.Secret, wsAddr, panelAddr)
+	imageTag := pkg.Version
+	if imageTag == "" || imageTag == "dev" {
+		imageTag = "latest"
+	}
+	cmd := fmt.Sprintf(`docker run -d --name gost-node --restart unless-stopped --network host -e NODE_ID=%d -e NODE_SECRET=%s -e WS_ADDR=%s/system-info -e FLOW_ADDR=%s 0xnetuser/gost-node:%s`,
+		node.ID, node.Secret, wsAddr, panelAddr, imageTag)
 
 	return dto.Ok(cmd)
 }

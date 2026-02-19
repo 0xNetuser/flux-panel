@@ -14,7 +14,7 @@ func XrayInboundCreate(c *gin.Context) {
 		c.JSON(http.StatusOK, dto.Err("参数错误"))
 		return
 	}
-	c.JSON(http.StatusOK, service.CreateXrayInbound(d))
+	c.JSON(http.StatusOK, service.CreateXrayInbound(d, GetUserId(c), GetRoleId(c)))
 }
 
 func XrayInboundList(c *gin.Context) {
@@ -22,7 +22,7 @@ func XrayInboundList(c *gin.Context) {
 		NodeId *int64 `json:"nodeId"`
 	}
 	c.ShouldBindJSON(&d)
-	c.JSON(http.StatusOK, service.ListXrayInbounds(d.NodeId))
+	c.JSON(http.StatusOK, service.ListXrayInbounds(d.NodeId, GetUserId(c), GetRoleId(c)))
 }
 
 func XrayInboundUpdate(c *gin.Context) {
@@ -31,7 +31,7 @@ func XrayInboundUpdate(c *gin.Context) {
 		c.JSON(http.StatusOK, dto.Err("参数错误"))
 		return
 	}
-	c.JSON(http.StatusOK, service.UpdateXrayInbound(d))
+	c.JSON(http.StatusOK, service.UpdateXrayInbound(d, GetUserId(c), GetRoleId(c)))
 }
 
 func XrayInboundDelete(c *gin.Context) {
@@ -42,7 +42,7 @@ func XrayInboundDelete(c *gin.Context) {
 		c.JSON(http.StatusOK, dto.Err("参数错误"))
 		return
 	}
-	c.JSON(http.StatusOK, service.DeleteXrayInbound(d.ID))
+	c.JSON(http.StatusOK, service.DeleteXrayInbound(d.ID, GetUserId(c), GetRoleId(c)))
 }
 
 func XrayInboundEnable(c *gin.Context) {
@@ -53,7 +53,7 @@ func XrayInboundEnable(c *gin.Context) {
 		c.JSON(http.StatusOK, dto.Err("参数错误"))
 		return
 	}
-	c.JSON(http.StatusOK, service.EnableXrayInbound(d.ID))
+	c.JSON(http.StatusOK, service.EnableXrayInbound(d.ID, GetUserId(c), GetRoleId(c)))
 }
 
 func XrayInboundDisable(c *gin.Context) {
@@ -64,5 +64,5 @@ func XrayInboundDisable(c *gin.Context) {
 		c.JSON(http.StatusOK, dto.Err("参数错误"))
 		return
 	}
-	c.JSON(http.StatusOK, service.DisableXrayInbound(d.ID))
+	c.JSON(http.StatusOK, service.DisableXrayInbound(d.ID, GetUserId(c), GetRoleId(c)))
 }

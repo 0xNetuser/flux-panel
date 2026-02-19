@@ -32,6 +32,10 @@ type XrayClientDto struct {
 	AlterId        *int   `json:"alterId"`
 	TotalTraffic   *int64 `json:"totalTraffic"`
 	ExpTime        *int64 `json:"expTime"`
+	LimitIp        *int   `json:"limitIp"`
+	Reset          *int   `json:"reset"`
+	TgId           string `json:"tgId"`
+	SubId          string `json:"subId"`
 	Remark         string `json:"remark"`
 }
 
@@ -41,15 +45,32 @@ type XrayClientUpdateDto struct {
 	AlterId      *int   `json:"alterId"`
 	TotalTraffic *int64 `json:"totalTraffic"`
 	ExpTime      *int64 `json:"expTime"`
+	LimitIp      *int   `json:"limitIp"`
+	Reset        *int   `json:"reset"`
+	TgId         string `json:"tgId"`
+	SubId        string `json:"subId"`
 	Enable       *int   `json:"enable"`
 	Remark       string `json:"remark"`
 }
 
 type XrayTlsCertDto struct {
-	NodeId     int64  `json:"nodeId" binding:"required"`
-	Domain     string `json:"domain" binding:"required"`
-	PublicKey  string `json:"publicKey"`
-	PrivateKey string `json:"privateKey"`
-	AutoRenew  *int   `json:"autoRenew"`
-	ExpireTime *int64 `json:"expireTime"`
+	NodeId        int64  `json:"nodeId" binding:"required"`
+	Domain        string `json:"domain" binding:"required"`
+	PublicKey     string `json:"publicKey"`
+	PrivateKey    string `json:"privateKey"`
+	AutoRenew     *int   `json:"autoRenew"`
+	AcmeEnabled   *int   `json:"acmeEnabled"`
+	AcmeEmail     string `json:"acmeEmail"`
+	ChallengeType string `json:"challengeType"`
+	DnsProvider   string `json:"dnsProvider"`
+	DnsConfig     string `json:"dnsConfig"`
+	ExpireTime    *int64 `json:"expireTime"`
+}
+
+type XrayCertIssueDto struct {
+	ID int64 `json:"id" binding:"required"`
+}
+
+type XrayCertRenewDto struct {
+	ID int64 `json:"id" binding:"required"`
 }

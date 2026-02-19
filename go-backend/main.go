@@ -125,6 +125,7 @@ func main() {
 	// Start scheduled tasks
 	task.StartResetFlowTask(db)
 	task.StartStatisticsTask()
+	service.StartXrayScheduler()
 
 	// Setup Gin
 	gin.SetMode(gin.ReleaseMode)

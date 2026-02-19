@@ -1,15 +1,32 @@
 # flux-panel 转发面板
 
-本项目基于 [go-gost/gost](https://github.com/go-gost/gost) 和 [go-gost/x](https://github.com/go-gost/x) 两个开源库，实现了转发面板。
+本项目基于 [go-gost/gost](https://github.com/go-gost/gost) 和 [go-gost/x](https://github.com/go-gost/x) 两个开源库，实现了转发面板。集成 Xray 代理管理，支持多协议入站、客户端管理和 ACME 证书自动签发。
 
 ## 特性
+
+### GOST 转发
 
 - 支持按 **隧道账号级别** 管理流量转发数量，可用于用户/隧道配额控制
 - 支持 **TCP** 和 **UDP** 协议的转发
 - 支持两种转发模式：**端口转发** 与 **隧道转发**
 - 可针对 **指定用户的指定隧道进行限速** 设置
 - 支持配置 **单向或双向流量计费方式**，灵活适配不同计费模型
-- 提供灵活的转发策略配置，适用于多种网络场景
+
+### Xray 代理
+
+- **入站管理**：结构化表单配置 VMess / VLESS / Trojan / Shadowsocks 入站，支持 TCP / WebSocket / gRPC / HTTPUpgrade / xHTTP / mKCP 传输层，None / TLS / Reality 安全层
+- **高级模式**：可随时切换到原始 JSON 编辑，表单与 JSON 双向转换
+- **客户端管理**：UUID 自动生成、流量限制、到期时间、IP 连接数限制、流量自动重置周期、Telegram 绑定、订阅 ID
+- **证书管理**：支持手动上传 PEM 证书，也支持 **ACME 自动申请**（Let's Encrypt，DNS-01 验证，Cloudflare）
+- **自动续签**：ACME 证书到期前 30 天自动续签，支持手动触发续签
+- **订阅链接**：自动生成 VMess / VLESS / Trojan / Shadowsocks 协议订阅链接
+
+### 权限与安全
+
+- 用户级 GOST / Xray 功能权限开关
+- 节点访问权限控制（按用户分配可访问节点）
+- bcrypt 密码存储、JWT 认证、WebSocket 认证
+- 登录/验证码限流、SSRF 防护、API 响应脱敏
 
 ---
 
@@ -37,10 +54,10 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 
 ```bash
 # 下载 docker-compose 配置文件
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/docker-compose.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.6.0/docker-compose.yml -o docker-compose.yml
 
 # 下载数据库初始化文件
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/gost.sql -o gost.sql
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.6.0/gost.sql -o gost.sql
 ```
 
 **2. 创建环境变量文件**
@@ -107,7 +124,7 @@ docker compose up -d
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.5.5
+  0xnetuser/gost-node:1.6.0
 ```
 
 也可以使用 docker-compose，参考项目中的 `docker-compose-node.yml`：
@@ -115,7 +132,7 @@ docker run -d --network=host --restart=unless-stopped --name gost-node \
 ```yaml
 services:
   gost-node:
-    image: 0xnetuser/gost-node:1.5.5
+    image: 0xnetuser/gost-node:1.6.0
     container_name: gost-node
     network_mode: host
     restart: unless-stopped
@@ -164,7 +181,7 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 
 ```bash
 # 下载最新 docker-compose 配置（覆盖旧文件）
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/docker-compose.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.6.0/docker-compose.yml -o docker-compose.yml
 
 # 拉取最新镜像并重启
 docker compose pull && docker compose up -d
@@ -186,7 +203,7 @@ docker stop gost-node && docker rm gost-node
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.5.5
+  0xnetuser/gost-node:1.6.0
 ```
 
 如果使用 docker-compose 部署，更新 `docker-compose-node.yml` 中的镜像版本后：
@@ -208,6 +225,19 @@ curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && c
 ---
 
 ## 更新日志
+
+### v1.6.0
+
+- **入站 UI 改造**：入站配置从原始 JSON 文本框改为结构化表单，支持协议/传输层/安全层/嗅探分区配置，可切换高级模式直接编辑 JSON
+- **传输层配置**：支持 TCP / WebSocket / gRPC / HTTPUpgrade / xHTTP / mKCP 全部传输协议的可视化配置
+- **安全层配置**：支持 None / TLS / Reality 安全模式配置，TLS 支持 ALPN / Fingerprint / SNI 等参数，Reality 支持前端生成 X25519 密钥对和 ShortId
+- **嗅探配置**：支持 HTTP / TLS / QUIC / FakeDNS 嗅探目标、metadataOnly 和 routeOnly 开关
+- **客户端扩展**：新增 IP 连接数限制、流量自动重置周期（天）、Telegram ID 绑定、订阅 ID 字段
+- **流量自动重置**：后台定时任务每小时检查客户端重置周期，到期自动清零上下行流量
+- **ACME 证书自动申请**：集成 Let's Encrypt，支持 DNS-01 验证（Cloudflare），一键签发 TLS 证书并自动部署到节点
+- **证书自动续签**：后台每日检查即将到期（< 30 天）的 ACME 证书并自动续签
+- **证书手动续签**：证书列表新增手动触发续签按钮，支持即时续签
+- **证书 UI 改造**：创建证书支持「手动上传」和「ACME 自动申请」两种模式切换，列表显示证书来源、上次续签时间和续签错误信息
 
 ### v1.5.5
 

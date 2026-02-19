@@ -70,6 +70,7 @@ func Setup(r *gin.Engine) {
 		// Node
 		auth.POST("/node/create", middleware.Admin(), handler.NodeCreate)
 		auth.POST("/node/list", middleware.Admin(), handler.NodeList)
+		auth.POST("/node/accessible", handler.NodeListAccessible)
 		auth.POST("/node/update", middleware.Admin(), handler.NodeUpdate)
 		auth.POST("/node/delete", middleware.Admin(), handler.NodeDelete)
 		auth.POST("/node/install", middleware.Admin(), handler.NodeInstall)
@@ -109,25 +110,27 @@ func Setup(r *gin.Engine) {
 		auth.POST("/config/update", middleware.Admin(), handler.ConfigUpdate)
 		auth.POST("/config/update-single", middleware.Admin(), handler.ConfigUpdateSingle)
 
-		// Xray Inbound
-		auth.POST("/xray/inbound/create", middleware.Admin(), handler.XrayInboundCreate)
-		auth.POST("/xray/inbound/list", middleware.Admin(), handler.XrayInboundList)
-		auth.POST("/xray/inbound/update", middleware.Admin(), handler.XrayInboundUpdate)
-		auth.POST("/xray/inbound/delete", middleware.Admin(), handler.XrayInboundDelete)
-		auth.POST("/xray/inbound/enable", middleware.Admin(), handler.XrayInboundEnable)
-		auth.POST("/xray/inbound/disable", middleware.Admin(), handler.XrayInboundDisable)
+		// Xray Inbound (permission checked in service layer)
+		auth.POST("/xray/inbound/create", handler.XrayInboundCreate)
+		auth.POST("/xray/inbound/list", handler.XrayInboundList)
+		auth.POST("/xray/inbound/update", handler.XrayInboundUpdate)
+		auth.POST("/xray/inbound/delete", handler.XrayInboundDelete)
+		auth.POST("/xray/inbound/enable", handler.XrayInboundEnable)
+		auth.POST("/xray/inbound/disable", handler.XrayInboundDisable)
 
-		// Xray Client
-		auth.POST("/xray/client/create", middleware.Admin(), handler.XrayClientCreate)
-		auth.POST("/xray/client/list", middleware.Admin(), handler.XrayClientList)
-		auth.POST("/xray/client/update", middleware.Admin(), handler.XrayClientUpdate)
-		auth.POST("/xray/client/delete", middleware.Admin(), handler.XrayClientDelete)
-		auth.POST("/xray/client/reset-traffic", middleware.Admin(), handler.XrayClientResetTraffic)
+		// Xray Client (permission checked in service layer)
+		auth.POST("/xray/client/create", handler.XrayClientCreate)
+		auth.POST("/xray/client/list", handler.XrayClientList)
+		auth.POST("/xray/client/update", handler.XrayClientUpdate)
+		auth.POST("/xray/client/delete", handler.XrayClientDelete)
+		auth.POST("/xray/client/reset-traffic", handler.XrayClientResetTraffic)
 
-		// Xray Cert
-		auth.POST("/xray/cert/create", middleware.Admin(), handler.XrayCertCreate)
-		auth.POST("/xray/cert/list", middleware.Admin(), handler.XrayCertList)
-		auth.POST("/xray/cert/delete", middleware.Admin(), handler.XrayCertDelete)
+		// Xray Cert (permission checked in service layer)
+		auth.POST("/xray/cert/create", handler.XrayCertCreate)
+		auth.POST("/xray/cert/list", handler.XrayCertList)
+		auth.POST("/xray/cert/delete", handler.XrayCertDelete)
+		auth.POST("/xray/cert/issue", handler.XrayCertIssue)
+		auth.POST("/xray/cert/renew", handler.XrayCertRenew)
 
 		// Xray Node
 		auth.POST("/xray/node/start", middleware.Admin(), handler.XrayNodeStart)

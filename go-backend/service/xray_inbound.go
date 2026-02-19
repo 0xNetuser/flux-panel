@@ -8,7 +8,63 @@ import (
 	"time"
 )
 
-func CreateXrayInbound(d dto.XrayInboundDto) dto.R {
+// ---------------------------------------------------------------------------
+// Xray permission helpers
+// ---------------------------------------------------------------------------
+
+func checkXrayPermission(userId int64, roleId int) *dto.R {
+	if roleId == 0 {
+		return nil // admin
+	}
+	var user model.User
+	if err := DB.First(&user, userId).Error; err != nil {
+		r := dto.Err("用户不存在")
+		return &r
+	}
+	if user.XrayEnabled != 1 {
+		r := dto.Err("无 Xray 权限")
+		return &r
+	}
+	return nil
+}
+
+func checkXrayNodeAccess(userId int64, roleId int, nodeId int64) *dto.R {
+	if roleId == 0 {
+		return nil
+	}
+	if !UserHasNodeAccess(userId, nodeId) {
+		r := dto.Err("无该节点的访问权限")
+		return &r
+	}
+	return nil
+}
+
+func getUserAccessibleNodeIds(userId int64) []int64 {
+	var total int64
+	DB.Model(&model.UserNode{}).Where("user_id = ?", userId).Count(&total)
+	if total == 0 {
+		// Legacy user: return all node IDs
+		var ids []int64
+		DB.Model(&model.Node{}).Pluck("id", &ids)
+		return ids
+	}
+	var ids []int64
+	DB.Model(&model.UserNode{}).Where("user_id = ?", userId).Pluck("node_id", &ids)
+	return ids
+}
+
+// ---------------------------------------------------------------------------
+// Xray Inbound CRUD
+// ---------------------------------------------------------------------------
+
+func CreateXrayInbound(d dto.XrayInboundDto, userId int64, roleId int) dto.R {
+	if r := checkXrayPermission(userId, roleId); r != nil {
+		return *r
+	}
+	if r := checkXrayNodeAccess(userId, roleId, d.NodeId); r != nil {
+		return *r
+	}
+
 	node := GetNodeById(d.NodeId)
 	if node == nil {
 		return dto.Err("节点不存在")
@@ -60,10 +116,21 @@ func CreateXrayInbound(d dto.XrayInboundDto) dto.R {
 	return dto.Ok(inbound)
 }
 
-func ListXrayInbounds(nodeId *int64) dto.R {
+func ListXrayInbounds(nodeId *int64, userId int64, roleId int) dto.R {
+	if r := checkXrayPermission(userId, roleId); r != nil {
+		return *r
+	}
+
 	query := DB.Model(&model.XrayInbound{}).Order("created_time DESC")
 	if nodeId != nil {
+		if r := checkXrayNodeAccess(userId, roleId, *nodeId); r != nil {
+			return *r
+		}
 		query = query.Where("node_id = ?", *nodeId)
+	} else if roleId != 0 {
+		// Non-admin without nodeId filter: restrict to accessible nodes
+		nodeIds := getUserAccessibleNodeIds(userId)
+		query = query.Where("node_id IN ?", nodeIds)
 	}
 
 	var list []model.XrayInbound
@@ -71,10 +138,18 @@ func ListXrayInbounds(nodeId *int64) dto.R {
 	return dto.Ok(list)
 }
 
-func UpdateXrayInbound(d dto.XrayInboundUpdateDto) dto.R {
+func UpdateXrayInbound(d dto.XrayInboundUpdateDto, userId int64, roleId int) dto.R {
+	if r := checkXrayPermission(userId, roleId); r != nil {
+		return *r
+	}
+
 	var existing model.XrayInbound
 	if err := DB.First(&existing, d.ID).Error; err != nil {
 		return dto.Err("入站不存在")
+	}
+
+	if r := checkXrayNodeAccess(userId, roleId, existing.NodeId); r != nil {
+		return *r
 	}
 
 	// Port conflict check
@@ -120,10 +195,18 @@ func UpdateXrayInbound(d dto.XrayInboundUpdateDto) dto.R {
 	return dto.Ok("更新成功")
 }
 
-func DeleteXrayInbound(id int64) dto.R {
+func DeleteXrayInbound(id int64, userId int64, roleId int) dto.R {
+	if r := checkXrayPermission(userId, roleId); r != nil {
+		return *r
+	}
+
 	var inbound model.XrayInbound
 	if err := DB.First(&inbound, id).Error; err != nil {
 		return dto.Err("入站不存在")
+	}
+
+	if r := checkXrayNodeAccess(userId, roleId, inbound.NodeId); r != nil {
+		return *r
 	}
 
 	// Delete associated clients
@@ -139,11 +222,20 @@ func DeleteXrayInbound(id int64) dto.R {
 	return dto.Ok("删除成功")
 }
 
-func EnableXrayInbound(id int64) dto.R {
+func EnableXrayInbound(id int64, userId int64, roleId int) dto.R {
+	if r := checkXrayPermission(userId, roleId); r != nil {
+		return *r
+	}
+
 	var inbound model.XrayInbound
 	if err := DB.First(&inbound, id).Error; err != nil {
 		return dto.Err("入站不存在")
 	}
+
+	if r := checkXrayNodeAccess(userId, roleId, inbound.NodeId); r != nil {
+		return *r
+	}
+
 	DB.Model(&inbound).Updates(map[string]interface{}{
 		"enable":       1,
 		"updated_time": time.Now().UnixMilli(),
@@ -152,11 +244,20 @@ func EnableXrayInbound(id int64) dto.R {
 	return dto.Ok("已启用")
 }
 
-func DisableXrayInbound(id int64) dto.R {
+func DisableXrayInbound(id int64, userId int64, roleId int) dto.R {
+	if r := checkXrayPermission(userId, roleId); r != nil {
+		return *r
+	}
+
 	var inbound model.XrayInbound
 	if err := DB.First(&inbound, id).Error; err != nil {
 		return dto.Err("入站不存在")
 	}
+
+	if r := checkXrayNodeAccess(userId, roleId, inbound.NodeId); r != nil {
+		return *r
+	}
+
 	DB.Model(&inbound).Updates(map[string]interface{}{
 		"enable":       0,
 		"updated_time": time.Now().UnixMilli(),

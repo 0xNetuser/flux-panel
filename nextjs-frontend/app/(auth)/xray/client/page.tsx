@@ -20,7 +20,7 @@ import { getAllUsers } from '@/lib/api/user';
 import { useAuth } from '@/lib/hooks/use-auth';
 
 export default function XrayClientPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, xrayEnabled } = useAuth();
   const [clients, setClients] = useState<any[]>([]);
   const [inbounds, setInbounds] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -30,6 +30,7 @@ export default function XrayClientPage() {
   const [form, setForm] = useState({
     inboundId: '', userId: '', email: '', uuid: '', flow: '',
     alterId: '0', totalTraffic: '', expTime: '', remark: '',
+    limitIp: '0', reset: '0', tgId: '', subId: '',
   });
 
   const formatBytes = (bytes: number) => {
@@ -48,18 +49,23 @@ export default function XrayClientPage() {
     });
   };
 
+  const generateSubId = () => {
+    const arr = new Uint8Array(16);
+    crypto.getRandomValues(arr);
+    return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+  };
+
   const loadData = useCallback(async () => {
     setLoading(true);
-    const [clientRes, inboundRes, userRes] = await Promise.all([
-      getXrayClientList(),
-      getXrayInboundList(),
-      getAllUsers(),
-    ]);
-    if (clientRes.code === 0) setClients(clientRes.data || []);
-    if (inboundRes.code === 0) setInbounds(inboundRes.data || []);
-    if (userRes.code === 0) setUsers(userRes.data || []);
+    const promises: Promise<any>[] = [getXrayClientList(), getXrayInboundList()];
+    if (isAdmin) promises.push(getAllUsers());
+
+    const results = await Promise.all(promises);
+    if (results[0].code === 0) setClients(results[0].data || []);
+    if (results[1].code === 0) setInbounds(results[1].data || []);
+    if (isAdmin && results[2]?.code === 0) setUsers(results[2].data || []);
     setLoading(false);
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -83,6 +89,7 @@ export default function XrayClientPage() {
     setForm({
       inboundId: '', userId: '', email: '', uuid: generateUUID(), flow: '',
       alterId: '0', totalTraffic: '', expTime: '', remark: '',
+      limitIp: '0', reset: '0', tgId: '', subId: '',
     });
     setDialogOpen(true);
   };
@@ -93,12 +100,16 @@ export default function XrayClientPage() {
       inboundId: client.inboundId?.toString() || '',
       userId: client.userId?.toString() || '',
       email: client.email || '',
-      uuid: client.uuid || client.id || '',
+      uuid: client.uuidOrPassword || client.uuid || client.id || '',
       flow: client.flow || '',
       alterId: client.alterId?.toString() || '0',
-      totalTraffic: client.totalTraffic?.toString() || '',
+      totalTraffic: client.totalTraffic ? (client.totalTraffic / (1024 * 1024 * 1024)).toString() : '',
       expTime: client.expTime ? new Date(client.expTime).toISOString().slice(0, 16) : '',
       remark: client.remark || '',
+      limitIp: client.limitIp?.toString() || '0',
+      reset: client.reset?.toString() || '0',
+      tgId: client.tgId || '',
+      subId: client.subId || '',
     });
     setDialogOpen(true);
   };
@@ -114,6 +125,10 @@ export default function XrayClientPage() {
       uuidOrPassword: form.uuid || undefined,
       flow: form.flow || undefined,
       alterId: parseInt(form.alterId) || 0,
+      limitIp: parseInt(form.limitIp) || 0,
+      reset: parseInt(form.reset) || 0,
+      tgId: form.tgId || undefined,
+      subId: form.subId || undefined,
       remark: form.remark || undefined,
     };
     if (form.userId) data.userId = parseInt(form.userId);
@@ -160,7 +175,7 @@ export default function XrayClientPage() {
     }
   };
 
-  if (!isAdmin) {
+  if (!isAdmin && !xrayEnabled) {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">无权限访问</p>
@@ -181,11 +196,13 @@ export default function XrayClientPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Email</TableHead>
-                <TableHead>用户</TableHead>
+                {isAdmin && <TableHead>用户</TableHead>}
                 <TableHead>入站</TableHead>
                 <TableHead>协议</TableHead>
                 <TableHead>上传/下载</TableHead>
                 <TableHead>流量限制</TableHead>
+                <TableHead>IP 限制</TableHead>
+                <TableHead>重置周期</TableHead>
                 <TableHead>到期时间</TableHead>
                 <TableHead>状态</TableHead>
                 <TableHead>操作</TableHead>
@@ -193,28 +210,34 @@ export default function XrayClientPage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8">加载中...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={isAdmin ? 11 : 10} className="text-center py-8">加载中...</TableCell></TableRow>
               ) : clients.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
+                <TableRow><TableCell colSpan={isAdmin ? 11 : 10} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
               ) : (
                 clients.map((c) => {
                   const isExpired = c.expTime && new Date(c.expTime) < new Date();
-                  const totalUsed = (c.up || 0) + (c.down || 0);
+                  const totalUsed = (c.upTraffic || c.up || 0) + (c.downTraffic || c.down || 0);
                   const isOverTraffic = c.totalTraffic > 0 && totalUsed >= c.totalTraffic;
 
                   return (
                     <TableRow key={c.id}>
                       <TableCell className="font-medium text-sm">{c.email || '-'}</TableCell>
-                      <TableCell className="text-sm">{c.userId ? getUserName(c.userId) : '-'}</TableCell>
+                      {isAdmin && <TableCell className="text-sm">{c.userId ? getUserName(c.userId) : '-'}</TableCell>}
                       <TableCell className="text-sm">{getInboundTag(c.inboundId)}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{getInboundProtocol(c.inboundId).toUpperCase()}</Badge>
                       </TableCell>
                       <TableCell className="text-xs">
-                        {formatBytes(c.up || 0)} / {formatBytes(c.down || 0)}
+                        {formatBytes(c.upTraffic || c.up || 0)} / {formatBytes(c.downTraffic || c.down || 0)}
                       </TableCell>
                       <TableCell className="text-sm">
                         {c.totalTraffic ? formatBytes(c.totalTraffic) : '无限'}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {c.limitIp ? c.limitIp : '无限'}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {c.reset ? `${c.reset} 天` : '-'}
                       </TableCell>
                       <TableCell className="text-sm">
                         {c.expTime ? new Date(c.expTime).toLocaleDateString() : '永不'}
@@ -224,7 +247,7 @@ export default function XrayClientPage() {
                           <Badge variant="destructive">已过期</Badge>
                         ) : isOverTraffic ? (
                           <Badge variant="destructive">流量超限</Badge>
-                        ) : c.enable === false ? (
+                        ) : c.enable === 0 ? (
                           <Badge variant="secondary">禁用</Badge>
                         ) : (
                           <Badge variant="default">启用</Badge>
@@ -262,7 +285,7 @@ export default function XrayClientPage() {
             <DialogTitle>{editingClient ? '编辑客户端' : '创建客户端'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className={isAdmin ? "grid grid-cols-2 gap-4" : ""}>
               <div className="space-y-2">
                 <Label>入站</Label>
                 <Select value={form.inboundId} onValueChange={v => setForm(p => ({ ...p, inboundId: v }))}>
@@ -276,23 +299,27 @@ export default function XrayClientPage() {
                   </SelectContent>
                 </Select>
               </div>
+              {isAdmin && (
+                <div className="space-y-2">
+                  <Label>用户 (可选)</Label>
+                  <Select value={form.userId} onValueChange={v => setForm(p => ({ ...p, userId: v }))}>
+                    <SelectTrigger><SelectValue placeholder="选择用户" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">不绑定</SelectItem>
+                      {users.map((u: any) => (
+                        <SelectItem key={u.id} value={u.id.toString()}>{u.user}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+            {isAdmin && (
               <div className="space-y-2">
-                <Label>用户 (可选)</Label>
-                <Select value={form.userId} onValueChange={v => setForm(p => ({ ...p, userId: v }))}>
-                  <SelectTrigger><SelectValue placeholder="选择用户" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">不绑定</SelectItem>
-                    {users.map((u: any) => (
-                      <SelectItem key={u.id} value={u.id.toString()}>{u.user}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Email</Label>
+                <Input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="client@example.com" />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} placeholder="client@example.com" />
-            </div>
+            )}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>UUID</Label>
@@ -329,6 +356,41 @@ export default function XrayClientPage() {
                   value={form.expTime}
                   onChange={e => setForm(p => ({ ...p, expTime: e.target.value }))}
                 />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>IP 限制</Label>
+                <Input
+                  type="number"
+                  value={form.limitIp}
+                  onChange={e => setForm(p => ({ ...p, limitIp: e.target.value }))}
+                  placeholder="0 = 无限"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>流量重置周期 (天)</Label>
+                <Input
+                  type="number"
+                  value={form.reset}
+                  onChange={e => setForm(p => ({ ...p, reset: e.target.value }))}
+                  placeholder="0 = 不重置"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Telegram ID</Label>
+                <Input value={form.tgId} onChange={e => setForm(p => ({ ...p, tgId: e.target.value }))} placeholder="可选" />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label>订阅 ID</Label>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setForm(p => ({ ...p, subId: generateSubId() }))}>
+                    <RefreshCw className="mr-1 h-3 w-3" />生成
+                  </Button>
+                </div>
+                <Input value={form.subId} onChange={e => setForm(p => ({ ...p, subId: e.target.value }))} placeholder="自动生成" className="font-mono text-sm" />
               </div>
             </div>
             <div className="space-y-2">

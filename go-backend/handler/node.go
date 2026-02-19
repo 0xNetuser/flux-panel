@@ -41,6 +41,12 @@ func NodeDelete(c *gin.Context) {
 	c.JSON(http.StatusOK, service.DeleteNode(d.ID))
 }
 
+func NodeListAccessible(c *gin.Context) {
+	userId := GetUserId(c)
+	roleId := GetRoleId(c)
+	c.JSON(http.StatusOK, service.GetUserAccessibleNodes(userId, roleId))
+}
+
 func NodeInstall(c *gin.Context) {
 	var d struct {
 		ID        int64  `json:"id" binding:"required"`

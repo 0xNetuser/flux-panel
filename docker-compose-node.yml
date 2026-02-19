@@ -1,6 +1,6 @@
 services:
   gost-node:
-    image: 0xnetuser/gost-node:1.5.5
+    image: 0xnetuser/gost-node:1.6.0
     container_name: gost-node
     network_mode: host
     restart: unless-stopped

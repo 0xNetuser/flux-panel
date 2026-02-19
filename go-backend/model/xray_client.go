@@ -12,6 +12,10 @@ type XrayClient struct {
 	UpTraffic      int64  `gorm:"column:up_traffic" json:"upTraffic"`
 	DownTraffic    int64  `gorm:"column:down_traffic" json:"downTraffic"`
 	ExpTime        *int64 `gorm:"column:exp_time" json:"expTime"`
+	LimitIp        int    `gorm:"column:limit_ip;default:0" json:"limitIp"`
+	Reset          int    `gorm:"column:reset;default:0" json:"reset"`
+	TgId           string `gorm:"column:tg_id" json:"tgId"`
+	SubId          string `gorm:"column:sub_id" json:"subId"`
 	Enable         int    `gorm:"column:enable" json:"enable"`
 	Remark         string `gorm:"column:remark" json:"remark"`
 	CreatedTime    int64  `gorm:"column:created_time" json:"createdTime"`

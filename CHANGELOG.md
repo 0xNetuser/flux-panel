@@ -1,5 +1,58 @@
 # Changelog
 
+## v1.6.0 — Xray 管理完整改造
+
+### New Features
+
+- **入站 UI 改造**：入站配置从原始 JSON 文本框改为结构化表单，支持协议/传输层/安全层/嗅探分区 Tab 配置
+- **传输层配置**：支持 TCP / WebSocket / gRPC / HTTPUpgrade / xHTTP / mKCP 全部传输协议的可视化配置，含 Headers 键值对编辑器
+- **安全层配置**：支持 None / TLS / Reality 安全模式，TLS 包括 ALPN / Fingerprint / SNI / minVersion / maxVersion 参数，Reality 支持前端生成 X25519 密钥对和 ShortId
+- **嗅探配置**：支持 HTTP / TLS / QUIC / FakeDNS 嗅探目标选择，metadataOnly 和 routeOnly 开关
+- **高级模式**：对话框顶部可切换高级模式，直接编辑 settingsJson / streamSettingsJson / sniffingJson，表单与 JSON 双向转换
+- **客户端字段扩展**：新增 IP 连接数限制 (`limitIp`)、流量自动重置周期 (`reset`，天)、Telegram ID (`tgId`)、订阅 ID (`subId`) 四个字段
+- **流量自动重置**：后台定时任务每小时检查客户端 `reset` 字段，到期自动清零上下行流量计数器
+- **ACME 证书签发**：集成 lego 库，支持 Let's Encrypt DNS-01 验证（Cloudflare provider），一键签发 TLS 证书并自动部署到节点
+- **证书自动续签**：后台每日检查 ACME 证书，到期前 30 天自动续签
+- **证书手动续签**：证书列表新增签发/续签操作按钮
+- **证书 UI 改造**：创建对话框支持「手动上传」和「ACME 自动申请」Tab 切换，列表新增来源、上次续签时间、续签错误列
+
+### Changed Files
+
+**新增文件：**
+- `go-backend/service/acme.go` — ACME 签发/续签逻辑 (lego + Cloudflare DNS-01)
+- `go-backend/service/xray_scheduler.go` — Xray 定时任务 (流量重置 + 证书续签)
+- `nextjs-frontend/app/(auth)/xray/inbound/_components/inbound-dialog.tsx` — 入站对话框壳 + 高级模式
+- `nextjs-frontend/app/(auth)/xray/inbound/_components/protocol-settings.tsx` — 协议设置表单
+- `nextjs-frontend/app/(auth)/xray/inbound/_components/transport-settings.tsx` — 传输层表单
+- `nextjs-frontend/app/(auth)/xray/inbound/_components/security-settings.tsx` — 安全层表单
+- `nextjs-frontend/app/(auth)/xray/inbound/_components/sniffing-settings.tsx` — 嗅探设置表单
+
+**后端修改：**
+- `go-backend/model/xray_client.go` — +4 字段 (limitIp, reset, tgId, subId)
+- `go-backend/model/xray_tls_cert.go` — +6 字段 (acmeEnabled, acmeEmail, challengeType, dnsProvider, dnsConfig, lastRenewTime, renewError)
+- `go-backend/dto/xray.go` — DTO 扩展 + 新增 XrayCertIssueDto / XrayCertRenewDto
+- `go-backend/service/xray_client.go` — Create/Update 处理新字段，subId 自动生成
+- `go-backend/service/xray_cert.go` — 新增 IssueCertificate / RenewCertificate
+- `go-backend/handler/xray_cert.go` — 新增 XrayCertIssue / XrayCertRenew handler
+- `go-backend/router/router.go` — +2 路由 (/xray/cert/issue, /xray/cert/renew)
+- `go-backend/main.go` — 启动 XrayScheduler
+- `go-backend/go.mod` — +lego v4 依赖
+
+**前端修改：**
+- `nextjs-frontend/app/(auth)/xray/inbound/page.tsx` — 重构使用 InboundDialog 组件
+- `nextjs-frontend/app/(auth)/xray/client/page.tsx` — 表单+表格新增字段
+- `nextjs-frontend/app/(auth)/xray/certificate/page.tsx` — ACME UI 改造
+- `nextjs-frontend/lib/api/xray-cert.ts` — +issueXrayCert / renewXrayCert
+
+### Backward Compatibility
+
+- 数据库字段通过 GORM AutoMigrate 自动添加，无需手动迁移
+- 新字段均有默认值 (0 或空字符串)，不影响现有数据
+- 入站已有的 JSON 配置能被正确解析回填到结构化表单
+- 节点端无需同步更新
+
+---
+
 ## v1.5.0 — 安全加固
 
 ### Security Fixes

@@ -5,35 +5,27 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, Edit2, Play, Pause } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   createXrayInbound, getXrayInboundList, updateXrayInbound,
   deleteXrayInbound, enableXrayInbound, disableXrayInbound,
 } from '@/lib/api/xray-inbound';
-import { getNodeList } from '@/lib/api/node';
+import { getAccessibleNodeList } from '@/lib/api/node';
 import { useAuth } from '@/lib/hooks/use-auth';
+import InboundDialog from './_components/inbound-dialog';
 
 export default function XrayInboundPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, xrayEnabled } = useAuth();
   const [inbounds, setInbounds] = useState<any[]>([]);
   const [nodes, setNodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingInbound, setEditingInbound] = useState<any>(null);
-  const [form, setForm] = useState({
-    nodeId: '', protocol: 'vmess', tag: '', port: '', listen: '0.0.0.0',
-    settingsJson: '{}', streamSettingsJson: '{}', sniffingJson: '{}', remark: '',
-  });
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const [inboundRes, nodeRes] = await Promise.all([getXrayInboundList(), getNodeList()]);
+    const [inboundRes, nodeRes] = await Promise.all([getXrayInboundList(), getAccessibleNodeList()]);
     if (inboundRes.code === 0) setInbounds(inboundRes.data || []);
     if (nodeRes.code === 0) setNodes(nodeRes.data || []);
     setLoading(false);
@@ -57,68 +49,37 @@ export default function XrayInboundPage() {
     }
   };
 
+  const getTransportInfo = (ib: any) => {
+    try {
+      const stream = JSON.parse(ib.streamSettingsJson || ib.streamSettings || '{}');
+      const network = stream.network || 'tcp';
+      const security = stream.security || 'none';
+      return `${network}${security !== 'none' ? '+' + security : ''}`;
+    } catch {
+      return '-';
+    }
+  };
+
   const handleCreate = () => {
     setEditingInbound(null);
-    setForm({
-      nodeId: '', protocol: 'vmess', tag: '', port: '', listen: '0.0.0.0',
-      settingsJson: '{}', streamSettingsJson: '{}', sniffingJson: '{}', remark: '',
-    });
     setDialogOpen(true);
   };
 
   const handleEdit = (inbound: any) => {
     setEditingInbound(inbound);
-    setForm({
-      nodeId: inbound.nodeId?.toString() || '',
-      protocol: inbound.protocol || 'vmess',
-      tag: inbound.tag || '',
-      port: inbound.port?.toString() || '',
-      listen: inbound.listen || '0.0.0.0',
-      settingsJson: inbound.settingsJson || inbound.settings || '{}',
-      streamSettingsJson: inbound.streamSettingsJson || inbound.streamSettings || '{}',
-      sniffingJson: inbound.sniffingJson || inbound.sniffing || '{}',
-      remark: inbound.remark || '',
-    });
     setDialogOpen(true);
   };
 
-  const handleSubmit = async () => {
-    if (!form.nodeId || !form.protocol || !form.port) {
-      toast.error('请填写节点、协议和端口');
-      return;
-    }
-
-    // Validate JSON fields
-    try {
-      JSON.parse(form.settingsJson);
-      JSON.parse(form.streamSettingsJson);
-      JSON.parse(form.sniffingJson);
-    } catch {
-      toast.error('JSON 格式不正确');
-      return;
-    }
-
-    const data: any = {
-      nodeId: parseInt(form.nodeId),
-      protocol: form.protocol,
-      tag: form.tag || undefined,
-      port: parseInt(form.port),
-      listen: form.listen,
-      settingsJson: form.settingsJson,
-      streamSettingsJson: form.streamSettingsJson,
-      sniffingJson: form.sniffingJson,
-      remark: form.remark || undefined,
-    };
-
+  const handleSubmit = async (data: any) => {
     let res;
-    if (editingInbound) {
-      res = await updateXrayInbound({ ...data, id: editingInbound.id });
+    if (data.id) {
+      res = await updateXrayInbound(data);
     } else {
       res = await createXrayInbound(data);
     }
 
     if (res.code === 0) {
-      toast.success(editingInbound ? '更新成功' : '创建成功');
+      toast.success(data.id ? '更新成功' : '创建成功');
       setDialogOpen(false);
       loadData();
     } else {
@@ -145,7 +106,7 @@ export default function XrayInboundPage() {
     }
   };
 
-  if (!isAdmin) {
+  if (!isAdmin && !xrayEnabled) {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">无权限访问</p>
@@ -167,6 +128,7 @@ export default function XrayInboundPage() {
               <TableRow>
                 <TableHead>备注</TableHead>
                 <TableHead>协议</TableHead>
+                <TableHead>传输/安全</TableHead>
                 <TableHead>监听地址</TableHead>
                 <TableHead>节点</TableHead>
                 <TableHead>客户端数</TableHead>
@@ -176,9 +138,9 @@ export default function XrayInboundPage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8">加载中...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8">加载中...</TableCell></TableRow>
               ) : inbounds.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
               ) : (
                 inbounds.map((ib) => (
                   <TableRow key={ib.id}>
@@ -188,6 +150,7 @@ export default function XrayInboundPage() {
                         {ib.protocol?.toUpperCase()}
                       </Badge>
                     </TableCell>
+                    <TableCell className="text-xs font-mono">{getTransportInfo(ib)}</TableCell>
                     <TableCell className="text-sm font-mono">{ib.listen || '0.0.0.0'}:{ib.port}</TableCell>
                     <TableCell>{getNodeName(ib.nodeId)}</TableCell>
                     <TableCell>{ib.clientCount ?? ib.clients ?? 0}</TableCell>
@@ -217,93 +180,13 @@ export default function XrayInboundPage() {
         </CardContent>
       </Card>
 
-      {/* Create/Edit Inbound Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingInbound ? '编辑入站' : '创建入站'}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>节点</Label>
-                <Select value={form.nodeId} onValueChange={v => setForm(p => ({ ...p, nodeId: v }))}>
-                  <SelectTrigger><SelectValue placeholder="选择节点" /></SelectTrigger>
-                  <SelectContent>
-                    {nodes.map((n: any) => (
-                      <SelectItem key={n.id} value={n.id.toString()}>{n.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>协议</Label>
-                <Select value={form.protocol} onValueChange={v => setForm(p => ({ ...p, protocol: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="vmess">VMess</SelectItem>
-                    <SelectItem value="vless">VLESS</SelectItem>
-                    <SelectItem value="trojan">Trojan</SelectItem>
-                    <SelectItem value="shadowsocks">Shadowsocks</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Tag</Label>
-                <Input value={form.tag} onChange={e => setForm(p => ({ ...p, tag: e.target.value }))} placeholder="入站标签" />
-              </div>
-              <div className="space-y-2">
-                <Label>端口</Label>
-                <Input type="number" value={form.port} onChange={e => setForm(p => ({ ...p, port: e.target.value }))} placeholder="443" />
-              </div>
-              <div className="space-y-2">
-                <Label>监听地址</Label>
-                <Input value={form.listen} onChange={e => setForm(p => ({ ...p, listen: e.target.value }))} placeholder="0.0.0.0" />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>备注</Label>
-              <Input value={form.remark} onChange={e => setForm(p => ({ ...p, remark: e.target.value }))} placeholder="入站备注" />
-            </div>
-            <div className="space-y-2">
-              <Label>Settings JSON</Label>
-              <Textarea
-                value={form.settingsJson}
-                onChange={e => setForm(p => ({ ...p, settingsJson: e.target.value }))}
-                placeholder='{"clients": []}'
-                rows={4}
-                className="font-mono text-sm"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Stream Settings JSON</Label>
-              <Textarea
-                value={form.streamSettingsJson}
-                onChange={e => setForm(p => ({ ...p, streamSettingsJson: e.target.value }))}
-                placeholder='{"network": "tcp"}'
-                rows={4}
-                className="font-mono text-sm"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Sniffing JSON</Label>
-              <Textarea
-                value={form.sniffingJson}
-                onChange={e => setForm(p => ({ ...p, sniffingJson: e.target.value }))}
-                placeholder='{"enabled": true, "destOverride": ["http", "tls"]}'
-                rows={3}
-                className="font-mono text-sm"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSubmit}>{editingInbound ? '更新' : '创建'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <InboundDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        editingInbound={editingInbound}
+        nodes={nodes}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }

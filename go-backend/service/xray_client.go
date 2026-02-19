@@ -12,10 +12,24 @@ import (
 	"time"
 )
 
-func CreateXrayClient(d dto.XrayClientDto) dto.R {
+func CreateXrayClient(d dto.XrayClientDto, userId int64, roleId int) dto.R {
+	if r := checkXrayPermission(userId, roleId); r != nil {
+		return *r
+	}
+
 	var inbound model.XrayInbound
 	if err := DB.First(&inbound, d.InboundId).Error; err != nil {
 		return dto.Err("入站不存在")
+	}
+
+	// Check node access via inbound's node
+	if r := checkXrayNodeAccess(userId, roleId, inbound.NodeId); r != nil {
+		return *r
+	}
+
+	// Non-admin: force bind to self
+	if roleId != 0 {
+		d.UserId = userId
 	}
 
 	if d.UserId > 0 {
@@ -34,6 +48,7 @@ func CreateXrayClient(d dto.XrayClientDto) dto.R {
 		UpTraffic:    0,
 		DownTraffic:  0,
 		Enable:       1,
+		TgId:         d.TgId,
 		Remark:       d.Remark,
 		CreatedTime:  time.Now().UnixMilli(),
 		UpdatedTime:  time.Now().UnixMilli(),
@@ -47,6 +62,19 @@ func CreateXrayClient(d dto.XrayClientDto) dto.R {
 	}
 	if d.ExpTime != nil {
 		client.ExpTime = d.ExpTime
+	}
+	if d.LimitIp != nil {
+		client.LimitIp = *d.LimitIp
+	}
+	if d.Reset != nil {
+		client.Reset = *d.Reset
+	}
+
+	// Generate or use provided subId
+	if d.SubId != "" {
+		client.SubId = d.SubId
+	} else {
+		client.SubId = pkg.GenerateRandomString(16)
 	}
 
 	// Generate UUID or use specified password
@@ -79,13 +107,30 @@ func CreateXrayClient(d dto.XrayClientDto) dto.R {
 	return dto.Ok(client)
 }
 
-func ListXrayClients(inboundId, userId *int64) dto.R {
+func ListXrayClients(inboundId, userIdFilter *int64, userId int64, roleId int) dto.R {
+	if r := checkXrayPermission(userId, roleId); r != nil {
+		return *r
+	}
+
 	query := DB.Model(&model.XrayClient{}).Order("created_time DESC")
+
+	if roleId != 0 {
+		// Non-admin: only see own clients
+		query = query.Where("user_id = ?", userId)
+
+		// Also filter by accessible node inbounds
+		nodeIds := getUserAccessibleNodeIds(userId)
+		query = query.Where("inbound_id IN (?)",
+			DB.Model(&model.XrayInbound{}).Select("id").Where("node_id IN ?", nodeIds))
+	} else {
+		// Admin: apply optional filters
+		if userIdFilter != nil {
+			query = query.Where("user_id = ?", *userIdFilter)
+		}
+	}
+
 	if inboundId != nil {
 		query = query.Where("inbound_id = ?", *inboundId)
-	}
-	if userId != nil {
-		query = query.Where("user_id = ?", *userId)
 	}
 
 	var list []model.XrayClient
@@ -93,10 +138,27 @@ func ListXrayClients(inboundId, userId *int64) dto.R {
 	return dto.Ok(list)
 }
 
-func UpdateXrayClient(d dto.XrayClientUpdateDto) dto.R {
+func UpdateXrayClient(d dto.XrayClientUpdateDto, userId int64, roleId int) dto.R {
+	if r := checkXrayPermission(userId, roleId); r != nil {
+		return *r
+	}
+
 	var existing model.XrayClient
 	if err := DB.First(&existing, d.ID).Error; err != nil {
 		return dto.Err("客户端不存在")
+	}
+
+	// Non-admin: must own this client
+	if roleId != 0 && existing.UserId != userId {
+		return dto.Err("无权操作此客户端")
+	}
+
+	// Check node access via inbound
+	var inbound model.XrayInbound
+	if err := DB.First(&inbound, existing.InboundId).Error; err == nil {
+		if r := checkXrayNodeAccess(userId, roleId, inbound.NodeId); r != nil {
+			return *r
+		}
 	}
 
 	updates := map[string]interface{}{"updated_time": time.Now().UnixMilli()}
@@ -112,6 +174,18 @@ func UpdateXrayClient(d dto.XrayClientUpdateDto) dto.R {
 	if d.ExpTime != nil {
 		updates["exp_time"] = *d.ExpTime
 	}
+	if d.LimitIp != nil {
+		updates["limit_ip"] = *d.LimitIp
+	}
+	if d.Reset != nil {
+		updates["reset"] = *d.Reset
+	}
+	if d.TgId != "" {
+		updates["tg_id"] = d.TgId
+	}
+	if d.SubId != "" {
+		updates["sub_id"] = d.SubId
+	}
 	if d.Enable != nil {
 		updates["enable"] = *d.Enable
 	}
@@ -123,7 +197,6 @@ func UpdateXrayClient(d dto.XrayClientUpdateDto) dto.R {
 
 	// Handle enable/disable via gRPC
 	if d.Enable != nil {
-		var inbound model.XrayInbound
 		if err := DB.First(&inbound, existing.InboundId).Error; err == nil {
 			node := GetNodeById(inbound.NodeId)
 			if node != nil {
@@ -139,14 +212,30 @@ func UpdateXrayClient(d dto.XrayClientUpdateDto) dto.R {
 	return dto.Ok("更新成功")
 }
 
-func DeleteXrayClient(id int64) dto.R {
+func DeleteXrayClient(id int64, userId int64, roleId int) dto.R {
+	if r := checkXrayPermission(userId, roleId); r != nil {
+		return *r
+	}
+
 	var client model.XrayClient
 	if err := DB.First(&client, id).Error; err != nil {
 		return dto.Err("客户端不存在")
 	}
 
+	// Non-admin: must own this client
+	if roleId != 0 && client.UserId != userId {
+		return dto.Err("无权操作此客户端")
+	}
+
+	// Check node access via inbound
 	var inbound model.XrayInbound
 	DB.First(&inbound, client.InboundId)
+
+	if inbound.ID > 0 {
+		if r := checkXrayNodeAccess(userId, roleId, inbound.NodeId); r != nil {
+			return *r
+		}
+	}
 
 	DB.Delete(&client)
 
@@ -163,10 +252,19 @@ func DeleteXrayClient(id int64) dto.R {
 	return dto.Ok("删除成功")
 }
 
-func ResetXrayClientTraffic(id int64) dto.R {
+func ResetXrayClientTraffic(id int64, userId int64, roleId int) dto.R {
+	if r := checkXrayPermission(userId, roleId); r != nil {
+		return *r
+	}
+
 	var client model.XrayClient
 	if err := DB.First(&client, id).Error; err != nil {
 		return dto.Err("客户端不存在")
+	}
+
+	// Non-admin: must own this client
+	if roleId != 0 && client.UserId != userId {
+		return dto.Err("无权操作此客户端")
 	}
 
 	DB.Model(&client).Updates(map[string]interface{}{

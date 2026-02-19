@@ -137,6 +137,39 @@ func DeleteNode(id int64) dto.R {
 	return dto.Ok("节点删除成功")
 }
 
+func GetUserAccessibleNodes(userId int64, roleId int) dto.R {
+	var nodes []model.Node
+	if roleId == 0 {
+		// Admin: return all nodes
+		DB.Order("created_time DESC").Find(&nodes)
+	} else {
+		// Check if user has any user_node records
+		var total int64
+		DB.Model(&model.UserNode{}).Where("user_id = ?", userId).Count(&total)
+		if total == 0 {
+			// Legacy user with no records: return all nodes
+			DB.Order("created_time DESC").Find(&nodes)
+		} else {
+			DB.Where("id IN (?)", DB.Model(&model.UserNode{}).Select("node_id").Where("user_id = ?", userId)).
+				Order("created_time DESC").Find(&nodes)
+		}
+	}
+
+	result := make([]map[string]interface{}, 0, len(nodes))
+	for _, n := range nodes {
+		status := n.Status
+		if pkg.WS != nil && pkg.WS.IsNodeOnline(n.ID) {
+			status = 1
+		}
+		result = append(result, map[string]interface{}{
+			"id":     n.ID,
+			"name":   n.Name,
+			"status": status,
+		})
+	}
+	return dto.Ok(result)
+}
+
 func GetNodeById(id int64) *model.Node {
 	var node model.Node
 	if err := DB.First(&node, id).Error; err != nil {

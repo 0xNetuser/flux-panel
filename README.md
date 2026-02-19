@@ -36,12 +36,8 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 **1. 下载必要文件**
 
 ```bash
-# 下载 docker-compose 配置文件（二选一）
-# IPv4 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/docker-compose-v4.yml -o docker-compose.yml
-
-# IPv6 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/docker-compose-v6.yml -o docker-compose.yml
+# 下载 docker-compose 配置文件
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/docker-compose.yml -o docker-compose.yml
 
 # 下载数据库初始化文件
 curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/gost.sql -o gost.sql
@@ -57,6 +53,8 @@ DB_USER=gost_user
 DB_PASSWORD=请替换为随机密码
 JWT_SECRET=请替换为随机密码
 PANEL_PORT=6366
+# IPv6 环境设置为 true，默认 false
+# ENABLE_IPV6=true
 # 可选：限制 CORS 允许的域名（逗号分隔），不设置则允许所有
 # ALLOWED_ORIGINS=https://panel.example.com,http://localhost:3000
 ```
@@ -71,7 +69,7 @@ docker compose up -d
 
 **4. IPv6 环境额外配置**
 
-如果使用 IPv6 版本的 docker-compose，还需要确保 Docker 已启用 IPv6 支持。编辑 `/etc/docker/daemon.json`：
+在 `.env` 文件中设置 `ENABLE_IPV6=true`，并确保 Docker 已启用 IPv6 支持。编辑 `/etc/docker/daemon.json`：
 
 ```json
 {
@@ -166,11 +164,7 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 
 ```bash
 # 下载最新 docker-compose 配置（覆盖旧文件）
-# IPv4 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/docker-compose-v4.yml -o docker-compose.yml
-
-# IPv6 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/docker-compose-v6.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/docker-compose.yml -o docker-compose.yml
 
 # 拉取最新镜像并重启
 docker compose pull && docker compose up -d

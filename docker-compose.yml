@@ -92,3 +92,4 @@ networks:
   gost-network:
     name: gost-network
     driver: bridge
+    enable_ipv6: ${ENABLE_IPV6:-false}

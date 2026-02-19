@@ -8,28 +8,15 @@ export LC_ALL=C
 
 
 # 全局下载地址配置
-DOCKER_COMPOSEV4_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/docker-compose-v4.yml"
-DOCKER_COMPOSEV6_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/docker-compose-v6.yml"
+DOCKER_COMPOSE_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/docker-compose.yml"
 GOST_SQL_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/gost.sql"
 
 COUNTRY=$(curl -s https://ipinfo.io/country)
 if [ "$COUNTRY" = "CN" ]; then
     # 拼接 URL
-    DOCKER_COMPOSEV4_URL="https://ghfast.top/${DOCKER_COMPOSEV4_URL}"
-    DOCKER_COMPOSEV6_URL="https://ghfast.top/${DOCKER_COMPOSEV6_URL}"
+    DOCKER_COMPOSE_URL="https://ghfast.top/${DOCKER_COMPOSE_URL}"
     GOST_SQL_URL="https://ghfast.top/${GOST_SQL_URL}"
 fi
-
-
-
-# 根据IPv6支持情况选择docker-compose URL
-get_docker_compose_url() {
-  if check_ipv6_support > /dev/null 2>&1; then
-    echo "$DOCKER_COMPOSEV6_URL"
-  else
-    echo "$DOCKER_COMPOSEV4_URL"
-  fi
-}
 
 # 检查 docker-compose 或 docker compose 命令
 check_docker() {
@@ -191,8 +178,7 @@ install_panel() {
   get_config_params
 
   echo "🔽 下载必要文件..."
-  DOCKER_COMPOSE_URL=$(get_docker_compose_url)
-  echo "📡 选择配置文件：$(basename "$DOCKER_COMPOSE_URL")"
+  echo "📡 下载配置文件..."
   curl -L -o docker-compose.yml "$DOCKER_COMPOSE_URL"
 
   # 检查 gost.sql 是否已存在
@@ -205,8 +191,10 @@ install_panel() {
   echo "✅ 文件准备完成"
 
   # 自动检测并配置 IPv6 支持
+  ENABLE_IPV6=false
   if check_ipv6_support; then
     echo "🚀 系统支持 IPv6，自动启用 IPv6 配置..."
+    ENABLE_IPV6=true
     configure_docker_ipv6
   fi
 
@@ -216,6 +204,7 @@ DB_USER=$DB_USER
 DB_PASSWORD=$DB_PASSWORD
 JWT_SECRET=$JWT_SECRET
 PANEL_PORT=$PANEL_PORT
+ENABLE_IPV6=$ENABLE_IPV6
 EOF
 
   echo "🚀 启动 docker 服务..."
@@ -238,8 +227,6 @@ update_panel() {
   check_docker
 
   echo "🔽 下载最新配置文件..."
-  DOCKER_COMPOSE_URL=$(get_docker_compose_url)
-  echo "📡 选择配置文件：$(basename "$DOCKER_COMPOSE_URL")"
   curl -L -o docker-compose.yml "$DOCKER_COMPOSE_URL"
   echo "✅ 下载完成"
 
@@ -247,6 +234,12 @@ update_panel() {
   if check_ipv6_support; then
     echo "🚀 系统支持 IPv6，自动启用 IPv6 配置..."
     configure_docker_ipv6
+    # 确保 .env 中有 ENABLE_IPV6
+    if [[ -f ".env" ]] && ! grep -q "^ENABLE_IPV6=" .env; then
+      echo "ENABLE_IPV6=true" >> .env
+    elif [[ -f ".env" ]]; then
+      sed -i 's/^ENABLE_IPV6=.*/ENABLE_IPV6=true/' .env
+    fi
   fi
 
   echo "🛑 停止当前服务..."
@@ -1154,8 +1147,6 @@ uninstall_panel() {
 
   if [[ ! -f "docker-compose.yml" ]]; then
     echo "⚠️ 未找到 docker-compose.yml 文件，正在下载以完成卸载..."
-    DOCKER_COMPOSE_URL=$(get_docker_compose_url)
-    echo "📡 选择配置文件：$(basename "$DOCKER_COMPOSE_URL")"
     curl -L -o docker-compose.yml "$DOCKER_COMPOSE_URL"
     echo "✅ docker-compose.yml 下载完成"
   fi

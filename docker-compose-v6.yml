@@ -26,15 +26,15 @@ services:
       retries: 10
 
   gost-binary-init:
-    image: 0xnetuser/gost-binary:1.4.6
+    image: 0xnetuser/gost-binary:1.4.7
     container_name: gost-binary-init
     volumes:
       - node_binary:/data/node
     restart: "no"
 
   backend:
-    image: 0xnetuser/springboot-backend:1.4.6
-    container_name: springboot-backend
+    image: 0xnetuser/go-backend:1.4.7
+    container_name: go-backend
     restart: unless-stopped
     environment:
       DB_HOST: mysql
@@ -43,7 +43,6 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       LOG_DIR: /app/logs
-      JAVA_OPTS: "-Xms256m -Xmx512m -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Shanghai"
     expose:
       - "6365"
     volumes:
@@ -58,13 +57,13 @@ services:
       - gost-network
     healthcheck:
       test: ["CMD", "sh", "-c", "wget --no-verbose --tries=1 --spider http://localhost:6365/flow/test || exit 1"]
-      interval: 30s
-      timeout: 10s
+      interval: 10s
+      timeout: 5s
       retries: 5
-      start_period: 90s
+      start_period: 10s
 
   frontend:
-    image: 0xnetuser/nextjs-frontend:1.4.6
+    image: 0xnetuser/nextjs-frontend:1.4.7
     container_name: nextjs-frontend
     restart: unless-stopped
     ports:

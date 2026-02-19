@@ -64,6 +64,9 @@ CREATE TABLE `node` (
   `http` int(10) NOT NULL DEFAULT '0',
   `tls` int(10) NOT NULL DEFAULT '0',
   `socks` int(10) NOT NULL DEFAULT '0',
+  `xray_enabled` tinyint(4) NOT NULL DEFAULT '0',
+  `xray_version` varchar(50) DEFAULT NULL,
+  `xray_status` tinyint(4) NOT NULL DEFAULT '0',
   `created_time` bigint(20) NOT NULL,
   `updated_time` bigint(20) DEFAULT NULL,
   `status` int(10) NOT NULL
@@ -299,6 +302,76 @@ ALTER TABLE `user_tunnel`
 --
 ALTER TABLE `vite_config`
   MODIFY `id` int(10) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1;
+
+-- --------------------------------------------------------
+
+--
+-- 表的结构 `xray_inbound`
+--
+
+CREATE TABLE IF NOT EXISTS `xray_inbound` (
+  `id` int(10) NOT NULL AUTO_INCREMENT,
+  `node_id` int(10) NOT NULL,
+  `tag` varchar(100) NOT NULL,
+  `protocol` varchar(50) NOT NULL,
+  `listen` varchar(100) DEFAULT '0.0.0.0',
+  `port` int(10) NOT NULL,
+  `settings_json` text NOT NULL,
+  `stream_settings_json` text,
+  `sniffing_json` text,
+  `remark` varchar(200) DEFAULT NULL,
+  `enable` tinyint(4) DEFAULT '1',
+  `created_time` bigint(20) NOT NULL,
+  `updated_time` bigint(20) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_node_tag` (`node_id`, `tag`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- 表的结构 `xray_client`
+--
+
+CREATE TABLE IF NOT EXISTS `xray_client` (
+  `id` int(10) NOT NULL AUTO_INCREMENT,
+  `inbound_id` int(10) NOT NULL,
+  `user_id` int(10) NOT NULL,
+  `email` varchar(200) NOT NULL,
+  `uuid_or_password` varchar(200) NOT NULL,
+  `flow` varchar(50) DEFAULT NULL,
+  `alter_id` int(10) DEFAULT '0',
+  `total_traffic` bigint(20) DEFAULT '0',
+  `up_traffic` bigint(20) DEFAULT '0',
+  `down_traffic` bigint(20) DEFAULT '0',
+  `exp_time` bigint(20) DEFAULT NULL,
+  `enable` tinyint(4) DEFAULT '1',
+  `remark` varchar(200) DEFAULT NULL,
+  `created_time` bigint(20) NOT NULL,
+  `updated_time` bigint(20) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- --------------------------------------------------------
+
+--
+-- 表的结构 `xray_tls_cert`
+--
+
+CREATE TABLE IF NOT EXISTS `xray_tls_cert` (
+  `id` int(10) NOT NULL AUTO_INCREMENT,
+  `node_id` int(10) NOT NULL,
+  `domain` varchar(200) NOT NULL,
+  `public_key` text NOT NULL,
+  `private_key` text NOT NULL,
+  `auto_renew` tinyint(4) DEFAULT '0',
+  `expire_time` bigint(20) DEFAULT NULL,
+  `created_time` bigint(20) NOT NULL,
+  `updated_time` bigint(20) NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

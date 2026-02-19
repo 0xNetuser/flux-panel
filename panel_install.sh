@@ -8,9 +8,9 @@ export LC_ALL=C
 
 
 # 全局下载地址配置
-DOCKER_COMPOSEV4_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.4.6/docker-compose-v4.yml"
-DOCKER_COMPOSEV6_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.4.6/docker-compose-v6.yml"
-GOST_SQL_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.4.6/gost.sql"
+DOCKER_COMPOSEV4_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.4.7/docker-compose-v4.yml"
+DOCKER_COMPOSEV6_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.4.7/docker-compose-v6.yml"
+GOST_SQL_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.4.7/gost.sql"
 
 COUNTRY=$(curl -s https://ipinfo.io/country)
 if [ "$COUNTRY" = "CN" ]; then
@@ -263,8 +263,8 @@ update_panel() {
   # 检查后端容器健康状态
   echo "🔍 检查后端服务状态..."
   for i in {1..90}; do
-    if docker ps --format "{{.Names}}" | grep -q "^springboot-backend$"; then
-      BACKEND_HEALTH=$(docker inspect -f '{{.State.Health.Status}}' springboot-backend 2>/dev/null || echo "unknown")
+    if docker ps --format "{{.Names}}" | grep -q "^go-backend$"; then
+      BACKEND_HEALTH=$(docker inspect -f '{{.State.Health.Status}}' go-backend 2>/dev/null || echo "unknown")
       if [[ "$BACKEND_HEALTH" == "healthy" ]]; then
         echo "✅ 后端服务健康检查通过"
         break
@@ -280,7 +280,7 @@ update_panel() {
     fi
     if [ $i -eq 90 ]; then
       echo "❌ 后端服务启动超时（90秒）"
-      echo "🔍 当前状态：$(docker inspect -f '{{.State.Health.Status}}' springboot-backend 2>/dev/null || echo '容器不存在')"
+      echo "🔍 当前状态：$(docker inspect -f '{{.State.Health.Status}}' go-backend 2>/dev/null || echo '容器不存在')"
       echo "🛑 更新终止"
       return 1
     fi
@@ -330,7 +330,7 @@ update_panel() {
   sleep 5
 
   # 先检查后端容器是否在运行
-  if ! docker ps --format "{{.Names}}" | grep -q "^springboot-backend$"; then
+  if ! docker ps --format "{{.Names}}" | grep -q "^go-backend$"; then
     echo "❌ 后端容器未运行，无法获取数据库配置"
     echo "🔍 当前运行的容器："
     docker ps --format "table {{.Names}}\t{{.Status}}"
@@ -338,7 +338,7 @@ update_panel() {
     return 1
   fi
 
-  DB_INFO=$(docker exec springboot-backend env | grep "^DB_" 2>/dev/null || echo "")
+  DB_INFO=$(docker exec go-backend env | grep "^DB_" 2>/dev/null || echo "")
 
   if [[ -n "$DB_INFO" ]]; then
     DB_NAME=$(echo "$DB_INFO" | grep "^DB_NAME=" | cut -d'=' -f2)
@@ -353,8 +353,8 @@ update_panel() {
   else
     echo "❌ 无法获取数据库配置信息"
     echo "🔍 尝试诊断问题："
-    echo "   容器状态: $(docker inspect -f '{{.State.Status}}' springboot-backend 2>/dev/null || echo '容器不存在')"
-    echo "   健康状态: $(docker inspect -f '{{.State.Health.Status}}' springboot-backend 2>/dev/null || echo '无健康检查')"
+    echo "   容器状态: $(docker inspect -f '{{.State.Status}}' go-backend 2>/dev/null || echo '容器不存在')"
+    echo "   健康状态: $(docker inspect -f '{{.State.Health.Status}}' go-backend 2>/dev/null || echo '无健康检查')"
 
     # 尝试从 .env 文件读取配置
     if [[ -f ".env" ]]; then
@@ -900,6 +900,110 @@ UPDATE \`statistics_flow\`
 SET \`created_time\` = UNIX_TIMESTAMP() * 1000
 WHERE \`created_time\` = 0 OR \`created_time\` IS NULL;
 
+-- node 表：添加 xray 相关字段（如果不存在）
+SET @sql = (
+  SELECT IF(
+    NOT EXISTS (
+      SELECT 1
+      FROM information_schema.COLUMNS
+      WHERE table_schema = DATABASE()
+        AND table_name = 'node'
+        AND column_name = 'xray_enabled'
+    ),
+    'ALTER TABLE \`node\` ADD COLUMN \`xray_enabled\` TINYINT(4) NOT NULL DEFAULT 0;',
+    'SELECT "Column \`xray_enabled\` already exists in \`node\`";'
+  )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+  SELECT IF(
+    NOT EXISTS (
+      SELECT 1
+      FROM information_schema.COLUMNS
+      WHERE table_schema = DATABASE()
+        AND table_name = 'node'
+        AND column_name = 'xray_version'
+    ),
+    'ALTER TABLE \`node\` ADD COLUMN \`xray_version\` VARCHAR(50) DEFAULT NULL;',
+    'SELECT "Column \`xray_version\` already exists in \`node\`";'
+  )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @sql = (
+  SELECT IF(
+    NOT EXISTS (
+      SELECT 1
+      FROM information_schema.COLUMNS
+      WHERE table_schema = DATABASE()
+        AND table_name = 'node'
+        AND column_name = 'xray_status'
+    ),
+    'ALTER TABLE \`node\` ADD COLUMN \`xray_status\` TINYINT(4) NOT NULL DEFAULT 0;',
+    'SELECT "Column \`xray_status\` already exists in \`node\`";'
+  )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- 创建 Xray 表（如果不存在）
+CREATE TABLE IF NOT EXISTS \`xray_inbound\` (
+  \`id\` int(10) NOT NULL AUTO_INCREMENT,
+  \`node_id\` int(10) NOT NULL,
+  \`tag\` varchar(100) NOT NULL,
+  \`protocol\` varchar(50) NOT NULL,
+  \`listen\` varchar(100) DEFAULT '0.0.0.0',
+  \`port\` int(10) NOT NULL,
+  \`settings_json\` text NOT NULL,
+  \`stream_settings_json\` text,
+  \`sniffing_json\` text,
+  \`remark\` varchar(200) DEFAULT NULL,
+  \`enable\` tinyint(4) DEFAULT 1,
+  \`created_time\` bigint(20) NOT NULL,
+  \`updated_time\` bigint(20) NOT NULL,
+  PRIMARY KEY (\`id\`),
+  UNIQUE KEY \`uk_node_tag\` (\`node_id\`, \`tag\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS \`xray_client\` (
+  \`id\` int(10) NOT NULL AUTO_INCREMENT,
+  \`inbound_id\` int(10) NOT NULL,
+  \`user_id\` int(10) NOT NULL,
+  \`email\` varchar(200) NOT NULL,
+  \`uuid_or_password\` varchar(200) NOT NULL,
+  \`flow\` varchar(50) DEFAULT NULL,
+  \`alter_id\` int(10) DEFAULT 0,
+  \`total_traffic\` bigint(20) DEFAULT 0,
+  \`up_traffic\` bigint(20) DEFAULT 0,
+  \`down_traffic\` bigint(20) DEFAULT 0,
+  \`exp_time\` bigint(20) DEFAULT NULL,
+  \`enable\` tinyint(4) DEFAULT 1,
+  \`remark\` varchar(200) DEFAULT NULL,
+  \`created_time\` bigint(20) NOT NULL,
+  \`updated_time\` bigint(20) NOT NULL,
+  PRIMARY KEY (\`id\`),
+  UNIQUE KEY \`uk_email\` (\`email\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS \`xray_tls_cert\` (
+  \`id\` int(10) NOT NULL AUTO_INCREMENT,
+  \`node_id\` int(10) NOT NULL,
+  \`domain\` varchar(200) NOT NULL,
+  \`public_key\` text NOT NULL,
+  \`private_key\` text NOT NULL,
+  \`auto_renew\` tinyint(4) DEFAULT 0,
+  \`expire_time\` bigint(20) DEFAULT NULL,
+  \`created_time\` bigint(20) NOT NULL,
+  \`updated_time\` bigint(20) NOT NULL,
+  PRIMARY KEY (\`id\`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 EOF
 
   # 检查数据库容器
@@ -942,7 +1046,7 @@ export_migration_sql() {
   echo "🔍 获取数据库配置信息..."
 
   # 先检查后端容器是否在运行
-  if ! docker ps --format "{{.Names}}" | grep -q "^springboot-backend$"; then
+  if ! docker ps --format "{{.Names}}" | grep -q "^go-backend$"; then
     echo "❌ 后端容器未运行，尝试从 .env 文件读取配置..."
 
     # 从 .env 文件读取配置
@@ -963,7 +1067,7 @@ export_migration_sql() {
     fi
   else
     # 从容器环境变量获取数据库信息
-    DB_INFO=$(docker exec springboot-backend env | grep "^DB_" 2>/dev/null || echo "")
+    DB_INFO=$(docker exec go-backend env | grep "^DB_" 2>/dev/null || echo "")
 
     if [[ -n "$DB_INFO" ]]; then
       DB_NAME=$(echo "$DB_INFO" | grep "^DB_NAME=" | cut -d'=' -f2)

@@ -2,7 +2,7 @@ name: Build and Push Images Based on Version
 
 # 在这里定义统一版本号
 env:
-  VERSION: "1.4.6"
+  VERSION: "1.4.7"
 
 on:
   push:
@@ -153,30 +153,13 @@ jobs:
             -t 0xnetuser/vite-frontend:${VERSION} \
             ./vite-frontend
 
-  build-java:
-    name: Build & Push Spring Boot Backend
+  build-go-backend:
+    name: Build & Push Go Backend
     needs: check-version
     if: needs.check-version.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
-      - name: Set up JDK and Maven
-        uses: actions/setup-java@v3
-        with:
-          java-version: 21
-          distribution: 'temurin'
-
-      - name: Cache Maven dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
-
-      - name: Build Java JAR
-        working-directory: ./springboot-backend
-        run: mvn clean package -DskipTests
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -187,15 +170,15 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-      - name: Build and push Java Docker images
+      - name: Build and push Go Backend Docker images
         run: |
           VERSION="${{ needs.check-version.outputs.version }}"
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
             --push \
-            -t 0xnetuser/springboot-backend:latest \
-            -t 0xnetuser/springboot-backend:${VERSION} \
-            ./springboot-backend
+            -t 0xnetuser/go-backend:latest \
+            -t 0xnetuser/go-backend:${VERSION} \
+            ./go-backend
 
   build-gost-node:
     name: Build & Push GOST Node Image
@@ -255,7 +238,7 @@ jobs:
 
   create-release:
     name: Create Release and Tag
-    needs: [check-version, build-gost, build-gost-node, build-gost-binary, build-vite, build-java]
+    needs: [check-version, build-gost, build-gost-node, build-gost-binary, build-vite, build-go-backend]
     if: needs.check-version.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     permissions:

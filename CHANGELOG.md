@@ -1,5 +1,19 @@
 # Changelog
 
+## v1.6.1 — 移除 gost.sql 依赖 + DB 连接重试
+
+### Bug Fixes
+
+- **数据库连接重试**：后端启动时增加 30 次重试（2秒间隔），解决 Docker 容器启动顺序导致的 DNS 解析失败 (`lookup mysql: server misbehaving`)
+
+### Changes
+
+- **移除 gost.sql 依赖**：后端启动时自动插入默认配置 (`ensureDefaultConfig`)，Docker 部署不再需要下载 `gost.sql` 文件
+- **删除移动端代码**：移除 `ios-app/`、`android-app/` 目录和 `flux.ipa`
+- **CI/CD 精简**：Release 不再上传 `gost.sql`，安装脚本不再下载该文件
+
+---
+
 ## v1.6.0 — Xray 管理完整改造
 
 ### New Features

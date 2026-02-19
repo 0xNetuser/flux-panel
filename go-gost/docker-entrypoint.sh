@@ -58,4 +58,4 @@ if [ "$XRAY_ENABLE" = "true" ] || [ "$XRAY_ENABLE" = "1" ]; then
 fi
 
 echo "启动 gost..."
-exec /etc/gost/gost
+exec /usr/local/bin/gost

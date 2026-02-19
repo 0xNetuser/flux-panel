@@ -15,8 +15,8 @@ RUN XRAY_ARCH=$(case ${TARGETARCH} in amd64) echo "64";; arm64) echo "arm64-v8a"
 
 WORKDIR /etc/gost
 
-COPY gost-${TARGETARCH} /etc/gost/gost
-RUN chmod +x /etc/gost/gost
+COPY gost-${TARGETARCH} /usr/local/bin/gost
+RUN chmod +x /usr/local/bin/gost
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh

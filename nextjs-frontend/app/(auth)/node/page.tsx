@@ -8,9 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Edit2, Terminal, Container, Copy, Eye, EyeOff } from 'lucide-react';
+import { Plus, Trash2, Edit2, Terminal, Container, Copy, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import { getNodeList, createNode, updateNode, deleteNode, getNodeInstallCommand, getNodeDockerCommand } from '@/lib/api/node';
+import { getNodeList, createNode, updateNode, deleteNode, getNodeInstallCommand, getNodeDockerCommand, reconcileNode } from '@/lib/api/node';
 import { getVersion } from '@/lib/api/system';
 import { useAuth } from '@/lib/hooks/use-auth';
 
@@ -115,6 +115,26 @@ export default function NodePage() {
     }
   };
 
+  const [reconcilingId, setReconcilingId] = useState<number | null>(null);
+
+  const handleReconcile = async (id: number) => {
+    setReconcilingId(id);
+    try {
+      const res = await reconcileNode(id);
+      if (res.code === 0) {
+        const d = res.data;
+        toast.success(`同步完成: 限速器=${d.limiters} 转发=${d.forwards} 入站=${d.inbounds} 证书=${d.certs} 耗时=${d.duration}ms`);
+        if (d.errors && d.errors.length > 0) {
+          toast.warning(`${d.errors.length} 个错误: ${d.errors[0]}`);
+        }
+      } else {
+        toast.error(res.msg);
+      }
+    } finally {
+      setReconcilingId(null);
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success('已复制到剪贴板');
@@ -190,6 +210,9 @@ export default function NodePage() {
                       <div className="flex gap-1">
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(n)} title="编辑">
                           <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleReconcile(n.id)} disabled={reconcilingId === n.id} title="同步配置">
+                          <RefreshCw className={`h-4 w-4 ${reconcilingId === n.id ? 'animate-spin' : ''}`} />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleInstallCommand(n.id)} title="安装命令">
                           <Terminal className="h-4 w-4" />

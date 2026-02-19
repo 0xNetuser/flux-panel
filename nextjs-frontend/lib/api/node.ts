@@ -8,3 +8,4 @@ export const getNodeInstallCommand = (id: number) => post('/node/install', { id,
 export const getNodeDockerCommand = (id: number) => post('/node/install/docker', { id, panelAddr: window.location.origin });
 export const getAccessibleNodeList = () => post('/node/accessible');
 export const checkNodeStatus = (nodeId?: number) => post('/node/check-status', nodeId ? { nodeId } : {});
+export const reconcileNode = (id: number) => post('/node/reconcile', { id });

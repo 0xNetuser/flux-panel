@@ -1,5 +1,52 @@
 # Changelog
 
+## v1.6.2 — 节点配置自动对账 + 手动自检
+
+### 解决的问题
+
+- 节点离线期间面板的创建/删除/修改操作，重连后不会同步到节点
+- `XrayRemoveInbound` 是空操作（只打日志不删除），已删除的入站在节点上永远残留
+- WebSocket 命令因超时或网络抖动失败时，DB 已写入但节点未执行
+- 现有 `CleanNodeConfigs` 只删除孤儿服务，不补齐 DB 中存在而节点缺失的服务
+
+### New Features
+
+- **节点上线自动对账**：节点 WebSocket 重连后延迟 2 秒自动触发全量配置同步，确保节点状态与面板 DB 一致
+- **手动同步按钮**：节点管理页面新增「同步配置」按钮（RefreshCw 图标），管理员可随时手动触发配置对账，toast 显示同步结果（限速器/转发/入站/证书数量及耗时）
+- **4 阶段对账逻辑**：
+  1. **限速器** — 查询使用该节点的隧道 → 用户隧道的限速 ID → `AddLimiters` 幂等下发
+  2. **GOST 转发** — 查询关联此节点的所有转发 → `updateGostServices`（内部 not found 自动回退 Add）→ 已暂停的转发额外调用 `PauseService`
+  3. **Xray 入站** — 查询已启用入站 → `XrayApplyConfig` 全量替换
+  4. **Xray 证书** — 查询节点证书 → `XrayDeployCert` 重新部署
+- **并发控制**：per-node 互斥锁（`sync.Map` + `TryLock`），同一节点不会重复触发同步
+
+### Bug Fixes
+
+- **Xray 入站删除修复**：`DeleteXrayInbound` 从调用无效的 `XrayRemoveInbound` 改为 `syncXrayNodeConfig` 全量同步，删除的入站在节点上被真正移除
+
+### Changed Files
+
+**新增文件：**
+- `go-backend/service/reconcile.go` — ReconcileNode 核心逻辑 + 4 个子函数 + API 包装 + 并发锁
+
+**后端修改：**
+- `go-backend/task/config_check.go` — 空函数 → 延迟 2 秒异步调用 ReconcileNode
+- `go-backend/service/xray_inbound.go` — DeleteXrayInbound 用 syncXrayNodeConfig 替代 XrayRemoveInbound
+- `go-backend/handler/node.go` — +NodeReconcile handler
+- `go-backend/router/router.go` — +`POST /node/reconcile`（Admin）
+
+**前端修改：**
+- `nextjs-frontend/lib/api/node.ts` — +`reconcileNode` API
+- `nextjs-frontend/app/(auth)/node/page.tsx` — +同步配置按钮（带 loading 旋转动画 + 结果 toast）
+
+### Backward Compatibility
+
+- 对账逻辑完全幂等，重复执行无副作用
+- 不影响现有的 `/flow/config` 孤儿清理流程（CleanNodeConfigs 仍然独立工作）
+- 节点端无需同步更新
+
+---
+
 ## v1.6.1 — 移除 gost.sql 依赖 + DB 连接重试
 
 ### Bug Fixes

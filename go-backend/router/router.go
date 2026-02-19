@@ -75,6 +75,7 @@ func Setup(r *gin.Engine) {
 		auth.POST("/node/delete", middleware.Admin(), handler.NodeDelete)
 		auth.POST("/node/install", middleware.Admin(), handler.NodeInstall)
 		auth.POST("/node/install/docker", middleware.Admin(), handler.NodeInstallDocker)
+		auth.POST("/node/reconcile", middleware.Admin(), handler.NodeReconcile)
 
 		// Tunnel
 		auth.POST("/tunnel/create", middleware.Admin(), handler.TunnelCreate)

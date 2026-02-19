@@ -214,10 +214,8 @@ func DeleteXrayInbound(id int64, userId int64, roleId int) dto.R {
 
 	DB.Delete(&inbound)
 
-	result := pkg.XrayRemoveInbound(inbound.NodeId, inbound.Tag)
-	if result != nil && result.Msg != "OK" {
-		log.Printf("下发 XrayRemoveInbound 到节点 %d 失败: %s", inbound.NodeId, result.Msg)
-	}
+	// Use full sync instead of single remove — XrayRemoveInbound is a no-op on node side
+	syncXrayNodeConfig(inbound.NodeId)
 
 	return dto.Ok("删除成功")
 }

@@ -50,7 +50,7 @@ func main() {
 	service.DB = db
 
 	// ── Security startup checks ──
-	if config.Cfg.JWTSecret == "default_jwt_secret" {
+	if config.Cfg.JWTSecret == "" {
 		config.Cfg.JWTSecret = generateRandomPassword(64)
 		log.Println("========================================")
 		log.Println("WARNING ⚠️  JWT_SECRET 未设置，已自动生成随机密钥")
@@ -59,7 +59,7 @@ func main() {
 		log.Println("========================================")
 	}
 
-	checkAndResetDefaultAdmin(db)
+	ensureAdminUser(db)
 
 	// Init WebSocket manager
 	pkg.InitWSManager()
@@ -111,20 +111,50 @@ func main() {
 	}
 }
 
-// checkAndResetDefaultAdmin checks if the admin user still has the default password.
-// If so, it generates a random password, updates the DB, and prints the new password.
-func checkAndResetDefaultAdmin(db *gorm.DB) {
+// ensureAdminUser creates the admin user if it doesn't exist,
+// or resets the password if it's still the default value.
+func ensureAdminUser(db *gorm.DB) {
 	var admin model.User
-	if err := db.Where("user = ? AND role_id = 0", "admin_user").First(&admin).Error; err != nil {
-		return // Admin not found or renamed — nothing to do
+	err := db.Where("user = ? AND role_id = 0", "admin_user").First(&admin).Error
+
+	if err != nil {
+		// Admin user doesn't exist — create with random password
+		newPassword := generateRandomPassword(12)
+		newHash := pkg.HashPassword(newPassword)
+		if newHash == "" {
+			log.Println("WARNING: Failed to generate bcrypt hash for admin password")
+			return
+		}
+		now := int64(0) // will be set by service layer conventions
+		admin = model.User{
+			User:          "admin_user",
+			Pwd:           newHash,
+			RoleId:        0,
+			ExpTime:       2727251700000,
+			Flow:          99999,
+			Num:           99999,
+			FlowResetTime: 1,
+			Status:        1,
+			CreatedTime:   now,
+			UpdatedTime:   now,
+		}
+		if createErr := db.Create(&admin).Error; createErr != nil {
+			log.Printf("WARNING: Failed to create admin user: %v", createErr)
+			return
+		}
+		log.Println("========================================")
+		log.Printf("⚠️  管理员账号已自动创建，新密码: %s", newPassword)
+		log.Println("⚠️  请立即登录并修改密码！")
+		log.Println("========================================")
+		return
 	}
 
-	// Check if password is still the default "admin_user" (MD5 or bcrypt)
+	// Admin exists — check if password is still the default "admin_user" (MD5 or bcrypt)
 	if !pkg.CheckPassword("admin_user", admin.Pwd) {
 		return // Password already changed
 	}
 
-	// Generate a 12-character random password
+	// Reset default password
 	newPassword := generateRandomPassword(12)
 	newHash := pkg.HashPassword(newPassword)
 	if newHash == "" {
@@ -132,8 +162,8 @@ func checkAndResetDefaultAdmin(db *gorm.DB) {
 		return
 	}
 
-	if err := db.Model(&model.User{}).Where("id = ?", admin.ID).Update("pwd", newHash).Error; err != nil {
-		log.Printf("WARNING: Failed to update default admin password: %v", err)
+	if updateErr := db.Model(&model.User{}).Where("id = ?", admin.ID).Update("pwd", newHash).Error; updateErr != nil {
+		log.Printf("WARNING: Failed to update default admin password: %v", updateErr)
 		return
 	}
 

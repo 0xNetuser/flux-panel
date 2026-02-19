@@ -26,7 +26,7 @@ func Load() {
 		DBName:         getEnv("DB_NAME", "gost"),
 		DBUser:         getEnv("DB_USER", "root"),
 		DBPassword:     getEnv("DB_PASSWORD", ""),
-		JWTSecret:      getEnv("JWT_SECRET", "default_jwt_secret"),
+		JWTSecret:      os.Getenv("JWT_SECRET"),
 		LogDir:         getEnv("LOG_DIR", "/app/logs"),
 		NodeBinaryDir:  getEnv("NODE_BINARY_DIR", "/data/node"),
 		Port:           getEnvInt("SERVER_PORT", 6365),

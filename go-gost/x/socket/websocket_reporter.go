@@ -221,7 +221,7 @@ func (w *WebSocketReporter) connect() error {
 	if w.useTLS {
 		wsScheme = "wss"
 	}
-	currentURL := wsScheme + "://" + w.addr + "/system-info?type=1&secret=" + w.secret + "&version=" + w.version +
+	currentURL := wsScheme + "://" + w.addr + "/system-info?type=1&secret=" + w.secret + "&nodeVersion=" + w.version +
 		"&http=" + strconv.Itoa(cfg.Http) + "&tls=" + strconv.Itoa(cfg.Tls) + "&socks=" + strconv.Itoa(cfg.Socks)
 
 	u, err := url.Parse(currentURL)
@@ -1286,7 +1286,7 @@ func StartWebSocketReporterWithConfig(addr string, secret string, http int, tls 
 	if useTLS {
 		wsScheme = "wss"
 	}
-	fullURL := wsScheme + "://" + addr + "/system-info?type=1&secret=" + secret + "&version=" + version + "&http=" + strconv.Itoa(http) + "&tls=" + strconv.Itoa(tls) + "&socks=" + strconv.Itoa(socks)
+	fullURL := wsScheme + "://" + addr + "/system-info?type=1&secret=" + secret + "&nodeVersion=" + version + "&http=" + strconv.Itoa(http) + "&tls=" + strconv.Itoa(tls) + "&socks=" + strconv.Itoa(socks)
 
 	fmt.Printf("🔗 WebSocket连接URL: %s\n", fullURL)
 

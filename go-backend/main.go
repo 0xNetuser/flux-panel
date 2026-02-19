@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"time"
 
 	"flux-panel/go-backend/config"
 	"flux-panel/go-backend/model"
@@ -23,12 +24,21 @@ func main() {
 	// Load config
 	config.Load()
 
-	// Connect database
-	db, err := gorm.Open(mysql.Open(config.DSN()), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Warn),
-	})
+	// Connect database with retry
+	var db *gorm.DB
+	var err error
+	for i := 1; i <= 30; i++ {
+		db, err = gorm.Open(mysql.Open(config.DSN()), &gorm.Config{
+			Logger: logger.Default.LogMode(logger.Warn),
+		})
+		if err == nil {
+			break
+		}
+		log.Printf("数据库连接失败 (第 %d/30 次): %v", i, err)
+		time.Sleep(2 * time.Second)
+	}
 	if err != nil {
-		log.Fatalf("Failed to connect database: %v", err)
+		log.Fatalf("数据库连接失败，已重试 30 次: %v", err)
 	}
 
 	// Auto-migrate tables
@@ -46,6 +56,9 @@ func main() {
 		&model.XrayTlsCert{},
 		&model.UserNode{},
 	)
+
+	// Ensure default config exists (replaces gost.sql seed data)
+	ensureDefaultConfig(db)
 
 	// Backfill NULL permission columns for existing users
 	db.Exec("UPDATE `user` SET gost_enabled = 1 WHERE gost_enabled IS NULL")
@@ -201,6 +214,21 @@ func ensureAdminUser(db *gorm.DB) {
 	log.Printf("⚠️  默认管理员密码已自动重置，新密码: %s", newPassword)
 	log.Println("⚠️  请立即登录并修改密码！")
 	log.Println("========================================")
+}
+
+// ensureDefaultConfig inserts default seed data (replaces gost.sql).
+// Only runs on first deploy — skips if data already exists.
+func ensureDefaultConfig(db *gorm.DB) {
+	var count int64
+	db.Model(&model.ViteConfig{}).Where("name = ?", "app_name").Count(&count)
+	if count == 0 {
+		db.Create(&model.ViteConfig{
+			Name:  "app_name",
+			Value: "flux",
+			Time:  time.Now().UnixMilli(),
+		})
+		log.Println("默认配置已初始化 (app_name=flux)")
+	}
 }
 
 func generateRandomPassword(length int) string {

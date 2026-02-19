@@ -55,9 +55,6 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 ```bash
 # 下载 docker-compose 配置文件
 curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.6.0/docker-compose.yml -o docker-compose.yml
-
-# 下载数据库初始化文件
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.6.0/gost.sql -o gost.sql
 ```
 
 **2. 创建环境变量文件**
@@ -187,7 +184,7 @@ curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.6.0/docker-c
 docker compose pull && docker compose up -d
 ```
 
-> `.env` 和 `gost.sql` 无需重新下载，数据库数据保留在 Docker 卷中。
+> `.env` 无需重新下载，数据库数据保留在 Docker 卷中。
 
 ---
 

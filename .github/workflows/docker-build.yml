@@ -420,9 +420,6 @@ jobs:
           echo "📤 上传 Docker Compose 配置文件..."
           gh release upload "${VERSION}" ./docker-compose.yml --clobber
 
-          echo "📤 上传数据库初始化文件..."
-          gh release upload "${VERSION}" ./gost.sql --clobber
-
           echo "✅ 所有文件已上传到 Release ${VERSION}"
 
   update-release-gost:

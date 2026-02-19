@@ -9,13 +9,11 @@ export LC_ALL=C
 
 # 全局下载地址配置
 DOCKER_COMPOSE_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.6.0/docker-compose.yml"
-GOST_SQL_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.6.0/gost.sql"
 
 COUNTRY=$(curl -s https://ipinfo.io/country)
 if [ "$COUNTRY" = "CN" ]; then
     # 拼接 URL
     DOCKER_COMPOSE_URL="https://ghfast.top/${DOCKER_COMPOSE_URL}"
-    GOST_SQL_URL="https://ghfast.top/${GOST_SQL_URL}"
 fi
 
 # 检查 docker-compose 或 docker compose 命令
@@ -181,13 +179,6 @@ install_panel() {
   echo "📡 下载配置文件..."
   curl -L -o docker-compose.yml "$DOCKER_COMPOSE_URL"
 
-  # 检查 gost.sql 是否已存在
-  if [[ -f "gost.sql" ]]; then
-    echo "⏭️ 跳过下载: gost.sql (使用当前位置的文件)"
-  else
-    echo "📡 下载数据库初始化文件..."
-    curl -L -o gost.sql "$GOST_SQL_URL"
-  fi
   echo "✅ 文件准备完成"
 
   # 自动检测并配置 IPv6 支持
@@ -1160,7 +1151,7 @@ uninstall_panel() {
   echo "🛑 停止并删除容器、镜像、卷..."
   $DOCKER_CMD down --rmi all --volumes --remove-orphans
   echo "🧹 删除配置文件..."
-  rm -f docker-compose.yml gost.sql .env
+  rm -f docker-compose.yml .env
   echo "✅ 卸载完成"
 }
 

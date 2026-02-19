@@ -47,6 +47,7 @@ type WSManager struct {
 	nodeSessions    sync.Map // nodeID(int64) → *NodeSession
 	adminSessions   sync.Map // sessionID(string) → *websocket.Conn
 	pendingRequests sync.Map // requestID(string) → chan *dto.GostResponse
+	nodeSystemInfo  sync.Map // nodeID(int64) → *NodeSystemInfo
 
 	// Callbacks set by the application
 	OnNodeOnline       func(nodeId int64, version, http, tls, socks string)
@@ -56,6 +57,23 @@ type WSManager struct {
 	// the specific node; if nodeId == 0, looks up by secret alone.
 	// Returns the resolved nodeId (0 = rejected).
 	ValidateNodeSecret func(nodeId int64, secret string) int64
+}
+
+// NodeSystemInfo holds the latest system metrics reported by a node.
+type NodeSystemInfo struct {
+	Uptime           uint64  `json:"uptime"`
+	CPUUsage         float64 `json:"cpuUsage"`
+	MemoryUsage      float64 `json:"memUsage"`
+	BytesReceived    uint64  `json:"bytesReceived"`
+	BytesTransmitted uint64  `json:"bytesTransmitted"`
+}
+
+// GetNodeSystemInfo returns the latest cached system info for a node, or nil.
+func (m *WSManager) GetNodeSystemInfo(nodeId int64) *NodeSystemInfo {
+	if val, ok := m.nodeSystemInfo.Load(nodeId); ok {
+		return val.(*NodeSystemInfo)
+	}
+	return nil
 }
 
 type NodeSession struct {
@@ -189,6 +207,7 @@ func (m *WSManager) readNodeMessages(nodeId int64, ns *NodeSession) {
 		if current, ok := m.nodeSessions.Load(nodeId); ok {
 			if current.(*NodeSession) == ns {
 				m.nodeSessions.Delete(nodeId)
+				m.nodeSystemInfo.Delete(nodeId)
 				if m.OnNodeOffline != nil {
 					m.OnNodeOffline(nodeId)
 				}
@@ -209,6 +228,25 @@ func (m *WSManager) readNodeMessages(nodeId int64, ns *NodeSession) {
 
 		if containsStr(decrypted, "memory_usage") {
 			m.sendToNode(ns, `{"type":"call"}`)
+
+			// Cache latest system info for REST API access
+			var sysInfo struct {
+				Uptime           uint64  `json:"uptime"`
+				CPUUsage         float64 `json:"cpu_usage"`
+				MemoryUsage      float64 `json:"memory_usage"`
+				BytesReceived    uint64  `json:"bytes_received"`
+				BytesTransmitted uint64  `json:"bytes_transmitted"`
+			}
+			if json.Unmarshal([]byte(decrypted), &sysInfo) == nil {
+				m.nodeSystemInfo.Store(nodeId, &NodeSystemInfo{
+					Uptime:           sysInfo.Uptime,
+					CPUUsage:         sysInfo.CPUUsage,
+					MemoryUsage:      sysInfo.MemoryUsage,
+					BytesReceived:    sysInfo.BytesReceived,
+					BytesTransmitted: sysInfo.BytesTransmitted,
+				})
+			}
+
 			// Broadcast system info to admin sessions
 			broadcastMsg := map[string]interface{}{
 				"id":   strconv.FormatInt(nodeId, 10),

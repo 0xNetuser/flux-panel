@@ -4,15 +4,22 @@ import (
 	"fmt"
 	"flux-panel/go-backend/dto"
 	"flux-panel/go-backend/model"
+	"flux-panel/go-backend/pkg"
 	"time"
 )
 
 // GetAdminDashboardStats returns aggregated stats for admin dashboard.
 func GetAdminDashboardStats() dto.R {
-	// Nodes
-	var totalNodes, onlineNodes int64
-	DB.Model(&model.Node{}).Count(&totalNodes)
-	DB.Model(&model.Node{}).Where("status = 1").Count(&onlineNodes)
+	// Nodes — use live WS status for accurate online count
+	var allNodes []model.Node
+	DB.Find(&allNodes)
+	totalNodes := int64(len(allNodes))
+	var onlineNodes int64
+	for _, n := range allNodes {
+		if pkg.WS != nil && pkg.WS.IsNodeOnline(n.ID) {
+			onlineNodes++
+		}
+	}
 
 	// Users (non-admin)
 	var totalUsers int64
@@ -43,16 +50,18 @@ func GetAdminDashboardStats() dto.R {
 		Limit(5).
 		Find(&topUsers)
 
-	// Node list
-	var nodes []model.Node
-	DB.Find(&nodes)
-	nodeList := make([]map[string]interface{}, 0, len(nodes))
-	for _, n := range nodes {
+	// Node list — reuse allNodes with live WS status
+	nodeList := make([]map[string]interface{}, 0, len(allNodes))
+	for _, n := range allNodes {
+		status := n.Status
+		if pkg.WS != nil && pkg.WS.IsNodeOnline(n.ID) {
+			status = 1
+		}
 		nodeList = append(nodeList, map[string]interface{}{
 			"id":       n.ID,
 			"name":     n.Name,
 			"serverIp": n.ServerIp,
-			"status":   n.Status,
+			"status":   status,
 			"version":  n.Version,
 		})
 	}

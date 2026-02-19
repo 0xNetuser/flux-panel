@@ -37,15 +37,47 @@ func GetAllNodes() dto.R {
 	var nodes []model.Node
 	DB.Order("created_time DESC").Find(&nodes)
 
-	// Update online status from WS manager; strip secrets from response
-	for i := range nodes {
-		if pkg.WS != nil && pkg.WS.IsNodeOnline(nodes[i].ID) {
-			nodes[i].Status = 1
+	result := make([]map[string]interface{}, 0, len(nodes))
+	for _, n := range nodes {
+		status := n.Status
+		if pkg.WS != nil && pkg.WS.IsNodeOnline(n.ID) {
+			status = 1
 		}
-		nodes[i].Secret = ""
+
+		item := map[string]interface{}{
+			"id":          n.ID,
+			"name":        n.Name,
+			"ip":          n.Ip,
+			"serverIp":    n.ServerIp,
+			"portSta":     n.PortSta,
+			"portEnd":     n.PortEnd,
+			"version":     n.Version,
+			"http":        n.Http,
+			"tls":         n.Tls,
+			"socks":       n.Socks,
+			"xrayEnabled": n.XrayEnabled,
+			"xrayVersion": n.XrayVersion,
+			"xrayStatus":  n.XrayStatus,
+			"createdTime": n.CreatedTime,
+			"updatedTime": n.UpdatedTime,
+			"status":      status,
+		}
+
+		// Overlay live system info from WS cache
+		if pkg.WS != nil {
+			if info := pkg.WS.GetNodeSystemInfo(n.ID); info != nil {
+				item["cpuUsage"] = info.CPUUsage
+				item["memUsage"] = info.MemoryUsage
+				item["uptime"] = info.Uptime
+				item["bytesReceived"] = info.BytesReceived
+				item["bytesTransmitted"] = info.BytesTransmitted
+			}
+		}
+
+		result = append(result, item)
 	}
 
-	return dto.Ok(nodes)
+	return dto.Ok(result)
 }
 
 func UpdateNode(d dto.NodeUpdateDto) dto.R {

@@ -38,13 +38,13 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 ```bash
 # 下载 docker-compose 配置文件（二选一）
 # IPv4 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.1/docker-compose-v4.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.2/docker-compose-v4.yml -o docker-compose.yml
 
 # IPv6 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.1/docker-compose-v6.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.2/docker-compose-v6.yml -o docker-compose.yml
 
 # 下载数据库初始化文件
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.1/gost.sql -o gost.sql
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.2/gost.sql -o gost.sql
 ```
 
 **2. 创建环境变量文件**
@@ -109,7 +109,7 @@ docker compose up -d
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.5.1
+  0xnetuser/gost-node:1.5.2
 ```
 
 也可以使用 docker-compose，参考项目中的 `docker-compose-node.yml`：
@@ -117,7 +117,7 @@ docker run -d --network=host --restart=unless-stopped --name gost-node \
 ```yaml
 services:
   gost-node:
-    image: 0xnetuser/gost-node:1.5.1
+    image: 0xnetuser/gost-node:1.5.2
     container_name: gost-node
     network_mode: host
     restart: unless-stopped
@@ -167,10 +167,10 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 ```bash
 # 下载最新 docker-compose 配置（覆盖旧文件）
 # IPv4 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.1/docker-compose-v4.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.2/docker-compose-v4.yml -o docker-compose.yml
 
 # IPv6 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.1/docker-compose-v6.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.2/docker-compose-v6.yml -o docker-compose.yml
 
 # 拉取最新镜像并重启
 docker compose pull && docker compose up -d
@@ -192,7 +192,7 @@ docker stop gost-node && docker rm gost-node
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.5.1
+  0xnetuser/gost-node:1.5.2
 ```
 
 如果使用 docker-compose 部署，更新 `docker-compose-node.yml` 中的镜像版本后：
@@ -214,6 +214,12 @@ curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && c
 ---
 
 ## 更新日志
+
+### v1.5.2
+
+- **修复健康检查 404**：`/flow/test` 新增 GET 方法，修复 docker-compose 健康检查失败导致前端无法启动
+- **修复 ViteConfig 迁移报错**：指定 `varchar(200)` 类型，避免 GORM 映射为 longtext 导致 MySQL 唯一索引冲突
+- **CI 构建优化**：Go 二进制改为宿主机原生交叉编译，Docker 只做 COPY；Next.js 原生构建后打包 nginx；全面启用 GitHub Actions 层缓存，总构建时间从 ~22min 降至 ~5min
 
 ### v1.5.1
 

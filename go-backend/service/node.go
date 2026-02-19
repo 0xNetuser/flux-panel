@@ -6,7 +6,6 @@ import (
 	"flux-panel/go-backend/dto"
 	"flux-panel/go-backend/model"
 	"flux-panel/go-backend/pkg"
-	"strings"
 	"time"
 )
 
@@ -199,14 +198,13 @@ func GenerateDockerInstallCommand(id int64, clientAddr string) dto.R {
 	}
 
 	panelAddr := getPanelAddress(clientAddr)
-	wsAddr := strings.Replace(strings.Replace(panelAddr, "https://", "wss://", 1), "http://", "ws://", 1)
 
 	imageTag := pkg.Version
 	if imageTag == "" || imageTag == "dev" {
 		imageTag = "latest"
 	}
-	cmd := fmt.Sprintf(`docker run -d --name gost-node --restart unless-stopped --network host -e NODE_ID=%d -e NODE_SECRET=%s -e WS_ADDR=%s/system-info -e FLOW_ADDR=%s 0xnetuser/gost-node:%s`,
-		node.ID, node.Secret, wsAddr, panelAddr, imageTag)
+	cmd := fmt.Sprintf(`docker run -d --name gost-node --restart unless-stopped --network host -e PANEL_ADDR=%s -e SECRET=%s 0xnetuser/gost-node:%s`,
+		panelAddr, node.Secret, imageTag)
 
 	return dto.Ok(cmd)
 }

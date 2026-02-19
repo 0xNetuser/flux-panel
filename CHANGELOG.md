@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.6.3 — 隧道协议修复
+
+### Bug Fixes
+
+- **隧道协议下拉框错误**：原来提供的 `tcp` / `udp` / `tcp+udp` 是传输层协议，不是 GOST 隧道协议。传入 `tcp` 作为 GOST dialer/listener 类型会导致隧道转发无法正常使用加密通道
+- **默认协议不一致**：后端默认协议为 `tls`，但前端默认发送 `tcp`，导致后端默认值从未生效
+
+### Changes
+
+- **隧道转发协议选项**：改为 GOST 完整协议列表 — TLS / mTLS / WSS / mWSS / QUIC / gRPC / WS / mWS / KCP
+- **端口转发协议显示**：固定显示 TCP+UDP（灰色禁用），因为端口转发的 `buildServices` 始终创建 TCP+UDP 双服务，协议字段无效
+- **默认协议**：前端默认值从 `tcp` 改为 `tls`，与后端默认值保持一致
+
+### Changed Files
+
+- `nextjs-frontend/app/(auth)/tunnel/page.tsx` — 协议下拉框改造 + 端口转发禁用 + 默认值修正
+
+---
+
 ## v1.6.2 — 节点配置自动对账 + 手动自检
 
 ### 解决的问题

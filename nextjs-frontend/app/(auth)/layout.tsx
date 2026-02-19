@@ -30,13 +30,13 @@ const navItems: NavItem[] = [
   // GOST
   { path: '/forward', label: '转发管理', icon: <ArrowRightLeft className="h-4 w-4" />, section: 'GOST' },
   { path: '/tunnel', label: '隧道管理', icon: <Link2 className="h-4 w-4" />, adminOnly: true, section: 'GOST' },
-  { path: '/node', label: '节点管理', icon: <Server className="h-4 w-4" />, adminOnly: true, section: 'GOST' },
   // Xray
   { path: '/xray/inbound', label: '入站管理', icon: <Inbox className="h-4 w-4" />, adminOnly: true, section: 'Xray' },
   { path: '/xray/client', label: '客户端管理', icon: <UserCheck className="h-4 w-4" />, adminOnly: true, section: 'Xray' },
   { path: '/xray/certificate', label: '证书管理', icon: <Award className="h-4 w-4" />, adminOnly: true, section: 'Xray' },
   { path: '/xray/subscription', label: '订阅管理', icon: <Rss className="h-4 w-4" />, section: 'Xray' },
   // System
+  { path: '/node', label: '节点管理', icon: <Server className="h-4 w-4" />, adminOnly: true, section: '系统' },
   { path: '/user', label: '用户管理', icon: <Users className="h-4 w-4" />, adminOnly: true, section: '系统' },
   { path: '/limit', label: '限速规则', icon: <Clock className="h-4 w-4" />, adminOnly: true, section: '系统' },
   { path: '/config', label: '网站配置', icon: <Settings className="h-4 w-4" />, adminOnly: true, section: '系统' },

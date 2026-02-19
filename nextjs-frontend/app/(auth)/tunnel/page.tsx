@@ -29,7 +29,7 @@ export default function TunnelPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTunnel, setEditingTunnel] = useState<any>(null);
   const [form, setForm] = useState({
-    name: '', inNodeId: '', outNodeId: '', type: 'port', protocol: 'tcp',
+    name: '', inNodeId: '', outNodeId: '', type: 'port', protocol: 'tls',
     portSta: '', portEnd: '', interfaceName: '',
   });
 
@@ -67,7 +67,7 @@ export default function TunnelPage() {
 
   const handleCreate = () => {
     setEditingTunnel(null);
-    setForm({ name: '', inNodeId: '', outNodeId: '', type: 'port', protocol: 'tcp', portSta: '', portEnd: '', interfaceName: '' });
+    setForm({ name: '', inNodeId: '', outNodeId: '', type: 'port', protocol: 'tls', portSta: '', portEnd: '', interfaceName: '' });
     setDialogOpen(true);
   };
 
@@ -78,7 +78,7 @@ export default function TunnelPage() {
       inNodeId: tunnel.inNodeId?.toString() || '',
       outNodeId: tunnel.outNodeId?.toString() || '',
       type: tunnel.type === 2 ? 'tunnel' : 'port',
-      protocol: tunnel.protocol || 'tcp',
+      protocol: tunnel.protocol || 'tls',
       portSta: tunnel.portSta?.toString() || '',
       portEnd: tunnel.portEnd?.toString() || '',
       interfaceName: tunnel.interfaceName || '',
@@ -213,7 +213,7 @@ export default function TunnelPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary">{t.protocol?.toUpperCase()}</Badge>
+                          <Badge variant="secondary">{t.type === 1 ? 'TCP+UDP' : t.protocol?.toUpperCase()}</Badge>
                         </TableCell>
                         <TableCell>{t.portSta} - {t.portEnd}</TableCell>
                         <TableCell>
@@ -329,14 +329,24 @@ export default function TunnelPage() {
               </div>
               <div className="space-y-2">
                 <Label>协议</Label>
-                <Select value={form.protocol} onValueChange={v => setForm(p => ({ ...p, protocol: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="tcp">TCP</SelectItem>
-                    <SelectItem value="udp">UDP</SelectItem>
-                    <SelectItem value="tcp+udp">TCP+UDP</SelectItem>
-                  </SelectContent>
-                </Select>
+                {form.type === 'port' ? (
+                  <Input value="TCP+UDP" disabled className="bg-muted" />
+                ) : (
+                  <Select value={form.protocol} onValueChange={v => setForm(p => ({ ...p, protocol: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tls">TLS</SelectItem>
+                      <SelectItem value="mtls">mTLS</SelectItem>
+                      <SelectItem value="wss">WSS</SelectItem>
+                      <SelectItem value="mwss">mWSS</SelectItem>
+                      <SelectItem value="quic">QUIC</SelectItem>
+                      <SelectItem value="grpc">gRPC</SelectItem>
+                      <SelectItem value="ws">WS</SelectItem>
+                      <SelectItem value="mws">mWS</SelectItem>
+                      <SelectItem value="kcp">KCP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">

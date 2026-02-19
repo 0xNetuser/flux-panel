@@ -14,6 +14,17 @@ import { getNodeList, createNode, updateNode, deleteNode, getNodeInstallCommand,
 import { getVersion } from '@/lib/api/system';
 import { useAuth } from '@/lib/hooks/use-auth';
 
+function compareVersions(a: string, b: string): number {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] || 0;
+    const nb = pb[i] || 0;
+    if (na !== nb) return na - nb;
+  }
+  return 0;
+}
+
 export default function NodePage() {
   const { isAdmin } = useAuth();
   const [nodes, setNodes] = useState<any[]>([]);
@@ -198,7 +209,7 @@ export default function NodePage() {
                     </TableCell>
                     <TableCell className="text-sm">
                       {n.version || '-'}
-                      {n.version && panelVersion && n.version !== panelVersion && n.version !== 'dev' && (
+                      {n.version && panelVersion && n.version !== panelVersion && n.version !== 'dev' && compareVersions(n.version, panelVersion) < 0 && (
                         <Badge variant="outline" className="ml-1 text-orange-600 border-orange-400">需更新</Badge>
                       )}
                     </TableCell>

@@ -31,7 +31,7 @@ export default function NodePage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingNode, setEditingNode] = useState<any>(null);
-  const [form, setForm] = useState({ name: '', serverIp: '', portSta: '', portEnd: '', secret: '' });
+  const [form, setForm] = useState({ name: '', ip: '', serverIp: '', portSta: '', portEnd: '', secret: '' });
   const [commandDialog, setCommandDialog] = useState(false);
   const [commandContent, setCommandContent] = useState('');
   const [commandTitle, setCommandTitle] = useState('');
@@ -50,7 +50,7 @@ export default function NodePage() {
 
   const handleCreate = () => {
     setEditingNode(null);
-    setForm({ name: '', serverIp: '', portSta: '', portEnd: '', secret: '' });
+    setForm({ name: '', ip: '', serverIp: '', portSta: '', portEnd: '', secret: '' });
     setShowSecret(false);
     setDialogOpen(true);
   };
@@ -59,6 +59,7 @@ export default function NodePage() {
     setEditingNode(node);
     setForm({
       name: node.name || '',
+      ip: node.ip || '',
       serverIp: node.serverIp || '',
       portSta: node.portSta?.toString() || '',
       portEnd: node.portEnd?.toString() || '',
@@ -75,6 +76,7 @@ export default function NodePage() {
     }
     const data: any = {
       name: form.name,
+      ip: form.ip || undefined,
       serverIp: form.serverIp,
       secret: form.secret || undefined,
     };
@@ -182,7 +184,8 @@ export default function NodePage() {
             <TableHeader>
               <TableRow>
                 <TableHead>名称</TableHead>
-                <TableHead>IP</TableHead>
+                <TableHead>入口IP</TableHead>
+                <TableHead>服务器IP</TableHead>
                 <TableHead>端口范围</TableHead>
                 <TableHead>状态</TableHead>
                 <TableHead>版本</TableHead>
@@ -193,14 +196,15 @@ export default function NodePage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8">加载中...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center py-8">加载中...</TableCell></TableRow>
               ) : nodes.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
               ) : (
                 nodes.map((n) => (
                   <TableRow key={n.id}>
                     <TableCell className="font-medium">{n.name}</TableCell>
-                    <TableCell>{n.serverIp}</TableCell>
+                    <TableCell className="text-sm">{n.ip || '-'}</TableCell>
+                    <TableCell className="text-sm">{n.serverIp}</TableCell>
                     <TableCell>{n.portSta} - {n.portEnd}</TableCell>
                     <TableCell>
                       <Badge variant={n.status === 1 ? 'default' : 'destructive'}>
@@ -255,9 +259,15 @@ export default function NodePage() {
               <Label>名称</Label>
               <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="节点名称" />
             </div>
-            <div className="space-y-2">
-              <Label>服务器IP</Label>
-              <Input value={form.serverIp} onChange={e => setForm(p => ({ ...p, serverIp: e.target.value }))} placeholder="1.2.3.4" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>入口IP</Label>
+                <Input value={form.ip} onChange={e => setForm(p => ({ ...p, ip: e.target.value }))} placeholder="用户连接的IP" />
+              </div>
+              <div className="space-y-2">
+                <Label>服务器IP</Label>
+                <Input value={form.serverIp} onChange={e => setForm(p => ({ ...p, serverIp: e.target.value }))} placeholder="节点通信IP" />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

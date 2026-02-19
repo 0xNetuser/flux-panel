@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.6.6 — 多项体验修复
+
+### Bug Fixes
+
+- **节点版本提示误报**：节点版本高于面板时不再显示「需更新」，改为语义化版本比较
+- **节点入口IP字段丢失**：节点管理页面恢复「入口IP」列和表单字段
+- **隧道转发节点校验**：隧道转发禁止入口节点和出口节点选同一个，前后端同时校验
+- **转发诊断无结果**：诊断按钮原来只显示「诊断完成」toast，改为弹窗展示每段链路的连通性、延迟、丢包率和错误信息
+
+### Changed Files
+
+- `nextjs-frontend/app/(auth)/node/page.tsx` — 版本比较 + 入口IP字段
+- `nextjs-frontend/app/(auth)/tunnel/page.tsx` — 同节点校验
+- `nextjs-frontend/app/(auth)/forward/page.tsx` — 诊断结果弹窗
+- `go-backend/service/tunnel.go` — 同节点校验
+
+---
+
 ## v1.6.5 — 节点 Docker 启动修复
 
 ### Bug Fixes

@@ -125,6 +125,7 @@ func Setup(r *gin.Engine) {
 		auth.POST("/xray/client/update", handler.XrayClientUpdate)
 		auth.POST("/xray/client/delete", handler.XrayClientDelete)
 		auth.POST("/xray/client/reset-traffic", handler.XrayClientResetTraffic)
+		auth.POST("/xray/client/link", handler.XrayClientLink)
 
 		// Xray Cert (permission checked in service layer)
 		auth.POST("/xray/cert/create", handler.XrayCertCreate)

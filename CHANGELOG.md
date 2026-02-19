@@ -1,5 +1,36 @@
 # Changelog
 
+## v1.6.4 — Xray 客户端导出链接 + 二维码
+
+### New Features
+
+- **客户端链接导出**：客户端管理页面「复制链接」按钮现在能正确生成包含完整传输层和安全层参数的协议链接
+- **二维码弹窗**：客户端操作栏新增 QR 按钮，点击弹出二维码 + 链接文本 + 复制按钮，方便手机扫码导入
+- **单客户端链接 API**：新增 `POST /xray/client/link` 接口，按客户端 ID 查询并生成协议链接
+
+### Bug Fixes
+
+- **链接生成修复**：4 个链接生成函数 (vmess/vless/trojan/shadowsocks) 原来硬编码 `type=tcp`、无 TLS/Reality/WS 等参数，现在完整解析 `streamSettingsJson` 并写入链接
+  - VLESS/Trojan：URL query 包含 type/security/sni/fp/alpn/path/host/pbk/sid/spx 等参数
+  - VMess：base64 JSON 包含 net/tls/sni/fp/alpn/host/path 字段
+  - Shadowsocks：method 从 `settingsJson` 读取，不再硬编码 `aes-256-gcm`
+- **复制链接无效**：`handleCopyLink` 原读取 `client.link` 字段（列表 API 从不返回），改为调用后端 API 实时生成
+- **隧道协议默认值**：端口转发默认协议从 `tls` 改为 `tcp+udp`，切换类型时自动重置协议（端口转发 → tcp+udp，隧道转发 → tls）
+
+### Changed Files
+
+**后端：**
+- `go-backend/service/xray_client.go` — streamSettings/inboundSettings 解析 + 重写链接生成 + GetClientLink
+- `go-backend/handler/xray_client.go` — +XrayClientLink handler
+- `go-backend/router/router.go` — +`POST /xray/client/link`
+
+**前端：**
+- `nextjs-frontend/lib/api/xray-client.ts` — +getXrayClientLink API
+- `nextjs-frontend/app/(auth)/xray/client/page.tsx` — 修复复制链接 + QR 弹窗
+- `nextjs-frontend/app/(auth)/tunnel/page.tsx` — 端口转发/隧道转发默认协议修正
+
+---
+
 ## v1.6.3 — 隧道协议修复
 
 ### Bug Fixes

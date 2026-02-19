@@ -5,3 +5,4 @@ export const getXrayClientList = (params?: { inboundId?: number; userId?: number
 export const updateXrayClient = (data: any) => post('/xray/client/update', data);
 export const deleteXrayClient = (id: number) => post('/xray/client/delete', { id });
 export const resetXrayClientTraffic = (id: number) => post('/xray/client/reset-traffic', { id });
+export const getXrayClientLink = (id: number) => post('/xray/client/link', { id });

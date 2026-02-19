@@ -56,3 +56,14 @@ func XrayClientResetTraffic(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, service.ResetXrayClientTraffic(d.ID, GetUserId(c), GetRoleId(c)))
 }
+
+func XrayClientLink(c *gin.Context) {
+	var d struct {
+		ID int64 `json:"id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&d); err != nil {
+		c.JSON(http.StatusOK, dto.Err("参数错误"))
+		return
+	}
+	c.JSON(http.StatusOK, service.GetClientLink(d.ID, GetUserId(c), GetRoleId(c)))
+}

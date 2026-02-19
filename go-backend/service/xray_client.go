@@ -9,8 +9,92 @@ import (
 	"flux-panel/go-backend/pkg"
 	"log"
 	"net/url"
+	"strings"
 	"time"
 )
+
+// streamSettings represents the parsed stream_settings_json from an inbound
+type streamSettings struct {
+	Network  string `json:"network"`
+	Security string `json:"security"`
+
+	WsSettings struct {
+		Path    string            `json:"path"`
+		Headers map[string]string `json:"headers"`
+	} `json:"wsSettings"`
+
+	GrpcSettings struct {
+		ServiceName string `json:"serviceName"`
+	} `json:"grpcSettings"`
+
+	TcpSettings struct {
+		Header struct {
+			Type    string `json:"type"`
+			Request struct {
+				Path    []string            `json:"path"`
+				Headers map[string][]string `json:"headers"`
+			} `json:"request"`
+		} `json:"header"`
+	} `json:"tcpSettings"`
+
+	HttpupgradeSettings struct {
+		Path string `json:"path"`
+		Host string `json:"host"`
+	} `json:"httpupgradeSettings"`
+
+	XhttpSettings struct {
+		Path string `json:"path"`
+		Host string `json:"host"`
+	} `json:"xhttpSettings"`
+
+	KcpSettings struct {
+		Header struct {
+			Type string `json:"type"`
+		} `json:"header"`
+		Seed string `json:"seed"`
+	} `json:"kcpSettings"`
+
+	TlsSettings struct {
+		ServerName  string   `json:"serverName"`
+		Fingerprint string   `json:"fingerprint"`
+		Alpn        []string `json:"alpn"`
+	} `json:"tlsSettings"`
+
+	RealitySettings struct {
+		ServerNames []string `json:"serverNames"`
+		PublicKey   string   `json:"publicKey"`
+		ShortIds    []string `json:"shortIds"`
+		SpiderX     string   `json:"spiderX"`
+		Fingerprint string   `json:"fingerprint"`
+	} `json:"realitySettings"`
+}
+
+// inboundSettings represents the parsed settings_json from an inbound
+type inboundSettings struct {
+	Method string `json:"method"`
+}
+
+func parseStreamSettings(jsonStr string) *streamSettings {
+	if jsonStr == "" {
+		return &streamSettings{}
+	}
+	var ss streamSettings
+	if err := json.Unmarshal([]byte(jsonStr), &ss); err != nil {
+		return &streamSettings{}
+	}
+	return &ss
+}
+
+func parseInboundSettings(jsonStr string) *inboundSettings {
+	if jsonStr == "" {
+		return &inboundSettings{}
+	}
+	var is inboundSettings
+	if err := json.Unmarshal([]byte(jsonStr), &is); err != nil {
+		return &inboundSettings{}
+	}
+	return &is
+}
 
 func CreateXrayClient(d dto.XrayClientDto, userId int64, roleId int) dto.R {
 	if r := checkXrayPermission(userId, roleId); r != nil {
@@ -340,21 +424,94 @@ func generateProtocolLink(client *model.XrayClient, inbound *model.XrayInbound, 
 		remark = inbound.Tag
 	}
 
+	ss := parseStreamSettings(inbound.StreamSettingsJson)
+	is := parseInboundSettings(inbound.SettingsJson)
+
 	switch inbound.Protocol {
 	case "vmess":
-		return generateVmessLink(client, host, port, remark)
+		return generateVmessLink(client, host, port, remark, ss)
 	case "vless":
-		return generateVlessLink(client, host, port, remark)
+		return generateVlessLink(client, host, port, remark, ss)
 	case "trojan":
-		return generateTrojanLink(client, host, port, remark)
+		return generateTrojanLink(client, host, port, remark, ss)
 	case "shadowsocks":
-		return generateShadowsocksLink(client, host, port, remark)
+		return generateShadowsocksLink(client, host, port, remark, is)
 	default:
 		return ""
 	}
 }
 
-func generateVmessLink(client *model.XrayClient, host string, port int, remark string) string {
+// streamPath returns the path for the current network type
+func streamPath(ss *streamSettings) string {
+	switch ss.Network {
+	case "ws":
+		return ss.WsSettings.Path
+	case "grpc":
+		return ss.GrpcSettings.ServiceName
+	case "httpupgrade":
+		return ss.HttpupgradeSettings.Path
+	case "xhttp", "splithttp":
+		return ss.XhttpSettings.Path
+	case "tcp":
+		if len(ss.TcpSettings.Header.Request.Path) > 0 {
+			return ss.TcpSettings.Header.Request.Path[0]
+		}
+	case "kcp", "mkcp":
+		return ss.KcpSettings.Seed
+	}
+	return ""
+}
+
+// streamHost returns the host for the current network type
+func streamHost(ss *streamSettings) string {
+	switch ss.Network {
+	case "ws":
+		return ss.WsSettings.Headers["Host"]
+	case "httpupgrade":
+		return ss.HttpupgradeSettings.Host
+	case "xhttp", "splithttp":
+		return ss.XhttpSettings.Host
+	case "tcp":
+		if hosts, ok := ss.TcpSettings.Header.Request.Headers["Host"]; ok && len(hosts) > 0 {
+			return hosts[0]
+		}
+	}
+	return ""
+}
+
+// streamHeaderType returns the header type for tcp/kcp
+func streamHeaderType(ss *streamSettings) string {
+	switch ss.Network {
+	case "tcp":
+		return ss.TcpSettings.Header.Type
+	case "kcp", "mkcp":
+		return ss.KcpSettings.Header.Type
+	}
+	return ""
+}
+
+func generateVmessLink(client *model.XrayClient, host string, port int, remark string, ss *streamSettings) string {
+	net := ss.Network
+	if net == "" {
+		net = "tcp"
+	}
+
+	tlsStr := ""
+	if ss.Security == "tls" {
+		tlsStr = "tls"
+	}
+
+	sni := ""
+	fp := ""
+	alpnStr := ""
+	if ss.Security == "tls" {
+		sni = ss.TlsSettings.ServerName
+		fp = ss.TlsSettings.Fingerprint
+		if len(ss.TlsSettings.Alpn) > 0 {
+			alpnStr = strings.Join(ss.TlsSettings.Alpn, ",")
+		}
+	}
+
 	config := map[string]interface{}{
 		"v":    "2",
 		"ps":   remark,
@@ -363,36 +520,162 @@ func generateVmessLink(client *model.XrayClient, host string, port int, remark s
 		"id":   client.UuidOrPassword,
 		"aid":  client.AlterId,
 		"scy":  "auto",
-		"net":  "tcp",
-		"type": "none",
-		"host": "",
-		"path": "",
-		"tls":  "",
+		"net":  net,
+		"type": streamHeaderType(ss),
+		"host": streamHost(ss),
+		"path": streamPath(ss),
+		"tls":  tlsStr,
+		"sni":  sni,
+		"fp":   fp,
+		"alpn": alpnStr,
 	}
+
+	// Clean empty values for cleaner JSON
+	if config["type"] == "" {
+		config["type"] = "none"
+	}
+
 	jsonBytes, _ := json.Marshal(config)
 	encoded := base64.StdEncoding.EncodeToString(jsonBytes)
 	return "vmess://" + encoded
 }
 
-func generateVlessLink(client *model.XrayClient, host string, port int, remark string) string {
-	sb := fmt.Sprintf("vless://%s@%s:%d?encryption=none", client.UuidOrPassword, host, port)
-	if client.Flow != "" {
-		sb += "&flow=" + client.Flow
+// addTransportParams appends transport & security query params for vless/trojan links
+func addTransportParams(params url.Values, ss *streamSettings) {
+	net := ss.Network
+	if net == "" {
+		net = "tcp"
 	}
-	sb += "&type=tcp"
-	sb += "#" + url.QueryEscape(remark)
-	return sb
+	params.Set("type", net)
+
+	if p := streamPath(ss); p != "" {
+		params.Set("path", p)
+	}
+	if h := streamHost(ss); h != "" {
+		params.Set("host", h)
+	}
+	if ht := streamHeaderType(ss); ht != "" && ht != "none" {
+		params.Set("headerType", ht)
+	}
+	if ss.Network == "grpc" {
+		params.Set("serviceName", ss.GrpcSettings.ServiceName)
+	}
+	if ss.Network == "kcp" || ss.Network == "mkcp" {
+		if ss.KcpSettings.Seed != "" {
+			params.Set("seed", ss.KcpSettings.Seed)
+		}
+	}
+
+	security := ss.Security
+	if security == "" {
+		security = "none"
+	}
+	params.Set("security", security)
+
+	if ss.Security == "tls" {
+		if ss.TlsSettings.ServerName != "" {
+			params.Set("sni", ss.TlsSettings.ServerName)
+		}
+		if ss.TlsSettings.Fingerprint != "" {
+			params.Set("fp", ss.TlsSettings.Fingerprint)
+		}
+		if len(ss.TlsSettings.Alpn) > 0 {
+			params.Set("alpn", strings.Join(ss.TlsSettings.Alpn, ","))
+		}
+	}
+
+	if ss.Security == "reality" {
+		if len(ss.RealitySettings.ServerNames) > 0 {
+			params.Set("sni", ss.RealitySettings.ServerNames[0])
+		}
+		if ss.RealitySettings.PublicKey != "" {
+			params.Set("pbk", ss.RealitySettings.PublicKey)
+		}
+		if len(ss.RealitySettings.ShortIds) > 0 {
+			params.Set("sid", ss.RealitySettings.ShortIds[0])
+		}
+		if ss.RealitySettings.SpiderX != "" {
+			params.Set("spx", ss.RealitySettings.SpiderX)
+		}
+		if ss.RealitySettings.Fingerprint != "" {
+			params.Set("fp", ss.RealitySettings.Fingerprint)
+		}
+	}
 }
 
-func generateTrojanLink(client *model.XrayClient, host string, port int, remark string) string {
-	return fmt.Sprintf("trojan://%s@%s:%d?type=tcp#%s", client.UuidOrPassword, host, port, url.QueryEscape(remark))
+func generateVlessLink(client *model.XrayClient, host string, port int, remark string, ss *streamSettings) string {
+	params := url.Values{}
+	params.Set("encryption", "none")
+	if client.Flow != "" {
+		params.Set("flow", client.Flow)
+	}
+	addTransportParams(params, ss)
+	return fmt.Sprintf("vless://%s@%s:%d?%s#%s", client.UuidOrPassword, host, port, params.Encode(), url.QueryEscape(remark))
 }
 
-func generateShadowsocksLink(client *model.XrayClient, host string, port int, remark string) string {
-	method := "aes-256-gcm"
+func generateTrojanLink(client *model.XrayClient, host string, port int, remark string, ss *streamSettings) string {
+	params := url.Values{}
+	addTransportParams(params, ss)
+	return fmt.Sprintf("trojan://%s@%s:%d?%s#%s", client.UuidOrPassword, host, port, params.Encode(), url.QueryEscape(remark))
+}
+
+func generateShadowsocksLink(client *model.XrayClient, host string, port int, remark string, is *inboundSettings) string {
+	method := is.Method
+	if method == "" {
+		method = "aes-256-gcm"
+	}
 	userInfo := method + ":" + client.UuidOrPassword
 	encoded := base64.StdEncoding.EncodeToString([]byte(userInfo))
 	return fmt.Sprintf("ss://%s@%s:%d#%s", encoded, host, port, url.QueryEscape(remark))
+}
+
+func GetClientLink(clientId int64, userId int64, roleId int) dto.R {
+	if r := checkXrayPermission(userId, roleId); r != nil {
+		return *r
+	}
+
+	var client model.XrayClient
+	if err := DB.First(&client, clientId).Error; err != nil {
+		return dto.Err("客户端不存在")
+	}
+
+	// Non-admin: must own this client
+	if roleId != 0 && client.UserId != userId {
+		return dto.Err("无权操作此客户端")
+	}
+
+	var inbound model.XrayInbound
+	if err := DB.First(&inbound, client.InboundId).Error; err != nil {
+		return dto.Err("入站不存在")
+	}
+
+	if r := checkXrayNodeAccess(userId, roleId, inbound.NodeId); r != nil {
+		return *r
+	}
+
+	node := GetNodeById(inbound.NodeId)
+	if node == nil {
+		return dto.Err("节点不存在")
+	}
+
+	link := generateProtocolLink(&client, &inbound, node)
+	if link == "" {
+		return dto.Err("不支持的协议")
+	}
+
+	remark := client.Remark
+	if remark == "" {
+		remark = inbound.Remark
+	}
+	if remark == "" {
+		remark = inbound.Tag
+	}
+
+	return dto.Ok(map[string]interface{}{
+		"link":     link,
+		"protocol": inbound.Protocol,
+		"remark":   remark,
+	})
 }
 
 func generateRandomString(length int) string {

@@ -29,7 +29,7 @@ export default function TunnelPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingTunnel, setEditingTunnel] = useState<any>(null);
   const [form, setForm] = useState({
-    name: '', inNodeId: '', outNodeId: '', type: 'port', protocol: 'tls',
+    name: '', inNodeId: '', outNodeId: '', type: 'port', protocol: 'tcp+udp',
     portSta: '', portEnd: '', interfaceName: '',
   });
 
@@ -67,7 +67,7 @@ export default function TunnelPage() {
 
   const handleCreate = () => {
     setEditingTunnel(null);
-    setForm({ name: '', inNodeId: '', outNodeId: '', type: 'port', protocol: 'tls', portSta: '', portEnd: '', interfaceName: '' });
+    setForm({ name: '', inNodeId: '', outNodeId: '', type: 'port', protocol: 'tcp+udp', portSta: '', portEnd: '', interfaceName: '' });
     setDialogOpen(true);
   };
 
@@ -78,7 +78,7 @@ export default function TunnelPage() {
       inNodeId: tunnel.inNodeId?.toString() || '',
       outNodeId: tunnel.outNodeId?.toString() || '',
       type: tunnel.type === 2 ? 'tunnel' : 'port',
-      protocol: tunnel.protocol || 'tls',
+      protocol: tunnel.type === 2 ? (tunnel.protocol || 'tls') : 'tcp+udp',
       portSta: tunnel.portSta?.toString() || '',
       portEnd: tunnel.portEnd?.toString() || '',
       interfaceName: tunnel.interfaceName || '',
@@ -319,7 +319,7 @@ export default function TunnelPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>类型</Label>
-                <Select value={form.type} onValueChange={v => setForm(p => ({ ...p, type: v }))}>
+                <Select value={form.type} onValueChange={v => setForm(p => ({ ...p, type: v, protocol: v === 'port' ? 'tcp+udp' : 'tls' }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="port">端口转发</SelectItem>

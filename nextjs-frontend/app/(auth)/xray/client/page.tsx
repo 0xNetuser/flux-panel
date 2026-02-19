@@ -9,11 +9,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Edit2, RotateCcw, Copy, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Edit2, RotateCcw, Copy, RefreshCw, QrCode } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { toast } from 'sonner';
 import {
   createXrayClient, getXrayClientList, updateXrayClient,
-  deleteXrayClient, resetXrayClientTraffic,
+  deleteXrayClient, resetXrayClientTraffic, getXrayClientLink,
 } from '@/lib/api/xray-client';
 import { getXrayInboundList } from '@/lib/api/xray-inbound';
 import { getAllUsers } from '@/lib/api/user';
@@ -27,6 +28,9 @@ export default function XrayClientPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<any>(null);
+  const [qrDialogOpen, setQrDialogOpen] = useState(false);
+  const [qrLink, setQrLink] = useState('');
+  const [qrRemark, setQrRemark] = useState('');
   const [form, setForm] = useState({
     inboundId: '', userId: '', email: '', uuid: '', flow: '',
     alterId: '0', totalTraffic: '', expTime: '', remark: '',
@@ -165,13 +169,32 @@ export default function XrayClientPage() {
     else toast.error(res.msg);
   };
 
-  const handleCopyLink = (client: any) => {
-    const link = client.link || client.subLink || '';
-    if (link) {
-      navigator.clipboard.writeText(link);
-      toast.success('链接已复制到剪贴板');
-    } else {
-      toast.error('无可用链接');
+  const handleCopyLink = async (id: number) => {
+    try {
+      const res = await getXrayClientLink(id);
+      if (res.code === 0 && res.data?.link) {
+        await navigator.clipboard.writeText(res.data.link);
+        toast.success('链接已复制到剪贴板');
+      } else {
+        toast.error(res.msg || '无可用链接');
+      }
+    } catch {
+      toast.error('获取链接失败');
+    }
+  };
+
+  const handleShowQR = async (id: number) => {
+    try {
+      const res = await getXrayClientLink(id);
+      if (res.code === 0 && res.data?.link) {
+        setQrLink(res.data.link);
+        setQrRemark(res.data.remark || '');
+        setQrDialogOpen(true);
+      } else {
+        toast.error(res.msg || '无可用链接');
+      }
+    } catch {
+      toast.error('获取链接失败');
     }
   };
 
@@ -261,8 +284,11 @@ export default function XrayClientPage() {
                           <Button variant="ghost" size="icon" onClick={() => handleResetTraffic(c.id)} title="重置流量">
                             <RotateCcw className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleCopyLink(c)} title="复制链接">
+                          <Button variant="ghost" size="icon" onClick={() => handleCopyLink(c.id)} title="复制链接">
                             <Copy className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleShowQR(c.id)} title="二维码">
+                            <QrCode className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="icon" onClick={() => handleDelete(c.id)} className="text-destructive" title="删除">
                             <Trash2 className="h-4 w-4" />
@@ -277,6 +303,32 @@ export default function XrayClientPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* QR Code Dialog */}
+      <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{qrRemark || '二维码'}</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4">
+            <QRCodeSVG value={qrLink} size={256} />
+            <div className="w-full rounded bg-muted p-2 text-xs font-mono break-all select-all max-h-24 overflow-y-auto">
+              {qrLink}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full"
+              onClick={() => {
+                navigator.clipboard.writeText(qrLink);
+                toast.success('链接已复制到剪贴板');
+              }}
+            >
+              <Copy className="mr-2 h-4 w-4" />复制链接
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Create/Edit Client Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

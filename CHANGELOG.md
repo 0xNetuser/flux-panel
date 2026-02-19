@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.6.5 — 节点 Docker 启动修复
+
+### Bug Fixes
+
+- **节点容器启动失败**：`~/.flux:/etc/gost` 卷挂载覆盖整个 `/etc/gost` 目录，导致构建时 COPY 进去的 gost 二进制丢失（`exec: /etc/gost/gost: not found`）。将 gost 二进制移至 `/usr/local/bin/gost`，`/etc/gost` 仅存放配置文件
+
+### Changed Files
+
+- `go-gost/Dockerfile` — gost 二进制 COPY 目标改为 `/usr/local/bin/gost`
+- `go-gost/docker-entrypoint.sh` — exec 路径改为 `/usr/local/bin/gost`
+
+---
+
 ## v1.6.4 — Xray 客户端导出链接 + 二维码
 
 ### New Features

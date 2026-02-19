@@ -4,10 +4,10 @@
 
 ### Security Fixes
 
-- **[High] WebSocket JWT 认证**：管理端 WebSocket 连接需要有效的 JWT 令牌校验，未认证连接返回 HTTP 401 拒绝升级
+- **[High] WebSocket JWT 认证**：管理端 WebSocket 连接需要有效的 JWT 令牌校验，未认证连接返回 HTTP 401 拒绝升级；支持 `Sec-WebSocket-Protocol` 传递 token（避免 URL 泄露），同时兼容 query 参数
 - **[Medium] 密码存储升级 MD5 → bcrypt**：密码哈希从 MD5+固定 salt 升级为 bcrypt；现有用户登录时自动透明迁移，无需手动操作
 - **[Medium] 默认管理员密码自动重置**：首次启动检测到 `admin_user/admin_user` 默认密码时，自动生成 12 位随机密码并打印到启动日志
-- **[Medium] JWT 默认密钥启动警告**：`JWT_SECRET` 未设置时，启动日志打印 WARNING 提醒
+- **[Medium] JWT 默认密钥自动替换**：`JWT_SECRET` 未设置时，启动自动生成随机密钥（每次重启失效，强制用户设置持久密钥）
 - **[Medium] Xray 订阅短期 token**：订阅 URL 使用独立的 24 小时有效期 JWT（scope=subscription），登录 JWT 不再能访问订阅接口
 - **[Medium] Flow 上报 secret 移至 Header**：节点流量上报优先使用 `X-Node-Secret` 请求头（兼容 query 参数）；新增 10MB 请求体大小限制防止 DoS
 - **[Medium] CORS 可配置**：新增 `ALLOWED_ORIGINS` 环境变量（逗号分隔），未设置时保持允许所有以兼容现有部署

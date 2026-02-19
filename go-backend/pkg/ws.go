@@ -89,15 +89,34 @@ func (m *WSManager) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	connType := q.Get("type")
 	secret := q.Get("secret")
 
+	var respHeader http.Header
+
 	if connType != "1" {
-		// Admin connection — validate JWT before upgrading
-		if !ValidateToken(secret) {
+		// Admin connection — extract JWT
+		// Priority: Sec-WebSocket-Protocol (avoids URL leakage) > query param (backward compat)
+		token := ""
+		selectedSubprotocol := ""
+		for _, sp := range websocket.Subprotocols(r) {
+			if ValidateToken(sp) {
+				token = sp
+				selectedSubprotocol = sp
+				break
+			}
+		}
+		if token == "" {
+			token = secret // fallback to query param
+		}
+		if !ValidateToken(token) {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
+		// Echo back the selected subprotocol so the browser handshake succeeds
+		if selectedSubprotocol != "" {
+			respHeader = http.Header{"Sec-WebSocket-Protocol": {selectedSubprotocol}}
+		}
 	}
 
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := upgrader.Upgrade(w, r, respHeader)
 	if err != nil {
 		log.Printf("WebSocket upgrade failed: %v", err)
 		return

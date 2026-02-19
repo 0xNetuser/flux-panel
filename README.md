@@ -217,10 +217,10 @@ curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && c
 
 ### v1.5.0
 
-- **[High] WebSocket JWT 认证**：管理端 WebSocket 连接现在需要有效的 JWT 令牌，未认证连接将被拒绝
+- **[High] WebSocket JWT 认证**：管理端 WebSocket 连接需要有效的 JWT 令牌，支持 `Sec-WebSocket-Protocol` 传递 token（避免 URL 泄露）
 - **[Medium] 密码存储升级**：从 MD5+固定 salt 升级为 bcrypt，现有用户登录时自动透明迁移
 - **[Medium] 默认管理员密码自动重置**：首次启动检测到默认密码时，自动生成随机密码并打印到日志
-- **[Medium] JWT 默认密钥启动警告**：未设置 `JWT_SECRET` 时，启动日志会打印安全风险警告
+- **[Medium] JWT 默认密钥自动替换**：未设置 `JWT_SECRET` 时，自动生成随机密钥（重启失效，强制用户设置持久密钥）
 - **[Medium] Xray 订阅短期 token**：订阅 URL 使用独立的 24 小时有效期 token，登录 JWT 不再能直接访问订阅接口
 - **[Medium] Flow 上报 secret 支持 Header**：节点流量上报优先使用 `X-Node-Secret` 请求头，同时兼容 query 参数；新增 10MB 请求体大小限制
 - **[Medium] CORS 可配置**：新增 `ALLOWED_ORIGINS` 环境变量，支持配置允许的跨域来源，未设置时保持允许所有

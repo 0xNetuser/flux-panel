@@ -51,8 +51,12 @@ func main() {
 
 	// ── Security startup checks ──
 	if config.Cfg.JWTSecret == "default_jwt_secret" {
-		log.Println("WARNING ⚠️  JWT_SECRET is using the default value. This is a security risk!")
-		log.Println("WARNING ⚠️  Please set the JWT_SECRET environment variable to a secure random string.")
+		config.Cfg.JWTSecret = generateRandomPassword(64)
+		log.Println("========================================")
+		log.Println("WARNING ⚠️  JWT_SECRET 未设置，已自动生成随机密钥")
+		log.Println("WARNING ⚠️  重启后所有已登录用户需要重新登录")
+		log.Println("WARNING ⚠️  请设置 JWT_SECRET 环境变量以持久化密钥")
+		log.Println("========================================")
 	}
 
 	checkAndResetDefaultAdmin(db)

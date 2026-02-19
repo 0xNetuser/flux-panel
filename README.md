@@ -38,13 +38,13 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 ```bash
 # 下载 docker-compose 配置文件（二选一）
 # IPv4 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.7/docker-compose-v4.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.0/docker-compose-v4.yml -o docker-compose.yml
 
 # IPv6 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.7/docker-compose-v6.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.0/docker-compose-v6.yml -o docker-compose.yml
 
 # 下载数据库初始化文件
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.7/gost.sql -o gost.sql
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.0/gost.sql -o gost.sql
 ```
 
 **2. 创建环境变量文件**
@@ -57,6 +57,8 @@ DB_USER=gost_user
 DB_PASSWORD=请替换为随机密码
 JWT_SECRET=请替换为随机密码
 PANEL_PORT=6366
+# 可选：限制 CORS 允许的域名（逗号分隔），不设置则允许所有
+# ALLOWED_ORIGINS=https://panel.example.com,http://localhost:3000
 ```
 
 > 可使用 `openssl rand -base64 16` 生成随机密码。
@@ -87,9 +89,9 @@ docker compose up -d
 | 项目 | 值 |
 |------|------|
 | 账号 | `admin_user` |
-| 密码 | `admin_user` |
+| 密码 | 首次启动时自动生成，请查看启动日志 |
 
-> 首次登录后请立即修改默认密码！
+> v1.5.0 起，首次启动会自动检测默认密码并重置为随机密码，新密码会打印在启动日志中。请使用 `docker logs go-backend` 查看。
 
 ---
 
@@ -107,7 +109,7 @@ docker compose up -d
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.4.7
+  0xnetuser/gost-node:1.5.0
 ```
 
 也可以使用 docker-compose，参考项目中的 `docker-compose-node.yml`：
@@ -115,7 +117,7 @@ docker run -d --network=host --restart=unless-stopped --name gost-node \
 ```yaml
 services:
   gost-node:
-    image: 0xnetuser/gost-node:1.4.7
+    image: 0xnetuser/gost-node:1.5.0
     container_name: gost-node
     network_mode: host
     restart: unless-stopped
@@ -165,10 +167,10 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 ```bash
 # 下载最新 docker-compose 配置（覆盖旧文件）
 # IPv4 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.7/docker-compose-v4.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.0/docker-compose-v4.yml -o docker-compose.yml
 
 # IPv6 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.4.7/docker-compose-v6.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.0/docker-compose-v6.yml -o docker-compose.yml
 
 # 拉取最新镜像并重启
 docker compose pull && docker compose up -d
@@ -190,7 +192,7 @@ docker stop gost-node && docker rm gost-node
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.4.7
+  0xnetuser/gost-node:1.5.0
 ```
 
 如果使用 docker-compose 部署，更新 `docker-compose-node.yml` 中的镜像版本后：
@@ -212,6 +214,17 @@ curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && c
 ---
 
 ## 更新日志
+
+### v1.5.0
+
+- **[High] WebSocket JWT 认证**：管理端 WebSocket 连接现在需要有效的 JWT 令牌，未认证连接将被拒绝
+- **[Medium] 密码存储升级**：从 MD5+固定 salt 升级为 bcrypt，现有用户登录时自动透明迁移
+- **[Medium] 默认管理员密码自动重置**：首次启动检测到默认密码时，自动生成随机密码并打印到日志
+- **[Medium] JWT 默认密钥启动警告**：未设置 `JWT_SECRET` 时，启动日志会打印安全风险警告
+- **[Medium] Xray 订阅短期 token**：订阅 URL 使用独立的 24 小时有效期 token，登录 JWT 不再能直接访问订阅接口
+- **[Medium] Flow 上报 secret 支持 Header**：节点流量上报优先使用 `X-Node-Secret` 请求头，同时兼容 query 参数；新增 10MB 请求体大小限制
+- **[Medium] CORS 可配置**：新增 `ALLOWED_ORIGINS` 环境变量，支持配置允许的跨域来源，未设置时保持允许所有
+- **[Low] 节点 secret 改用 crypto/rand**：节点密钥生成从可预测的 `md5(time)` 改为密码学安全的随机数
 
 ### v1.4.7
 

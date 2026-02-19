@@ -139,7 +139,18 @@ func (r *TrafficReporter) reportTraffic() {
 		bodyData = payloadJSON
 	}
 
-	resp, err := http.Post(url, "application/json", bytes.NewReader(bodyData))
+	req, err := http.NewRequest("POST", url, bytes.NewReader(bodyData))
+	if err != nil {
+		fmt.Printf("⚠️ Failed to create Xray traffic request: %v\n", err)
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if r.secret != "" {
+		req.Header.Set("X-Node-Secret", r.secret)
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		fmt.Printf("⚠️ Failed to upload Xray traffic: %v\n", err)
 		return

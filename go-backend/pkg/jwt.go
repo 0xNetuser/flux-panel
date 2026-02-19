@@ -98,6 +98,45 @@ func GetNameFromToken(token string) (string, error) {
 	return name, nil
 }
 
+// GenerateSubToken creates a short-lived JWT (24h) for subscription use.
+// The token contains a "scope":"subscription" claim to differentiate it from login JWTs.
+func GenerateSubToken(userId int64) (string, error) {
+	now := time.Now()
+	exp := now.Add(24 * time.Hour)
+
+	header := map[string]interface{}{
+		"alg": "HmacSHA256",
+		"typ": "JWT",
+	}
+	headerJSON, _ := json.Marshal(header)
+	encodedHeader := base64.RawURLEncoding.EncodeToString(headerJSON)
+
+	payload := map[string]interface{}{
+		"sub":   intToStr(userId),
+		"iat":   now.Unix(),
+		"exp":   exp.Unix(),
+		"scope": "subscription",
+	}
+	payloadJSON, _ := json.Marshal(payload)
+	encodedPayload := base64.RawURLEncoding.EncodeToString(payloadJSON)
+
+	signature := calcSignature(encodedHeader, encodedPayload)
+	return encodedHeader + "." + encodedPayload + "." + signature, nil
+}
+
+// ValidateSubToken validates a token and checks that scope == "subscription".
+func ValidateSubToken(token string) bool {
+	if !ValidateToken(token) {
+		return false
+	}
+	payload, err := parsePayload(token)
+	if err != nil {
+		return false
+	}
+	scope, _ := payload["scope"].(string)
+	return scope == "subscription"
+}
+
 func parsePayload(token string) (map[string]interface{}, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {

@@ -104,9 +104,17 @@ func Login(d dto.LoginDto) dto.R {
 		return dto.Err("账号或密码错误")
 	}
 
-	// 3. Verify password
-	if user.Pwd != pkg.Md5WithSalt(d.Password) {
+	// 3. Verify password (supports both bcrypt and legacy MD5)
+	if !pkg.CheckPassword(d.Password, user.Pwd) {
 		return dto.Err("账号或密码错误")
+	}
+
+	// 3.5 Transparent migration: if password is still MD5, upgrade to bcrypt
+	if !pkg.IsBcrypt(user.Pwd) {
+		if newHash := pkg.HashPassword(d.Password); newHash != "" {
+			DB.Model(&model.User{}).Where("id = ?", user.ID).Update("pwd", newHash)
+			log.Printf("User %s password migrated from MD5 to bcrypt", user.User)
+		}
 	}
 
 	// 4. Check account status
@@ -152,7 +160,7 @@ func CreateUser(d dto.UserDto) dto.R {
 
 	user := model.User{
 		User:          d.User,
-		Pwd:           pkg.Md5WithSalt(d.Pwd),
+		Pwd:           pkg.HashPassword(d.Pwd),
 		RoleId:        userRoleID,
 		Flow:          d.Flow,
 		Num:           d.Num,
@@ -217,7 +225,7 @@ func UpdateUser(d dto.UserUpdateDto) dto.R {
 		updates["status"] = *d.Status
 	}
 	if d.Pwd != "" {
-		updates["pwd"] = pkg.Md5WithSalt(d.Pwd)
+		updates["pwd"] = pkg.HashPassword(d.Pwd)
 	}
 
 	if err := DB.Model(&model.User{}).Where("id = ?", d.ID).Updates(updates).Error; err != nil {
@@ -469,8 +477,8 @@ func UpdatePassword(userId int64, d dto.UpdatePasswordDto) dto.R {
 		return dto.Err("用户不存在")
 	}
 
-	// 2. Verify current password
-	if user.Pwd != pkg.Md5WithSalt(d.OldPassword) {
+	// 2. Verify current password (supports both bcrypt and legacy MD5)
+	if !pkg.CheckPassword(d.OldPassword, user.Pwd) {
 		return dto.Err("当前密码错误")
 	}
 
@@ -491,7 +499,7 @@ func UpdatePassword(userId int64, d dto.UpdatePasswordDto) dto.R {
 
 	updates := map[string]interface{}{
 		"user":         newUsername,
-		"pwd":          pkg.Md5WithSalt(d.NewPassword),
+		"pwd":          pkg.HashPassword(d.NewPassword),
 		"updated_time": time.Now().UnixMilli(),
 	}
 

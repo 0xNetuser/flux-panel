@@ -21,7 +21,7 @@ func CreateNode(d dto.NodeDto) dto.R {
 		ServerIp:    d.ServerIp,
 		PortSta:     d.PortSta,
 		PortEnd:     d.PortEnd,
-		Secret:      pkg.Md5WithSalt(fmt.Sprintf("%d", time.Now().UnixNano())),
+		Secret:      pkg.GenerateSecureSecret(),
 		Status:      0,
 		CreatedTime: time.Now().UnixMilli(),
 		UpdatedTime: time.Now().UnixMilli(),

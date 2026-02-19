@@ -8,9 +8,9 @@ export LC_ALL=C
 
 
 # 全局下载地址配置
-DOCKER_COMPOSEV4_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.4.7/docker-compose-v4.yml"
-DOCKER_COMPOSEV6_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.4.7/docker-compose-v6.yml"
-GOST_SQL_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.4.7/gost.sql"
+DOCKER_COMPOSEV4_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.5.0/docker-compose-v4.yml"
+DOCKER_COMPOSEV6_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.5.0/docker-compose-v6.yml"
+GOST_SQL_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.5.0/gost.sql"
 
 COUNTRY=$(curl -s https://ipinfo.io/country)
 if [ "$COUNTRY" = "CN" ]; then
@@ -225,8 +225,9 @@ EOF
   echo "🌐 访问地址: http://服务器IP:$PANEL_PORT"
   echo "📖 部署完成后请阅读下使用文档，求求了啊，不要上去就是一顿操作"
   echo "📚 文档地址: https://tes.cc/guide.html"
-  echo "💡 默认管理员账号: admin_user / admin_user"
-  echo "⚠️  登录后请立即修改默认密码！"
+  echo "💡 默认管理员账号: admin_user"
+  echo "🔑 首次启动会自动重置默认密码，请查看日志获取新密码："
+  echo "   docker logs go-backend 2>&1 | grep '新密码'"
 
 
 }

@@ -19,7 +19,8 @@ func XraySubscription(c *gin.Context) {
 		return
 	}
 
-	if !pkg.ValidateToken(token) {
+	// Require subscription-scoped token
+	if !pkg.ValidateSubToken(token) {
 		c.String(http.StatusUnauthorized, "invalid or expired token")
 		return
 	}
@@ -55,14 +56,21 @@ func XraySubscription(c *gin.Context) {
 }
 
 func XraySubToken(c *gin.Context) {
-	token := c.GetHeader("Authorization")
-	if token == "" {
+	userId := GetUserId(c)
+	if userId == 0 {
 		c.JSON(http.StatusOK, dto.Err("未登录"))
 		return
 	}
-	// Return the user's JWT token for subscription URL
+
+	// Generate a short-lived subscription token (24h)
+	subToken, err := pkg.GenerateSubToken(userId)
+	if err != nil {
+		c.JSON(http.StatusOK, dto.Err("生成订阅令牌失败"))
+		return
+	}
+
 	c.JSON(http.StatusOK, dto.Ok(map[string]interface{}{
-		"token": token,
+		"token": subToken,
 	}))
 }
 
@@ -78,7 +86,8 @@ func GetSubStore(c *gin.Context) {
 		return
 	}
 
-	if !pkg.ValidateToken(token) {
+	// Require subscription-scoped token
+	if !pkg.ValidateSubToken(token) {
 		c.String(http.StatusUnauthorized, "invalid token")
 		return
 	}

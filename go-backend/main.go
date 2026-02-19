@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"log"
 
@@ -46,6 +48,14 @@ func main() {
 
 	// Set global DB
 	service.DB = db
+
+	// ── Security startup checks ──
+	if config.Cfg.JWTSecret == "default_jwt_secret" {
+		log.Println("WARNING ⚠️  JWT_SECRET is using the default value. This is a security risk!")
+		log.Println("WARNING ⚠️  Please set the JWT_SECRET environment variable to a secure random string.")
+	}
+
+	checkAndResetDefaultAdmin(db)
 
 	// Init WebSocket manager
 	pkg.InitWSManager()
@@ -95,4 +105,44 @@ func main() {
 	if err := r.Run(addr); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+}
+
+// checkAndResetDefaultAdmin checks if the admin user still has the default password.
+// If so, it generates a random password, updates the DB, and prints the new password.
+func checkAndResetDefaultAdmin(db *gorm.DB) {
+	var admin model.User
+	if err := db.Where("user = ? AND role_id = 0", "admin_user").First(&admin).Error; err != nil {
+		return // Admin not found or renamed — nothing to do
+	}
+
+	// Check if password is still the default "admin_user" (MD5 or bcrypt)
+	if !pkg.CheckPassword("admin_user", admin.Pwd) {
+		return // Password already changed
+	}
+
+	// Generate a 12-character random password
+	newPassword := generateRandomPassword(12)
+	newHash := pkg.HashPassword(newPassword)
+	if newHash == "" {
+		log.Println("WARNING: Failed to generate bcrypt hash for new admin password")
+		return
+	}
+
+	if err := db.Model(&model.User{}).Where("id = ?", admin.ID).Update("pwd", newHash).Error; err != nil {
+		log.Printf("WARNING: Failed to update default admin password: %v", err)
+		return
+	}
+
+	log.Println("========================================")
+	log.Printf("⚠️  默认管理员密码已自动重置，新密码: %s", newPassword)
+	log.Println("⚠️  请立即登录并修改密码！")
+	log.Println("========================================")
+}
+
+func generateRandomPassword(length int) string {
+	b := make([]byte, length)
+	if _, err := rand.Read(b); err != nil {
+		panic("crypto/rand failed: " + err.Error())
+	}
+	return hex.EncodeToString(b)[:length]
 }

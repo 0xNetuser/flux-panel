@@ -4,17 +4,41 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"net/url"
 	"strconv"
 	"sync"
 	"time"
 
+	"flux-panel/go-backend/config"
 	"flux-panel/go-backend/dto"
 
 	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool {
+		allowed := config.Cfg.AllowedOrigins
+		if len(allowed) == 0 {
+			return true // No restriction configured — backward compatible
+		}
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true // Non-browser clients (e.g., nodes) have no Origin
+		}
+		for _, o := range allowed {
+			if o == origin {
+				return true
+			}
+		}
+		// Also allow same-origin: compare origin host with request host
+		if reqURL, err := url.Parse(origin); err == nil {
+			if reqURL.Host == r.Host {
+				return true
+			}
+		}
+		log.Printf("WebSocket CheckOrigin rejected origin: %s", origin)
+		return false
+	},
 }
 
 type WSManager struct {
@@ -60,16 +84,24 @@ func InitWSManager() {
 }
 
 func (m *WSManager) HandleConnection(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	id := q.Get("id")
+	connType := q.Get("type")
+	secret := q.Get("secret")
+
+	if connType != "1" {
+		// Admin connection — validate JWT before upgrading
+		if !ValidateToken(secret) {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+	}
+
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade failed: %v", err)
 		return
 	}
-
-	q := r.URL.Query()
-	id := q.Get("id")
-	connType := q.Get("type")
-	secret := q.Get("secret")
 
 	if connType == "1" {
 		// Node connection

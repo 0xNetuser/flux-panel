@@ -38,8 +38,12 @@ else
 fi
 
 # 确保 gost.json 存在（运行时状态文件）
+# 仅在文件不存在时创建，保留已有配置以实现重启持久化
 if [ ! -f "$GOST_CONFIG" ]; then
   echo "{}" > "$GOST_CONFIG"
+  echo "创建新的运行时配置: $GOST_CONFIG"
+else
+  echo "使用已有运行时配置: $GOST_CONFIG"
 fi
 
 # Xray 配置

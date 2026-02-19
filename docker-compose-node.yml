@@ -1,9 +1,11 @@
 services:
   gost-node:
-    image: 0xnetuser/gost-node:1.6.0
+    image: 0xnetuser/gost-node:1.6.1
     container_name: gost-node
     network_mode: host
     restart: unless-stopped
+    volumes:
+      - ~/.flux:/etc/gost
     environment:
       - PANEL_ADDR=http://面板IP:6366
       - SECRET=节点密钥

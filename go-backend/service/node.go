@@ -144,7 +144,7 @@ func GenerateDockerInstallCommand(id int64) dto.R {
 
 func getPanelAddress() string {
 	var cfg model.ViteConfig
-	if err := DB.Where("name = ?", "panel_address").First(&cfg).Error; err == nil && cfg.Value != "" {
+	if err := DB.Where("name = ?", "panel_addr").First(&cfg).Error; err == nil && cfg.Value != "" {
 		return cfg.Value
 	}
 	return fmt.Sprintf("http://127.0.0.1:%d", config.Cfg.Port)

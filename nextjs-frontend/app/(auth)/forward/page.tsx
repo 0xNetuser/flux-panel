@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Pause, Play, Edit2, Stethoscope } from 'lucide-react';
+import { Plus, Trash2, Pause, Play, Edit2, Stethoscope, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { getForwardList, createForward, updateForward, deleteForward, pauseForwardService, resumeForwardService, diagnoseForward } from '@/lib/api/forward';
 import { userTunnel } from '@/lib/api/tunnel';
@@ -23,6 +23,9 @@ export default function ForwardPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingForward, setEditingForward] = useState<any>(null);
   const [form, setForm] = useState({ name: '', tunnelId: '', remoteAddr: '', inPort: '', strategy: 'round', interfaceName: '' });
+  const [diagnoseDialogOpen, setDiagnoseDialogOpen] = useState(false);
+  const [diagnoseResult, setDiagnoseResult] = useState<any>(null);
+  const [diagnosing, setDiagnosing] = useState<number | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -103,11 +106,19 @@ export default function ForwardPage() {
   };
 
   const handleDiagnose = async (id: number) => {
-    const res = await diagnoseForward(id);
-    if (res.code === 0) {
-      toast.success('诊断完成');
-    } else {
-      toast.error(res.msg);
+    setDiagnosing(id);
+    try {
+      const res = await diagnoseForward(id);
+      if (res.code === 0) {
+        setDiagnoseResult(res.data);
+        setDiagnoseDialogOpen(true);
+      } else {
+        toast.error(res.msg);
+      }
+    } catch {
+      toast.error('诊断请求失败');
+    } finally {
+      setDiagnosing(null);
     }
   };
 
@@ -174,7 +185,9 @@ export default function ForwardPage() {
                         ) : (
                           <Button variant="ghost" size="icon" onClick={() => handleResume(f.id)}><Play className="h-4 w-4" /></Button>
                         )}
-                        <Button variant="ghost" size="icon" onClick={() => handleDiagnose(f.id)}><Stethoscope className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDiagnose(f.id)} disabled={diagnosing === f.id}>
+                          <Stethoscope className={`h-4 w-4 ${diagnosing === f.id ? 'animate-pulse' : ''}`} />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleDelete(f.id)} className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
                       </div>
                     </TableCell>
@@ -185,6 +198,50 @@ export default function ForwardPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Diagnose Dialog */}
+      <Dialog open={diagnoseDialogOpen} onOpenChange={setDiagnoseDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>诊断结果 — {diagnoseResult?.forwardName}</DialogTitle>
+          </DialogHeader>
+          {diagnoseResult && (
+            <div className="space-y-3">
+              <div className="flex gap-2 text-sm text-muted-foreground">
+                <Badge variant="outline">{diagnoseResult.tunnelType}</Badge>
+              </div>
+              <div className="space-y-2">
+                {diagnoseResult.results?.map((r: any, i: number) => (
+                  <div key={i} className="rounded border p-3 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium">{r.description}</span>
+                      {r.success ? (
+                        <Badge variant="default" className="gap-1"><CheckCircle2 className="h-3 w-3" />成功</Badge>
+                      ) : (
+                        <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" />失败</Badge>
+                      )}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {r.nodeName} → {r.targetIp}:{r.targetPort}
+                    </div>
+                    {r.success ? (
+                      <div className="text-xs">
+                        延迟: <span className="font-mono">{r.averageTime.toFixed(1)}ms</span>
+                        {r.packetLoss > 0 && <span className="ml-2 text-orange-600">丢包: {r.packetLoss.toFixed(0)}%</span>}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-destructive">{r.message}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDiagnoseDialogOpen(false)}>关闭</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>

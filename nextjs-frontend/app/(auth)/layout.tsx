@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { useAuth, logout } from '@/lib/hooks/use-auth';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { ThemeToggle } from '@/components/theme-toggle';
+import { getVersion } from '@/lib/api/system';
 
 interface NavItem {
   path: string;
@@ -40,10 +42,11 @@ const navItems: NavItem[] = [
   { path: '/config', label: '网站配置', icon: <Settings className="h-4 w-4" />, adminOnly: true, section: '系统' },
 ];
 
-function SidebarContent({ pathname, isAdmin, onNavigate }: {
+function SidebarContent({ pathname, isAdmin, onNavigate, version }: {
   pathname: string;
   isAdmin: boolean;
   onNavigate: (path: string) => void;
+  version: string;
 }) {
   const filtered = navItems.filter(item => !item.adminOnly || isAdmin);
   let lastSection = '';
@@ -55,7 +58,7 @@ function SidebarContent({ pathname, isAdmin, onNavigate }: {
           <Shield className="h-6 w-6 text-primary" />
           <div>
             <h1 className="text-sm font-bold">Flux Panel</h1>
-            <p className="text-xs text-muted-foreground">v1.5.0</p>
+            <p className="text-xs text-muted-foreground">{version}</p>
           </div>
         </div>
       </div>
@@ -105,12 +108,17 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   const { isAuthenticated, isAdmin, username, loading } = useAuth();
   const isMobile = useIsMobile();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [panelVersion, setPanelVersion] = useState('');
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
       router.push('/');
     }
   }, [loading, isAuthenticated, router]);
+
+  useEffect(() => {
+    getVersion().then((v) => setPanelVersion(v ? `v${v}` : ''));
+  }, []);
 
   if (loading || !isAuthenticated) {
     return (
@@ -130,7 +138,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       {/* Desktop sidebar */}
       {!isMobile && (
         <aside className="w-64 border-r bg-card flex-shrink-0">
-          <SidebarContent pathname={pathname} isAdmin={isAdmin} onNavigate={handleNavigate} />
+          <SidebarContent pathname={pathname} isAdmin={isAdmin} onNavigate={handleNavigate} version={panelVersion} />
         </aside>
       )}
 
@@ -147,18 +155,20 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="w-64 p-0">
-                  <SidebarContent pathname={pathname} isAdmin={isAdmin} onNavigate={handleNavigate} />
+                  <SidebarContent pathname={pathname} isAdmin={isAdmin} onNavigate={handleNavigate} version={panelVersion} />
                 </SheetContent>
               </Sheet>
             )}
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="gap-1">
-                {username}
-                <ChevronDown className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="gap-1">
+                  {username}
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => router.push('/change-password')}>
                 <KeyRound className="mr-2 h-4 w-4" />
@@ -168,8 +178,9 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
                 <LogOut className="mr-2 h-4 w-4" />
                 退出登录
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </header>
 
         {/* Page content */}

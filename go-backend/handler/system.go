@@ -1,0 +1,12 @@
+package handler
+
+import (
+	"flux-panel/go-backend/service"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+func CheckUpdate(c *gin.Context) {
+	c.JSON(http.StatusOK, service.CheckUpdate())
+}

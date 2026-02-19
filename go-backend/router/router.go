@@ -45,6 +45,9 @@ func Setup(r *gin.Engine) {
 	// Open API
 	r.GET("/api/v1/open_api/sub_store", handler.SubStore)
 
+	// Version (public)
+	r.GET("/api/v1/version", handler.GetVersion)
+
 	// WebSocket
 	r.GET("/system-info", func(c *gin.Context) {
 		pkg.WS.HandleConnection(c.Writer, c.Request)
@@ -135,5 +138,11 @@ func Setup(r *gin.Engine) {
 		// Xray Subscription
 		auth.POST("/xray/sub/token", handler.XraySubToken)
 		auth.POST("/xray/sub/links", handler.XraySubLinks)
+
+		// Dashboard
+		auth.POST("/dashboard/stats", handler.DashboardStats)
+
+		// System
+		auth.POST("/system/check-update", middleware.Admin(), handler.CheckUpdate)
 	}
 }

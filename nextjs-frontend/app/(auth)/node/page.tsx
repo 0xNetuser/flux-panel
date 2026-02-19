@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Plus, Trash2, Edit2, Terminal, Container, Copy, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { getNodeList, createNode, updateNode, deleteNode, getNodeInstallCommand, getNodeDockerCommand } from '@/lib/api/node';
+import { getVersion } from '@/lib/api/system';
 import { useAuth } from '@/lib/hooks/use-auth';
 
 export default function NodePage() {
@@ -24,11 +25,13 @@ export default function NodePage() {
   const [commandContent, setCommandContent] = useState('');
   const [commandTitle, setCommandTitle] = useState('');
   const [showSecret, setShowSecret] = useState(false);
+  const [panelVersion, setPanelVersion] = useState('');
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const res = await getNodeList();
+    const [res, ver] = await Promise.all([getNodeList(), getVersion()]);
     if (res.code === 0) setNodes(res.data || []);
+    if (ver) setPanelVersion(ver);
     setLoading(false);
   }, []);
 
@@ -173,7 +176,12 @@ export default function NodePage() {
                         {n.status === 1 ? '在线' : '离线'}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-sm">{n.version || '-'}</TableCell>
+                    <TableCell className="text-sm">
+                      {n.version || '-'}
+                      {n.version && panelVersion && n.version !== panelVersion && n.version !== 'dev' && (
+                        <Badge variant="outline" className="ml-1 text-orange-600 border-orange-400">需更新</Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="text-sm">
                       {n.cpuUsage != null ? `${n.cpuUsage.toFixed(1)}%` : '-'} / {n.memUsage != null ? `${n.memUsage.toFixed(1)}%` : '-'}
                     </TableCell>

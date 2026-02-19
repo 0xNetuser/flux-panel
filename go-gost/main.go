@@ -19,6 +19,10 @@ import (
 	"github.com/judwhite/go-svc"
 )
 
+// nodeVersion is the panel version reported to the panel via WebSocket.
+// Overridden at build time via -ldflags.
+var nodeVersion = "dev"
+
 type stringList []string
 
 func (l *stringList) String() string {
@@ -119,7 +123,7 @@ func main() {
 	log := xlogger.NewLogger()
 	logger.SetDefault(log)
 
-	wsReporter := socket.StartWebSocketReporterWithConfig(config.Addr, config.Secret, config.Http, config.Tls, config.Socks, "1.4.6", config.UseTLS)
+	wsReporter := socket.StartWebSocketReporterWithConfig(config.Addr, config.Secret, config.Http, config.Tls, config.Socks, nodeVersion, config.UseTLS)
 	defer wsReporter.Stop()
 	service.SetHTTPReportURL(config.Addr, config.Secret, config.UseTLS)
 

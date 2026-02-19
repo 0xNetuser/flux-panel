@@ -91,10 +91,12 @@ func Login(d dto.LoginDto) dto.R {
 	var vc model.ViteConfig
 	if err := DB.Where("name = ?", "captcha_enabled").First(&vc).Error; err == nil {
 		if vc.Value == "true" {
-			if d.CaptchaId == "" {
-				return dto.Err("验证码校验失败")
+			if d.CaptchaId == "" || d.CaptchaAnswer == "" {
+				return dto.Err("请完成验证码")
 			}
-			// TODO: integrate real captcha verification; for now non-empty passes
+			if !captchaStore.Verify(d.CaptchaId, d.CaptchaAnswer, true) {
+				return dto.Err("验证码错误")
+			}
 		}
 	}
 
@@ -144,6 +146,11 @@ func Login(d dto.LoginDto) dto.R {
 // ---------------------------------------------------------------------------
 
 func CreateUser(d dto.UserDto) dto.R {
+	// 0. Validate password length
+	if len(d.Pwd) < 8 {
+		return dto.Err("密码长度至少8位")
+	}
+
 	// 1. Check username uniqueness
 	var count int64
 	DB.Model(&model.User{}).Where("user = ?", d.User).Count(&count)
@@ -186,6 +193,10 @@ func CreateUser(d dto.UserDto) dto.R {
 func GetAllUsers() dto.R {
 	var users []model.User
 	DB.Where("role_id != ?", adminRoleID).Find(&users)
+	// Strip password hashes from response
+	for i := range users {
+		users[i].Pwd = ""
+	}
 	return dto.Ok(users)
 }
 
@@ -225,6 +236,9 @@ func UpdateUser(d dto.UserUpdateDto) dto.R {
 		updates["status"] = *d.Status
 	}
 	if d.Pwd != "" {
+		if len(d.Pwd) < 8 {
+			return dto.Err("密码长度至少8位")
+		}
 		updates["pwd"] = pkg.HashPassword(d.Pwd)
 	}
 
@@ -480,6 +494,11 @@ func UpdatePassword(userId int64, d dto.UpdatePasswordDto) dto.R {
 	// 2. Verify current password (supports both bcrypt and legacy MD5)
 	if !pkg.CheckPassword(d.OldPassword, user.Pwd) {
 		return dto.Err("当前密码错误")
+	}
+
+	// 2.5 Validate new password length
+	if len(d.NewPassword) < 8 {
+		return dto.Err("新密码长度至少8位")
 	}
 
 	// 3. If new username differs, check uniqueness

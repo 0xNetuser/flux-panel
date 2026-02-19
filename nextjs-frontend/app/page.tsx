@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { login, checkCaptcha } from '@/lib/api/auth';
+import { login, checkCaptchaEnabled, generateCaptcha } from '@/lib/api/auth';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,8 +15,22 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [captchaEnabled, setCaptchaEnabled] = useState(false);
-  const [captchaId] = useState('');
-  const [captchaVerified] = useState(false);
+  const [captchaId, setCaptchaId] = useState('');
+  const [captchaImage, setCaptchaImage] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+
+  const refreshCaptcha = useCallback(async () => {
+    try {
+      const res = await generateCaptcha();
+      if (res.code === 0 && res.data) {
+        setCaptchaId(res.data.captchaId);
+        setCaptchaImage(res.data.captchaImage);
+        setCaptchaAnswer('');
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -25,12 +39,18 @@ export default function LoginPage() {
       return;
     }
 
-    checkCaptcha().then(res => {
-      if (res.code === 0 && res.data) {
+    checkCaptchaEnabled().then(res => {
+      if (res.code === 0 && res.data?.value === 'true') {
         setCaptchaEnabled(true);
       }
     });
   }, [router]);
+
+  useEffect(() => {
+    if (captchaEnabled) {
+      refreshCaptcha();
+    }
+  }, [captchaEnabled, refreshCaptcha]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,14 +60,19 @@ export default function LoginPage() {
       return;
     }
 
-    if (captchaEnabled && !captchaVerified) {
-      toast.error('请先完成验证码');
+    if (captchaEnabled && !captchaAnswer) {
+      toast.error('请输入验证码');
       return;
     }
 
     setLoading(true);
     try {
-      const res = await login({ username, password, captchaId });
+      const res = await login({
+        username,
+        password,
+        captchaId: captchaEnabled ? captchaId : undefined,
+        captchaAnswer: captchaEnabled ? captchaAnswer : undefined,
+      });
       if (res.code === 0) {
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('role_id', res.data.role_id.toString());
@@ -63,9 +88,15 @@ export default function LoginPage() {
         }
       } else {
         toast.error(res.msg || '登录失败');
+        if (captchaEnabled) {
+          refreshCaptcha();
+        }
       }
     } catch {
       toast.error('网络请求失败');
+      if (captchaEnabled) {
+        refreshCaptcha();
+      }
     } finally {
       setLoading(false);
     }
@@ -99,6 +130,27 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
+            {captchaEnabled && captchaImage && (
+              <div className="space-y-2">
+                <Label htmlFor="captcha">验证码</Label>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    id="captcha"
+                    placeholder="请输入验证码"
+                    value={captchaAnswer}
+                    onChange={(e) => setCaptchaAnswer(e.target.value)}
+                    className="flex-1"
+                  />
+                  <img
+                    src={captchaImage}
+                    alt="验证码"
+                    className="h-10 cursor-pointer rounded border"
+                    onClick={refreshCaptcha}
+                    title="点击刷新验证码"
+                  />
+                </div>
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? '登录中...' : '登录'}
             </Button>

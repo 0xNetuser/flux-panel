@@ -6,6 +6,12 @@ import (
 	"time"
 )
 
+// publicConfigKeys defines config keys safe for unauthenticated access.
+var publicConfigKeys = map[string]bool{
+	"captcha_enabled": true,
+	"app_name":        true,
+}
+
 func GetConfigs() dto.R {
 	var configs []model.ViteConfig
 	DB.Find(&configs)
@@ -17,9 +23,39 @@ func GetConfigs() dto.R {
 	return dto.Ok(configMap)
 }
 
+// GetPublicConfigs returns only whitelisted config keys for unauthenticated access.
+func GetPublicConfigs() dto.R {
+	var configs []model.ViteConfig
+	DB.Find(&configs)
+
+	configMap := make(map[string]string)
+	for _, c := range configs {
+		if publicConfigKeys[c.Name] {
+			configMap[c.Name] = c.Value
+		}
+	}
+	return dto.Ok(configMap)
+}
+
 func GetConfigByName(name string) dto.R {
 	if name == "" {
 		return dto.Err("配置名称不能为空")
+	}
+
+	var cfg model.ViteConfig
+	if err := DB.Where("name = ?", name).First(&cfg).Error; err != nil {
+		return dto.Err("配置不存在")
+	}
+	return dto.Ok(cfg)
+}
+
+// GetPublicConfigByName returns a config only if it's in the public whitelist.
+func GetPublicConfigByName(name string) dto.R {
+	if name == "" {
+		return dto.Err("配置名称不能为空")
+	}
+	if !publicConfigKeys[name] {
+		return dto.Err("配置不存在")
 	}
 
 	var cfg model.ViteConfig

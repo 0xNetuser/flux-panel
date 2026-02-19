@@ -7,6 +7,7 @@ import (
 	"flux-panel/go-backend/model"
 	"flux-panel/go-backend/pkg"
 	"log"
+	"net"
 	"strings"
 	"time"
 )
@@ -50,6 +51,11 @@ type DiagnosisResult struct {
 // ---------------------- Public API functions ----------------------
 
 func CreateForward(d dto.ForwardDto, userId int64, roleId int, userName string) dto.R {
+	// 0. SSRF check
+	if ssrfErr := validateRemoteAddr(d.RemoteAddr, roleId); ssrfErr != "" {
+		return dto.Err(ssrfErr)
+	}
+
 	// 1. Get tunnel, check status
 	var tunnel model.Tunnel
 	if err := DB.First(&tunnel, d.TunnelId).Error; err != nil {
@@ -133,6 +139,11 @@ func GetAllForwards(userId int64, roleId int) dto.R {
 }
 
 func UpdateForward(d dto.ForwardUpdateDto, userId int64, roleId int) dto.R {
+	// 0. Non-admin: always use authenticated userId (ignore client-supplied value)
+	if roleId != adminRoleId {
+		d.UserId = userId
+	}
+
 	// 1. Non-admin user status check
 	if roleId != adminRoleId {
 		var user model.User
@@ -142,6 +153,11 @@ func UpdateForward(d dto.ForwardUpdateDto, userId int64, roleId int) dto.R {
 		if user.Status == 0 {
 			return dto.Err("用户已到期或被禁用")
 		}
+	}
+
+	// 1.5 SSRF check
+	if ssrfErr := validateRemoteAddr(d.RemoteAddr, roleId); ssrfErr != "" {
+		return dto.Err(ssrfErr)
 	}
 
 	// 2. Validate forward exists and user has access
@@ -1025,6 +1041,65 @@ func deleteOldGostServices(forward *model.Forward, oldTunnel *model.Tunnel) {
 
 func updateForwardStatusToError(forwardId int64) {
 	DB.Model(&model.Forward{}).Where("id = ?", forwardId).Update("status", forwardStatusError)
+}
+
+// ---------------------- SSRF protection ----------------------
+
+// isPrivateIP checks if an IP is in a private/reserved range.
+func isPrivateIP(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	privateRanges := []string{
+		"127.0.0.0/8",
+		"10.0.0.0/8",
+		"172.16.0.0/12",
+		"192.168.0.0/16",
+		"169.254.0.0/16",
+		"::1/128",
+		"fc00::/7",
+		"fe80::/10",
+	}
+	for _, cidr := range privateRanges {
+		_, network, err := net.ParseCIDR(cidr)
+		if err == nil && network.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// validateRemoteAddr checks that none of the comma-separated addresses
+// point to private/reserved IPs. Resolves domain names to catch DNS rebinding.
+// Admin users bypass this check.
+func validateRemoteAddr(remoteAddr string, roleId int) string {
+	if roleId == adminRoleId {
+		return "" // Admin can forward to any address
+	}
+	addrs := strings.Split(remoteAddr, ",")
+	for _, addr := range addrs {
+		host := extractIpFromAddress(strings.TrimSpace(addr))
+		if host == "" {
+			continue
+		}
+		// Check literal IP first
+		if isPrivateIP(host) {
+			return fmt.Sprintf("禁止转发到内网地址: %s", host)
+		}
+		// If host is a domain name, resolve and check all IPs
+		if net.ParseIP(host) == nil {
+			ips, err := net.LookupIP(host)
+			if err == nil {
+				for _, ip := range ips {
+					if isPrivateIP(ip.String()) {
+						return fmt.Sprintf("禁止转发到内网地址: %s (解析为 %s)", host, ip)
+					}
+				}
+			}
+		}
+	}
+	return ""
 }
 
 // ---------------------- Address parsing helpers ----------------------

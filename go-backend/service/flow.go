@@ -16,11 +16,13 @@ import (
 
 const bytesToGB = 1024 * 1024 * 1024
 
+// Lock maps are keyed by entity IDs. Growth is bounded by the number of
+// users/forwards/tunnels in the system (each sync.Mutex is ~8 bytes), so
+// explicit cleanup is unnecessary for expected workloads.
 var (
 	userLocks    sync.Map
 	tunnelLocks  sync.Map
 	forwardLocks sync.Map
-	cryptoCache  sync.Map
 )
 
 func getUserLock(id string) *sync.Mutex {

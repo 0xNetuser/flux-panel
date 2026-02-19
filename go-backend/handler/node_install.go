@@ -71,10 +71,16 @@ echo "Node ID: $NODE_ID"
 	c.String(http.StatusOK, script)
 }
 
+var allowedArchs = map[string]bool{
+	"amd64": true,
+	"arm64": true,
+	"arm":   true,
+}
+
 func NodeInstallBinary(c *gin.Context) {
 	arch := c.Param("arch")
-	if arch == "" {
-		c.String(http.StatusBadRequest, "arch is required")
+	if !allowedArchs[arch] {
+		c.String(http.StatusBadRequest, "invalid architecture")
 		return
 	}
 

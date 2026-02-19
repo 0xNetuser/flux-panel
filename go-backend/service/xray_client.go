@@ -9,7 +9,6 @@ import (
 	"flux-panel/go-backend/pkg"
 	"log"
 	"net/url"
-	"strings"
 	"time"
 )
 
@@ -283,12 +282,7 @@ func generateShadowsocksLink(client *model.XrayClient, host string, port int, re
 }
 
 func generateRandomString(length int) string {
-	uuid := generateUUID()
-	clean := strings.ReplaceAll(uuid, "-", "")
-	if len(clean) >= length {
-		return clean[:length]
-	}
-	return clean
+	return pkg.GenerateRandomString(length)
 }
 
 func generateUUID() string {

@@ -38,13 +38,13 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 ```bash
 # 下载 docker-compose 配置文件（二选一）
 # IPv4 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.0/docker-compose-v4.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.1/docker-compose-v4.yml -o docker-compose.yml
 
 # IPv6 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.0/docker-compose-v6.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.1/docker-compose-v6.yml -o docker-compose.yml
 
 # 下载数据库初始化文件
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.0/gost.sql -o gost.sql
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.1/gost.sql -o gost.sql
 ```
 
 **2. 创建环境变量文件**
@@ -109,7 +109,7 @@ docker compose up -d
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.5.0
+  0xnetuser/gost-node:1.5.1
 ```
 
 也可以使用 docker-compose，参考项目中的 `docker-compose-node.yml`：
@@ -117,7 +117,7 @@ docker run -d --network=host --restart=unless-stopped --name gost-node \
 ```yaml
 services:
   gost-node:
-    image: 0xnetuser/gost-node:1.5.0
+    image: 0xnetuser/gost-node:1.5.1
     container_name: gost-node
     network_mode: host
     restart: unless-stopped
@@ -167,10 +167,10 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 ```bash
 # 下载最新 docker-compose 配置（覆盖旧文件）
 # IPv4 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.0/docker-compose-v4.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.1/docker-compose-v4.yml -o docker-compose.yml
 
 # IPv6 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.0/docker-compose-v6.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.1/docker-compose-v6.yml -o docker-compose.yml
 
 # 拉取最新镜像并重启
 docker compose pull && docker compose up -d
@@ -192,7 +192,7 @@ docker stop gost-node && docker rm gost-node
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.5.0
+  0xnetuser/gost-node:1.5.1
 ```
 
 如果使用 docker-compose 部署，更新 `docker-compose-node.yml` 中的镜像版本后：
@@ -214,6 +214,21 @@ curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && c
 ---
 
 ## 更新日志
+
+### v1.5.1
+
+- **WebSocket 节点认证**：节点 WebSocket 连接在升级前校验 secret，支持 `id+secret` 和仅 `secret` 两种认证模式（向后兼容旧节点）
+- **JWT 时序安全**：JWT 签名比较改用 `hmac.Equal` 防止时序侧信道攻击；JWT 有效期从 90 天缩短至 7 天
+- **登录/验证码限流**：新增独立的 per-IP 速率限制 — 登录 10 次/分钟、验证码 20 次/分钟
+- **SSRF 防护**：转发规则创建/更新时校验目标地址，拦截内网 IP 和域名解析到私有地址的请求
+- **Xray 接口权限**：`/xray/inbound/list`、`/xray/client/list`、`/xray/cert/list` 新增管理员权限校验
+- **公开配置过滤**：未认证请求仅能获取 `captcha_enabled`、`app_name` 等公开配置项
+- **验证码校验修复**：登录接口现在正确调用 `captchaStore.Verify()` 校验验证码
+- **API 响应脱敏**：节点列表隐藏 secret、证书列表隐藏私钥、用户列表隐藏密码哈希
+- **密码强度校验**：创建/修改用户密码时要求最少 8 位，修改密码需确认密码一致性
+- **路径遍历防护**：节点安装脚本的架构参数使用白名单校验（仅允许 amd64/arm64/arm）
+- **UUID/密码生成安全**：所有随机数生成（UUID、密码、token）改用 `crypto/rand`，失败时优雅降级而非 panic
+- **转发 userId 覆盖**：非管理员创建/更新转发规则时强制绑定当前用户 ID，防止越权操作
 
 ### v1.5.0
 

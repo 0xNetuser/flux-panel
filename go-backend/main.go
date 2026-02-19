@@ -65,6 +65,27 @@ func main() {
 	pkg.InitWSManager()
 
 	// Wire up WS callbacks
+	// ValidateNodeSecret verifies a node's secret against the DB.
+	// If nodeId > 0, validates that specific node; if 0, looks up by secret.
+	// Returns the resolved nodeId (0 = rejected).
+	pkg.WS.ValidateNodeSecret = func(nodeId int64, secret string) int64 {
+		var node model.Node
+		if nodeId > 0 {
+			if err := db.First(&node, nodeId).Error; err != nil {
+				return 0
+			}
+			if node.Secret != secret {
+				return 0
+			}
+			return node.ID
+		}
+		// No id provided — look up by secret
+		if err := db.Where("secret = ?", secret).First(&node).Error; err != nil {
+			return 0
+		}
+		return node.ID
+	}
+
 	pkg.WS.OnNodeOnline = func(nodeId int64, version, http, tls, socks string) {
 		updates := map[string]interface{}{
 			"status": 1,

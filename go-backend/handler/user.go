@@ -67,6 +67,10 @@ func UserUpdatePassword(c *gin.Context) {
 		c.JSON(http.StatusOK, dto.Err("参数错误"))
 		return
 	}
+	if d.NewPassword != d.ConfirmPassword {
+		c.JSON(http.StatusOK, dto.Err("两次输入的密码不一致"))
+		return
+	}
 	userId := c.GetInt64("userId")
 	c.JSON(http.StatusOK, service.UpdatePassword(userId, dto.UpdatePasswordDto{
 		OldPassword: d.CurrentPassword,

@@ -1,7 +1,9 @@
 package pkg
 
 import (
+	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -47,9 +49,13 @@ type WSManager struct {
 	pendingRequests sync.Map // requestID(string) → chan *dto.GostResponse
 
 	// Callbacks set by the application
-	OnNodeOnline  func(nodeId int64, version, http, tls, socks string)
-	OnNodeOffline func(nodeId int64)
-	OnNodeConfig  func(nodeId int64, data string)
+	OnNodeOnline       func(nodeId int64, version, http, tls, socks string)
+	OnNodeOffline      func(nodeId int64)
+	OnNodeConfig       func(nodeId int64, data string)
+	// ValidateNodeSecret checks a node's secret. If nodeId > 0, validates
+	// the specific node; if nodeId == 0, looks up by secret alone.
+	// Returns the resolved nodeId (0 = rejected).
+	ValidateNodeSecret func(nodeId int64, secret string) int64
 }
 
 type NodeSession struct {
@@ -91,7 +97,30 @@ func (m *WSManager) HandleConnection(w http.ResponseWriter, r *http.Request) {
 
 	var respHeader http.Header
 
-	if connType != "1" {
+	if connType == "1" {
+		// Node connection — validate secret against DB before upgrading
+		if secret == "" || m.ValidateNodeSecret == nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		// If id is provided, validate that specific node; otherwise look up by secret
+		var reqNodeId int64
+		if id != "" {
+			var err error
+			reqNodeId, err = strconv.ParseInt(id, 10, 64)
+			if err != nil {
+				http.Error(w, "Invalid node ID", http.StatusBadRequest)
+				return
+			}
+		}
+		resolvedNodeId := m.ValidateNodeSecret(reqNodeId, secret)
+		if resolvedNodeId == 0 {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		// Store resolved ID for use after upgrade
+		id = strconv.FormatInt(resolvedNodeId, 10)
+	} else {
 		// Admin connection — extract JWT
 		// Priority: Sec-WebSocket-Protocol (avoids URL leakage) > query param (backward compat)
 		token := ""
@@ -123,12 +152,8 @@ func (m *WSManager) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if connType == "1" {
-		// Node connection
-		nodeId, err := strconv.ParseInt(id, 10, 64)
-		if err != nil {
-			conn.Close()
-			return
-		}
+		// Node connection (already validated above)
+		nodeId, _ := strconv.ParseInt(id, 10, 64)
 
 		version := q.Get("nodeVersion")
 		httpVal := q.Get("http")
@@ -355,25 +380,34 @@ func generateUUID() string {
 
 func GenerateUUIDv4() string {
 	b := make([]byte, 16)
-	n := time.Now().UnixNano()
-	for i := range b {
-		b[i] = byte(n >> (i * 4))
-		n = n*6364136223846793005 + 1442695040888963407
+	if _, err := rand.Read(b); err != nil {
+		// Extremely unlikely; fall back to timestamp-seeded bytes rather than crash
+		log.Printf("CRITICAL: crypto/rand failed: %v", err)
+		n := time.Now().UnixNano()
+		for i := range b {
+			b[i] = byte(n >> (i * 8))
+			n ^= n << 13
+		}
 	}
 	b[6] = (b[6] & 0x0f) | 0x40
 	b[8] = (b[8] & 0x3f) | 0x80
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
 
-	hex := "0123456789abcdef"
-	buf := make([]byte, 36)
-	idx := 0
-	for i, v := range b {
-		if i == 4 || i == 6 || i == 8 || i == 10 {
-			buf[idx] = '-'
-			idx++
+// GenerateRandomString generates a cryptographically secure random hex string.
+func GenerateRandomString(length int) string {
+	b := make([]byte, (length+1)/2)
+	if _, err := rand.Read(b); err != nil {
+		log.Printf("CRITICAL: crypto/rand failed: %v", err)
+		n := time.Now().UnixNano()
+		for i := range b {
+			b[i] = byte(n >> (i * 8))
+			n ^= n << 13
 		}
-		buf[idx] = hex[v>>4]
-		buf[idx+1] = hex[v&0x0f]
-		idx += 2
 	}
-	return string(buf)
+	hex := fmt.Sprintf("%x", b)
+	if len(hex) > length {
+		return hex[:length]
+	}
+	return hex
 }

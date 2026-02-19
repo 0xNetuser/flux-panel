@@ -16,13 +16,13 @@ func Setup(r *gin.Engine) {
 
 	// ─── Public routes (no auth) ───
 
-	// User login
-	r.POST("/api/v1/user/login", handler.Login)
+	// User login (rate limited — separate bucket from captcha)
+	r.POST("/api/v1/user/login", middleware.LoginRateLimit(), handler.Login)
 
-	// Captcha
-	r.POST("/api/v1/captcha/check", handler.CaptchaCheck)
-	r.POST("/api/v1/captcha/generate", handler.CaptchaGenerate)
-	r.POST("/api/v1/captcha/verify", handler.CaptchaVerify)
+	// Captcha (rate limited — separate bucket from login)
+	r.POST("/api/v1/captcha/check", middleware.CaptchaRateLimit(), handler.CaptchaCheck)
+	r.POST("/api/v1/captcha/generate", middleware.CaptchaRateLimit(), handler.CaptchaGenerate)
+	r.POST("/api/v1/captcha/verify", middleware.CaptchaRateLimit(), handler.CaptchaVerify)
 
 	// Config (public read)
 	r.POST("/api/v1/config/list", handler.ConfigList)
@@ -107,7 +107,7 @@ func Setup(r *gin.Engine) {
 
 		// Xray Inbound
 		auth.POST("/xray/inbound/create", middleware.Admin(), handler.XrayInboundCreate)
-		auth.POST("/xray/inbound/list", handler.XrayInboundList)
+		auth.POST("/xray/inbound/list", middleware.Admin(), handler.XrayInboundList)
 		auth.POST("/xray/inbound/update", middleware.Admin(), handler.XrayInboundUpdate)
 		auth.POST("/xray/inbound/delete", middleware.Admin(), handler.XrayInboundDelete)
 		auth.POST("/xray/inbound/enable", middleware.Admin(), handler.XrayInboundEnable)
@@ -115,14 +115,14 @@ func Setup(r *gin.Engine) {
 
 		// Xray Client
 		auth.POST("/xray/client/create", middleware.Admin(), handler.XrayClientCreate)
-		auth.POST("/xray/client/list", handler.XrayClientList)
+		auth.POST("/xray/client/list", middleware.Admin(), handler.XrayClientList)
 		auth.POST("/xray/client/update", middleware.Admin(), handler.XrayClientUpdate)
 		auth.POST("/xray/client/delete", middleware.Admin(), handler.XrayClientDelete)
 		auth.POST("/xray/client/reset-traffic", middleware.Admin(), handler.XrayClientResetTraffic)
 
 		// Xray Cert
 		auth.POST("/xray/cert/create", middleware.Admin(), handler.XrayCertCreate)
-		auth.POST("/xray/cert/list", handler.XrayCertList)
+		auth.POST("/xray/cert/list", middleware.Admin(), handler.XrayCertList)
 		auth.POST("/xray/cert/delete", middleware.Admin(), handler.XrayCertDelete)
 
 		// Xray Node

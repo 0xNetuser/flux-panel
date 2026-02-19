@@ -218,6 +218,11 @@ secrets.json
 go-gost/config.json
 go-gost/gost.json
 
+# Build artifacts
+go-gost/gost
+go-gost/gost-*
+go-backend/go-backend
+
 # ==========================================
 # 备份和临时文件
 # ==========================================

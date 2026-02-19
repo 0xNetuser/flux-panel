@@ -37,11 +37,12 @@ func GetAllNodes() dto.R {
 	var nodes []model.Node
 	DB.Order("created_time DESC").Find(&nodes)
 
-	// Update online status from WS manager
+	// Update online status from WS manager; strip secrets from response
 	for i := range nodes {
 		if pkg.WS != nil && pkg.WS.IsNodeOnline(nodes[i].ID) {
 			nodes[i].Status = 1
 		}
+		nodes[i].Secret = ""
 	}
 
 	return dto.Ok(nodes)

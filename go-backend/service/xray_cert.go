@@ -51,6 +51,10 @@ func ListXrayTlsCerts(nodeId *int64) dto.R {
 
 	var list []model.XrayTlsCert
 	query.Find(&list)
+	// Strip private keys from response
+	for i := range list {
+		list[i].PrivateKey = ""
+	}
 	return dto.Ok(list)
 }
 

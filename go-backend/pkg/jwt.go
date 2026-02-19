@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const expireDuration = 90 * 24 * time.Hour
+const expireDuration = 7 * 24 * time.Hour
 
 func GenerateToken(user *model.User) (string, error) {
 	now := time.Now()
@@ -48,7 +48,7 @@ func ValidateToken(token string) bool {
 		return false
 	}
 	expected := calcSignature(parts[0], parts[1])
-	if expected != parts[2] {
+	if !hmac.Equal([]byte(expected), []byte(parts[2])) {
 		return false
 	}
 	payload, err := decodePayload(parts[1])

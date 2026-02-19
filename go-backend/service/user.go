@@ -32,6 +32,8 @@ type UserInfoDto struct {
 	Num           int    `json:"num"`
 	ExpTime       int64  `json:"expTime"`
 	FlowResetTime int64  `json:"flowResetTime"`
+	GostEnabled   int    `json:"gostEnabled"`
+	XrayEnabled   int    `json:"xrayEnabled"`
 	CreatedTime   int64  `json:"createdTime"`
 	UpdatedTime   int64  `json:"updatedTime"`
 }
@@ -138,6 +140,8 @@ func Login(d dto.LoginDto) dto.R {
 		"name":                  user.User,
 		"role_id":               user.RoleId,
 		"requirePasswordChange": requirePasswordChange,
+		"gost_enabled":          user.GostEnabled,
+		"xray_enabled":          user.XrayEnabled,
 	})
 }
 
@@ -165,6 +169,15 @@ func CreateUser(d dto.UserDto) dto.R {
 		status = *d.Status
 	}
 
+	gostEnabled := 1
+	if d.GostEnabled != nil {
+		gostEnabled = *d.GostEnabled
+	}
+	xrayEnabled := 1
+	if d.XrayEnabled != nil {
+		xrayEnabled = *d.XrayEnabled
+	}
+
 	user := model.User{
 		User:          d.User,
 		Pwd:           pkg.HashPassword(d.Pwd),
@@ -174,6 +187,8 @@ func CreateUser(d dto.UserDto) dto.R {
 		ExpTime:       d.ExpTime,
 		FlowResetTime: d.FlowResetTime,
 		Status:        status,
+		GostEnabled:   gostEnabled,
+		XrayEnabled:   xrayEnabled,
 		CreatedTime:   now,
 		UpdatedTime:   now,
 	}
@@ -183,6 +198,13 @@ func CreateUser(d dto.UserDto) dto.R {
 		return dto.Err("用户创建失败")
 	}
 
+	// 4. Save user_node records
+	if len(d.NodeIds) > 0 {
+		for _, nodeId := range d.NodeIds {
+			DB.Create(&model.UserNode{UserId: user.ID, NodeId: nodeId})
+		}
+	}
+
 	return dto.Ok("用户创建成功")
 }
 
@@ -190,14 +212,48 @@ func CreateUser(d dto.UserDto) dto.R {
 // GetAllUsers returns all non-admin users.
 // ---------------------------------------------------------------------------
 
+// UserWithNodes wraps a user with their assigned node IDs.
+type UserWithNodes struct {
+	model.User
+	NodeIds []int64 `json:"nodeIds"`
+}
+
 func GetAllUsers() dto.R {
 	var users []model.User
 	DB.Where("role_id != ?", adminRoleID).Find(&users)
-	// Strip password hashes from response
-	for i := range users {
-		users[i].Pwd = ""
+
+	// Collect all user IDs
+	userIds := make([]int64, len(users))
+	for i, u := range users {
+		userIds[i] = u.ID
 	}
-	return dto.Ok(users)
+
+	// Batch query user_node records
+	var userNodes []model.UserNode
+	if len(userIds) > 0 {
+		DB.Where("user_id IN ?", userIds).Find(&userNodes)
+	}
+
+	// Group node IDs by user ID
+	nodeMap := make(map[int64][]int64)
+	for _, un := range userNodes {
+		nodeMap[un.UserId] = append(nodeMap[un.UserId], un.NodeId)
+	}
+
+	// Build response
+	result := make([]UserWithNodes, len(users))
+	for i, u := range users {
+		u.Pwd = ""
+		result[i] = UserWithNodes{
+			User:    u,
+			NodeIds: nodeMap[u.ID],
+		}
+		if result[i].NodeIds == nil {
+			result[i].NodeIds = []int64{}
+		}
+	}
+
+	return dto.Ok(result)
 }
 
 // ---------------------------------------------------------------------------
@@ -235,6 +291,12 @@ func UpdateUser(d dto.UserUpdateDto) dto.R {
 	if d.Status != nil {
 		updates["status"] = *d.Status
 	}
+	if d.GostEnabled != nil {
+		updates["gost_enabled"] = *d.GostEnabled
+	}
+	if d.XrayEnabled != nil {
+		updates["xray_enabled"] = *d.XrayEnabled
+	}
 	if d.Pwd != "" {
 		if len(d.Pwd) < 8 {
 			return dto.Err("密码长度至少8位")
@@ -244,6 +306,14 @@ func UpdateUser(d dto.UserUpdateDto) dto.R {
 
 	if err := DB.Model(&model.User{}).Where("id = ?", d.ID).Updates(updates).Error; err != nil {
 		return dto.Err("用户更新失败")
+	}
+
+	// Update user_node records if nodeIds is provided
+	if d.NodeIds != nil {
+		DB.Where("user_id = ?", d.ID).Delete(&model.UserNode{})
+		for _, nodeId := range d.NodeIds {
+			DB.Create(&model.UserNode{UserId: d.ID, NodeId: nodeId})
+		}
 	}
 
 	return dto.Ok("用户更新成功")
@@ -285,6 +355,9 @@ func DeleteUser(id int64) dto.R {
 
 	// 4. Delete user_tunnel records
 	DB.Where("user_id = ?", id).Delete(&model.UserTunnel{})
+
+	// 4.5 Delete user_node records
+	DB.Where("user_id = ?", id).Delete(&model.UserNode{})
 
 	// 5. Delete statistics_flow records
 	DB.Where("user_id = ?", id).Delete(&model.StatisticsFlow{})
@@ -352,6 +425,8 @@ func GetUserPackageInfo(userId int64, roleId int) dto.R {
 		Num:           user.Num,
 		ExpTime:       user.ExpTime,
 		FlowResetTime: user.FlowResetTime,
+		GostEnabled:   user.GostEnabled,
+		XrayEnabled:   user.XrayEnabled,
 		CreatedTime:   user.CreatedTime,
 		UpdatedTime:   user.UpdatedTime,
 	}
@@ -556,4 +631,21 @@ func ResetFlow(d dto.ResetFlowDto, flowType int) dto.R {
 		})
 	}
 	return dto.OkMsg()
+}
+
+// ---------------------------------------------------------------------------
+// UserHasNodeAccess checks if a user has permission to access a given node.
+// If the user has no user_node records, they are treated as a legacy user
+// and granted access to all nodes.
+// ---------------------------------------------------------------------------
+
+func UserHasNodeAccess(userId, nodeId int64) bool {
+	var total int64
+	DB.Model(&model.UserNode{}).Where("user_id = ?", userId).Count(&total)
+	if total == 0 {
+		return true // No records = legacy user, allow all
+	}
+	var count int64
+	DB.Model(&model.UserNode{}).Where("user_id = ? AND node_id = ?", userId, nodeId).Count(&count)
+	return count > 0
 }

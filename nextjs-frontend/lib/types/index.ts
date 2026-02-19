@@ -8,6 +8,9 @@ export interface User {
   outFlow: number;
   num: number;
   expTime: number | null;
+  gostEnabled: number;
+  xrayEnabled: number;
+  nodeIds: number[];
   createdTime: number;
   updatedTime: number;
 }

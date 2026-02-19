@@ -111,15 +111,14 @@ export default function XrayClientPage() {
 
     const data: any = {
       inboundId: parseInt(form.inboundId),
-      email: form.email || undefined,
-      uuid: form.uuid,
+      uuidOrPassword: form.uuid || undefined,
       flow: form.flow || undefined,
       alterId: parseInt(form.alterId) || 0,
       remark: form.remark || undefined,
     };
     if (form.userId) data.userId = parseInt(form.userId);
     if (form.totalTraffic) data.totalTraffic = parseFloat(form.totalTraffic) * 1024 * 1024 * 1024;
-    if (form.expTime) data.expTime = new Date(form.expTime).toISOString();
+    if (form.expTime) data.expTime = new Date(form.expTime).getTime();
 
     let res;
     if (editingClient) {

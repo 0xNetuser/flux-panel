@@ -59,9 +59,9 @@ export default function XrayCertificatePage() {
       domain: form.domain,
       publicKey: form.publicKey || undefined,
       privateKey: form.privateKey || undefined,
-      autoRenew: form.autoRenew,
+      autoRenew: form.autoRenew ? 1 : 0,
     };
-    if (form.expireTime) data.expireTime = new Date(form.expireTime).toISOString();
+    if (form.expireTime) data.expireTime = new Date(form.expireTime).getTime();
 
     const res = await createXrayCert(data);
     if (res.code === 0) {

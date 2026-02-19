@@ -11,6 +11,8 @@ type User struct {
 	OutFlow       int64  `gorm:"column:out_flow" json:"outFlow"`
 	FlowResetTime int64  `gorm:"column:flow_reset_time" json:"flowResetTime"`
 	Num           int    `gorm:"column:num" json:"num"`
+	GostEnabled   int    `gorm:"column:gost_enabled;default:1" json:"gostEnabled"`
+	XrayEnabled   int    `gorm:"column:xray_enabled;default:1" json:"xrayEnabled"`
 	CreatedTime   int64  `gorm:"column:created_time" json:"createdTime"`
 	UpdatedTime   int64  `gorm:"column:updated_time" json:"updatedTime"`
 	Status        int    `gorm:"column:status" json:"status"`

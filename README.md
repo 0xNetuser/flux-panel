@@ -38,13 +38,13 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 ```bash
 # 下载 docker-compose 配置文件（二选一）
 # IPv4 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.4/docker-compose-v4.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/docker-compose-v4.yml -o docker-compose.yml
 
 # IPv6 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.4/docker-compose-v6.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/docker-compose-v6.yml -o docker-compose.yml
 
 # 下载数据库初始化文件
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.4/gost.sql -o gost.sql
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/gost.sql -o gost.sql
 ```
 
 **2. 创建环境变量文件**
@@ -109,7 +109,7 @@ docker compose up -d
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.5.4
+  0xnetuser/gost-node:1.5.5
 ```
 
 也可以使用 docker-compose，参考项目中的 `docker-compose-node.yml`：
@@ -117,7 +117,7 @@ docker run -d --network=host --restart=unless-stopped --name gost-node \
 ```yaml
 services:
   gost-node:
-    image: 0xnetuser/gost-node:1.5.4
+    image: 0xnetuser/gost-node:1.5.5
     container_name: gost-node
     network_mode: host
     restart: unless-stopped
@@ -167,10 +167,10 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 ```bash
 # 下载最新 docker-compose 配置（覆盖旧文件）
 # IPv4 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.4/docker-compose-v4.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/docker-compose-v4.yml -o docker-compose.yml
 
 # IPv6 环境：
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.4/docker-compose-v6.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.5.5/docker-compose-v6.yml -o docker-compose.yml
 
 # 拉取最新镜像并重启
 docker compose pull && docker compose up -d
@@ -192,7 +192,7 @@ docker stop gost-node && docker rm gost-node
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.5.4
+  0xnetuser/gost-node:1.5.5
 ```
 
 如果使用 docker-compose 部署，更新 `docker-compose-node.yml` 中的镜像版本后：
@@ -214,6 +214,15 @@ curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && c
 ---
 
 ## 更新日志
+
+### v1.5.5
+
+- **用户权限系统**：新增 GOST 转发/Xray 代理功能级权限开关，可按用户独立控制
+- **节点权限控制**：支持为用户分配可访问的节点列表，未分配则允许全部（向后兼容）
+- **用户管理 UI**：用户创建/编辑对话框新增权限开关和节点多选列表
+- **侧边栏权限过滤**：非管理员用户仅显示已授权的功能分类
+- **DTO 绑定修复**：修复全局 `binding:"required"` 导致大部分创建/更新操作返回「参数错误」的问题
+- **前端参数修复**：修复隧道类型、Xray 客户端 UUID、证书自动续签等前后端字段不匹配问题
 
 ### v1.5.4
 

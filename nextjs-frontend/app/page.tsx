@@ -78,6 +78,8 @@ export default function LoginPage() {
         localStorage.setItem('role_id', res.data.role_id.toString());
         localStorage.setItem('name', res.data.name);
         localStorage.setItem('admin', (res.data.role_id === 0).toString());
+        localStorage.setItem('gost_enabled', (res.data.gost_enabled ?? 1).toString());
+        localStorage.setItem('xray_enabled', (res.data.xray_enabled ?? 1).toString());
 
         toast.success('登录成功');
 

@@ -44,7 +44,12 @@ func main() {
 		&model.XrayInbound{},
 		&model.XrayClient{},
 		&model.XrayTlsCert{},
+		&model.UserNode{},
 	)
+
+	// Backfill NULL permission columns for existing users
+	db.Exec("UPDATE `user` SET gost_enabled = 1 WHERE gost_enabled IS NULL")
+	db.Exec("UPDATE `user` SET xray_enabled = 1 WHERE xray_enabled IS NULL")
 
 	// Set global DB
 	service.DB = db

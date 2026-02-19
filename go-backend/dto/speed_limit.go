@@ -3,7 +3,7 @@ package dto
 type SpeedLimitDto struct {
 	Name     string `json:"name" binding:"required"`
 	Speed    int    `json:"speed" binding:"required"`
-	TunnelId int64  `json:"tunnelId" binding:"required"`
+	TunnelId int64  `json:"tunnelId"`
 }
 
 type SpeedLimitUpdateDto struct {

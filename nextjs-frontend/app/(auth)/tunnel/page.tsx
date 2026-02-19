@@ -77,7 +77,7 @@ export default function TunnelPage() {
       name: tunnel.name || '',
       inNodeId: tunnel.inNodeId?.toString() || '',
       outNodeId: tunnel.outNodeId?.toString() || '',
-      type: tunnel.type || 'port',
+      type: tunnel.type === 2 ? 'tunnel' : 'port',
       protocol: tunnel.protocol || 'tcp',
       portSta: tunnel.portSta?.toString() || '',
       portEnd: tunnel.portEnd?.toString() || '',
@@ -91,11 +91,12 @@ export default function TunnelPage() {
       toast.error('请填写必要字段');
       return;
     }
+    const typeInt = form.type === 'tunnel' ? 2 : (typeof form.type === 'number' ? form.type : 1);
     const data: any = {
       name: form.name,
       inNodeId: parseInt(form.inNodeId),
       outNodeId: parseInt(form.outNodeId),
-      type: form.type,
+      type: typeInt,
       protocol: form.protocol,
       interfaceName: form.interfaceName || null,
     };
@@ -208,7 +209,7 @@ export default function TunnelPage() {
                         <TableCell>{getNodeName(t.outNodeId)}</TableCell>
                         <TableCell>
                           <Badge variant="outline">
-                            {t.type === 'port' ? '端口转发' : '隧道转发'}
+                            {t.type === 1 ? '端口转发' : '隧道转发'}
                           </Badge>
                         </TableCell>
                         <TableCell>

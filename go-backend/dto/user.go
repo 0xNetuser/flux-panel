@@ -8,24 +8,30 @@ type LoginDto struct {
 }
 
 type UserDto struct {
-	User          string `json:"user" binding:"required"`
-	Pwd           string `json:"pwd" binding:"required"`
-	Flow          int64  `json:"flow" binding:"required"`
-	Num           int    `json:"num" binding:"required"`
-	ExpTime       int64  `json:"expTime" binding:"required"`
-	FlowResetTime int64  `json:"flowResetTime" binding:"required"`
-	Status        *int   `json:"status"`
+	User          string  `json:"user" binding:"required"`
+	Pwd           string  `json:"pwd" binding:"required"`
+	Flow          int64   `json:"flow"`
+	Num           int     `json:"num"`
+	ExpTime       int64   `json:"expTime"`
+	FlowResetTime int64   `json:"flowResetTime"`
+	Status        *int    `json:"status"`
+	GostEnabled   *int    `json:"gostEnabled"`
+	XrayEnabled   *int    `json:"xrayEnabled"`
+	NodeIds       []int64 `json:"nodeIds"`
 }
 
 type UserUpdateDto struct {
-	ID            int64  `json:"id" binding:"required"`
-	User          string `json:"user" binding:"required"`
-	Pwd           string `json:"pwd"`
-	Flow          int64  `json:"flow" binding:"required"`
-	Num           int    `json:"num" binding:"required"`
-	ExpTime       int64  `json:"expTime" binding:"required"`
-	FlowResetTime int64  `json:"flowResetTime" binding:"required"`
-	Status        *int   `json:"status"`
+	ID            int64   `json:"id" binding:"required"`
+	User          string  `json:"user" binding:"required"`
+	Pwd           string  `json:"pwd"`
+	Flow          int64   `json:"flow"`
+	Num           int     `json:"num"`
+	ExpTime       int64   `json:"expTime"`
+	FlowResetTime int64   `json:"flowResetTime"`
+	Status        *int    `json:"status"`
+	GostEnabled   *int    `json:"gostEnabled"`
+	XrayEnabled   *int    `json:"xrayEnabled"`
+	NodeIds       []int64 `json:"nodeIds"`
 }
 
 type UpdatePasswordDto struct {

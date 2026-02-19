@@ -11,7 +11,7 @@ type ForwardDto struct {
 
 type ForwardUpdateDto struct {
 	ID            int64  `json:"id" binding:"required"`
-	UserId        int64  `json:"userId" binding:"required"`
+	UserId        int64  `json:"userId"`
 	Name          string `json:"name" binding:"required"`
 	TunnelId      int64  `json:"tunnelId" binding:"required"`
 	RemoteAddr    string `json:"remoteAddr" binding:"required"`

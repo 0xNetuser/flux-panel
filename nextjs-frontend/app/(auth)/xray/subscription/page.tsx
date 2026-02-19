@@ -12,7 +12,7 @@ import { getSubscriptionToken, getSubscriptionLinks } from '@/lib/api/xray-subsc
 import { useAuth } from '@/lib/hooks/use-auth';
 
 export default function XraySubscriptionPage() {
-  const { username } = useAuth();
+  const { isAdmin, xrayEnabled } = useAuth();
   const [token, setToken] = useState('');
   const [subUrl, setSubUrl] = useState('');
   const [links, setLinks] = useState<any[]>([]);
@@ -72,6 +72,14 @@ export default function XraySubscriptionPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">加载中...</p>
+      </div>
+    );
+  }
+
+  if (!isAdmin && !xrayEnabled) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">你没有 Xray 代理权限，请联系管理员</p>
       </div>
     );
   }

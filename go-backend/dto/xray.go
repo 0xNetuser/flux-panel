@@ -2,11 +2,11 @@ package dto
 
 type XrayInboundDto struct {
 	NodeId             int64  `json:"nodeId" binding:"required"`
-	Tag                string `json:"tag" binding:"required"`
+	Tag                string `json:"tag"`
 	Protocol           string `json:"protocol" binding:"required"`
 	Listen             string `json:"listen"`
 	Port               int    `json:"port" binding:"required"`
-	SettingsJson       string `json:"settingsJson" binding:"required"`
+	SettingsJson       string `json:"settingsJson"`
 	StreamSettingsJson string `json:"streamSettingsJson"`
 	SniffingJson       string `json:"sniffingJson"`
 	Remark             string `json:"remark"`
@@ -26,7 +26,7 @@ type XrayInboundUpdateDto struct {
 
 type XrayClientDto struct {
 	InboundId      int64  `json:"inboundId" binding:"required"`
-	UserId         int64  `json:"userId" binding:"required"`
+	UserId         int64  `json:"userId"`
 	UuidOrPassword string `json:"uuidOrPassword"`
 	Flow           string `json:"flow"`
 	AlterId        *int   `json:"alterId"`
@@ -48,8 +48,8 @@ type XrayClientUpdateDto struct {
 type XrayTlsCertDto struct {
 	NodeId     int64  `json:"nodeId" binding:"required"`
 	Domain     string `json:"domain" binding:"required"`
-	PublicKey  string `json:"publicKey" binding:"required"`
-	PrivateKey string `json:"privateKey" binding:"required"`
+	PublicKey  string `json:"publicKey"`
+	PrivateKey string `json:"privateKey"`
 	AutoRenew  *int   `json:"autoRenew"`
 	ExpireTime *int64 `json:"expireTime"`
 }

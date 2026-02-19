@@ -2,10 +2,10 @@ package dto
 
 type NodeDto struct {
 	Name     string `json:"name" binding:"required"`
-	Ip       string `json:"ip" binding:"required"`
+	Ip       string `json:"ip"`
 	ServerIp string `json:"serverIp" binding:"required"`
-	PortSta  int    `json:"portSta" binding:"required"`
-	PortEnd  int    `json:"portEnd" binding:"required"`
+	PortSta  int    `json:"portSta"`
+	PortEnd  int    `json:"portEnd"`
 }
 
 type NodeUpdateDto struct {

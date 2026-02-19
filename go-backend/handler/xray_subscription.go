@@ -62,6 +62,20 @@ func XraySubToken(c *gin.Context) {
 		return
 	}
 
+	// Check Xray permission for non-admin users
+	roleId := GetRoleId(c)
+	if roleId != 0 {
+		var user model.User
+		if err := service.DB.First(&user, userId).Error; err != nil {
+			c.JSON(http.StatusOK, dto.Err("用户不存在"))
+			return
+		}
+		if user.XrayEnabled != 1 {
+			c.JSON(http.StatusOK, dto.Err("你没有 Xray 代理权限"))
+			return
+		}
+	}
+
 	// Generate a short-lived subscription token (24h)
 	subToken, err := pkg.GenerateSubToken(userId)
 	if err != nil {

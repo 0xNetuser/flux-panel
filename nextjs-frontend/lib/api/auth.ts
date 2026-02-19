@@ -12,6 +12,8 @@ export interface LoginResponse {
   role_id: number;
   name: string;
   requirePasswordChange?: boolean;
+  gost_enabled?: number;
+  xray_enabled?: number;
 }
 
 export const login = (data: LoginData) => post<LoginResponse>('/user/login', data);

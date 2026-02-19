@@ -18,9 +18,11 @@ func CreateXrayClient(d dto.XrayClientDto) dto.R {
 		return dto.Err("入站不存在")
 	}
 
-	var user model.User
-	if err := DB.First(&user, d.UserId).Error; err != nil {
-		return dto.Err("用户不存在")
+	if d.UserId > 0 {
+		var user model.User
+		if err := DB.First(&user, d.UserId).Error; err != nil {
+			return dto.Err("用户不存在")
+		}
 	}
 
 	client := model.XrayClient{
@@ -177,6 +179,15 @@ func ResetXrayClientTraffic(id int64) dto.R {
 }
 
 func GetSubscriptionLinks(userId int64) dto.R {
+	// Check Xray permission
+	var user model.User
+	if err := DB.First(&user, userId).Error; err != nil {
+		return dto.Err("用户不存在")
+	}
+	if user.RoleId != 0 && user.XrayEnabled != 1 {
+		return dto.Ok([]map[string]interface{}{})
+	}
+
 	var clients []model.XrayClient
 	DB.Where("user_id = ? AND enable = 1", userId).Find(&clients)
 
@@ -190,6 +201,11 @@ func GetSubscriptionLinks(userId int64) dto.R {
 
 		node := GetNodeById(inbound.NodeId)
 		if node == nil || node.Status != 1 {
+			continue
+		}
+
+		// Node access check for non-admin users
+		if user.RoleId != 0 && !UserHasNodeAccess(userId, node.ID) {
 			continue
 		}
 

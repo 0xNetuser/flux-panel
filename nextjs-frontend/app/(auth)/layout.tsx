@@ -42,13 +42,20 @@ const navItems: NavItem[] = [
   { path: '/config', label: '网站配置', icon: <Settings className="h-4 w-4" />, adminOnly: true, section: '系统' },
 ];
 
-function SidebarContent({ pathname, isAdmin, onNavigate, version }: {
+function SidebarContent({ pathname, isAdmin, gostEnabled, xrayEnabled, onNavigate, version }: {
   pathname: string;
   isAdmin: boolean;
+  gostEnabled: boolean;
+  xrayEnabled: boolean;
   onNavigate: (path: string) => void;
   version: string;
 }) {
-  const filtered = navItems.filter(item => !item.adminOnly || isAdmin);
+  const filtered = navItems.filter(item => {
+    if (item.adminOnly && !isAdmin) return false;
+    if (item.section === 'GOST' && !isAdmin && !gostEnabled) return false;
+    if (item.section === 'Xray' && !isAdmin && !xrayEnabled) return false;
+    return true;
+  });
   let lastSection = '';
 
   return (
@@ -105,7 +112,7 @@ function SidebarContent({ pathname, isAdmin, onNavigate, version }: {
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, isAdmin, username, loading } = useAuth();
+  const { isAuthenticated, isAdmin, username, gostEnabled, xrayEnabled, loading } = useAuth();
   const isMobile = useIsMobile();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [panelVersion, setPanelVersion] = useState('');
@@ -138,7 +145,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       {/* Desktop sidebar */}
       {!isMobile && (
         <aside className="w-64 border-r bg-card flex-shrink-0">
-          <SidebarContent pathname={pathname} isAdmin={isAdmin} onNavigate={handleNavigate} version={panelVersion} />
+          <SidebarContent pathname={pathname} isAdmin={isAdmin} gostEnabled={gostEnabled} xrayEnabled={xrayEnabled} onNavigate={handleNavigate} version={panelVersion} />
         </aside>
       )}
 
@@ -155,7 +162,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="w-64 p-0">
-                  <SidebarContent pathname={pathname} isAdmin={isAdmin} onNavigate={handleNavigate} version={panelVersion} />
+                  <SidebarContent pathname={pathname} isAdmin={isAdmin} gostEnabled={gostEnabled} xrayEnabled={xrayEnabled} onNavigate={handleNavigate} version={panelVersion} />
                 </SheetContent>
               </Sheet>
             )}

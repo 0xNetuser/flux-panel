@@ -171,10 +171,23 @@ func GetUserAccessibleTunnels(userId int64, roleId int) dto.R {
 		UserTunnelId int64 `json:"userTunnelId"`
 	}
 
+	// Check if user has node restrictions
+	var nodeCount int64
+	DB.Model(&model.UserNode{}).Where("user_id = ?", userId).Count(&nodeCount)
+
 	var tunnels []TunnelWithPermission
-	DB.Raw(`SELECT t.*, ut.id as user_tunnel_id FROM tunnel t
-		INNER JOIN user_tunnel ut ON t.id = ut.tunnel_id
-		WHERE ut.user_id = ? AND ut.status = 1`, userId).Scan(&tunnels)
+	if nodeCount > 0 {
+		// User has node restrictions: filter tunnels by allowed nodes
+		DB.Raw(`SELECT t.*, ut.id as user_tunnel_id FROM tunnel t
+			INNER JOIN user_tunnel ut ON t.id = ut.tunnel_id
+			WHERE ut.user_id = ? AND ut.status = 1
+			AND t.in_node_id IN (SELECT node_id FROM user_node WHERE user_id = ?)`, userId, userId).Scan(&tunnels)
+	} else {
+		// No node restrictions: show all permitted tunnels
+		DB.Raw(`SELECT t.*, ut.id as user_tunnel_id FROM tunnel t
+			INNER JOIN user_tunnel ut ON t.id = ut.tunnel_id
+			WHERE ut.user_id = ? AND ut.status = 1`, userId).Scan(&tunnels)
+	}
 
 	return dto.Ok(tunnels)
 }

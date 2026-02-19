@@ -16,7 +16,7 @@ import { userTunnel } from '@/lib/api/tunnel';
 import { useAuth } from '@/lib/hooks/use-auth';
 
 export default function ForwardPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, gostEnabled } = useAuth();
   const [forwards, setForwards] = useState<any[]>([]);
   const [tunnels, setTunnels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,6 +118,14 @@ export default function ForwardPage() {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
+
+  if (!isAdmin && !gostEnabled) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-muted-foreground">你没有 GOST 转发权限，请联系管理员</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

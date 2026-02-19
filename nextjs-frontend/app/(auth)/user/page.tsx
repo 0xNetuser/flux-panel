@@ -8,18 +8,38 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
 import { Plus, Trash2, Edit2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { getAllUsers, createUser, updateUser, deleteUser, resetUserFlow } from '@/lib/api/user';
+import { getNodeList } from '@/lib/api/node';
 import { useAuth } from '@/lib/hooks/use-auth';
+
+interface NodeItem {
+  id: number;
+  name: string;
+  status: number;
+}
 
 export default function UserPage() {
   const { isAdmin } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
+  const [nodes, setNodes] = useState<NodeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
-  const [form, setForm] = useState({ user: '', password: '', flow: '', num: '', expTime: '' });
+  const [form, setForm] = useState({
+    user: '',
+    password: '',
+    flow: '',
+    num: '',
+    expTime: '',
+    gostEnabled: true,
+    xrayEnabled: true,
+    nodeIds: [] as number[],
+  });
 
   const formatBytes = (bytes: number) => {
     if (!bytes) return '0 B';
@@ -31,27 +51,43 @@ export default function UserPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const res = await getAllUsers();
-    if (res.code === 0) setUsers(res.data || []);
+    const [usersRes, nodesRes] = await Promise.all([getAllUsers(), getNodeList()]);
+    if (usersRes.code === 0) setUsers(usersRes.data || []);
+    if (nodesRes.code === 0) setNodes(nodesRes.data || []);
     setLoading(false);
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  const allNodeIds = nodes.map(n => n.id);
+
   const handleCreate = () => {
     setEditingUser(null);
-    setForm({ user: '', password: '', flow: '', num: '', expTime: '' });
+    setForm({
+      user: '',
+      password: '',
+      flow: '',
+      num: '',
+      expTime: '',
+      gostEnabled: true,
+      xrayEnabled: true,
+      nodeIds: [...allNodeIds],
+    });
     setDialogOpen(true);
   };
 
   const handleEdit = (u: any) => {
     setEditingUser(u);
+    const userNodeIds = u.nodeIds && u.nodeIds.length > 0 ? u.nodeIds : [...allNodeIds];
     setForm({
       user: u.user || '',
       password: '',
       flow: u.flow?.toString() || '',
       num: u.num?.toString() || '',
       expTime: u.expTime ? new Date(u.expTime).toISOString().slice(0, 16) : '',
+      gostEnabled: u.gostEnabled !== 0,
+      xrayEnabled: u.xrayEnabled !== 0,
+      nodeIds: userNodeIds,
     });
     setDialogOpen(true);
   };
@@ -63,11 +99,14 @@ export default function UserPage() {
     }
     const data: any = {
       user: form.user,
+      gostEnabled: form.gostEnabled ? 1 : 0,
+      xrayEnabled: form.xrayEnabled ? 1 : 0,
+      nodeIds: form.nodeIds,
     };
-    if (form.password) data.password = form.password;
+    if (form.password) data.pwd = form.password;
     if (form.flow) data.flow = parseFloat(form.flow);
     if (form.num) data.num = parseInt(form.num);
-    if (form.expTime) data.expTime = new Date(form.expTime).toISOString();
+    if (form.expTime) data.expTime = new Date(form.expTime).getTime();
 
     let res;
     if (editingUser) {
@@ -99,6 +138,22 @@ export default function UserPage() {
     else toast.error(res.msg);
   };
 
+  const toggleNodeId = (nodeId: number) => {
+    setForm(p => ({
+      ...p,
+      nodeIds: p.nodeIds.includes(nodeId)
+        ? p.nodeIds.filter(id => id !== nodeId)
+        : [...p.nodeIds, nodeId],
+    }));
+  };
+
+  const toggleAllNodes = () => {
+    setForm(p => ({
+      ...p,
+      nodeIds: p.nodeIds.length === allNodeIds.length ? [] : [...allNodeIds],
+    }));
+  };
+
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -121,6 +176,7 @@ export default function UserPage() {
               <TableRow>
                 <TableHead>用户名</TableHead>
                 <TableHead>角色</TableHead>
+                <TableHead>权限</TableHead>
                 <TableHead>流量 (已用/总量)</TableHead>
                 <TableHead>转发数</TableHead>
                 <TableHead>到期时间</TableHead>
@@ -130,9 +186,9 @@ export default function UserPage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8">加载中...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8">加载中...</TableCell></TableRow>
               ) : users.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
               ) : (
                 users.map((u) => {
                   const usedFlow = (u.inFlow || 0) + (u.outFlow || 0);
@@ -147,6 +203,16 @@ export default function UserPage() {
                         <Badge variant={u.roleId === 0 ? 'default' : 'secondary'}>
                           {u.roleId === 0 ? '管理员' : '用户'}
                         </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          {u.gostEnabled !== 0 && (
+                            <Badge variant="outline" className="text-xs">GOST</Badge>
+                          )}
+                          {u.xrayEnabled !== 0 && (
+                            <Badge variant="outline" className="text-xs">Xray</Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="text-sm">
                         {formatBytes(usedFlow)} / {u.flow ? `${u.flow} GB` : '无限'}
@@ -188,7 +254,7 @@ export default function UserPage() {
 
       {/* Create/Edit User Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingUser ? '编辑用户' : '创建用户'}</DialogTitle>
           </DialogHeader>
@@ -239,6 +305,63 @@ export default function UserPage() {
                 onChange={e => setForm(p => ({ ...p, expTime: e.target.value }))}
               />
             </div>
+
+            <Separator />
+
+            {/* Permission Settings */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">权限设置</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <Label htmlFor="gost-switch" className="text-sm">GOST 转发</Label>
+                  <Switch
+                    id="gost-switch"
+                    checked={form.gostEnabled}
+                    onCheckedChange={(checked: boolean) => setForm(p => ({ ...p, gostEnabled: checked }))}
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <Label htmlFor="xray-switch" className="text-sm">Xray 代理</Label>
+                  <Switch
+                    id="xray-switch"
+                    checked={form.xrayEnabled}
+                    onCheckedChange={(checked: boolean) => setForm(p => ({ ...p, xrayEnabled: checked }))}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Node Permissions */}
+            {nodes.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-semibold">节点权限</Label>
+                  <Button variant="outline" size="sm" onClick={toggleAllNodes}>
+                    {form.nodeIds.length === allNodeIds.length ? '取消全选' : '全选'}
+                  </Button>
+                </div>
+                <div className="max-h-[160px] overflow-y-auto rounded-lg border p-2 space-y-1">
+                  {nodes.map((node) => (
+                    <label
+                      key={node.id}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={form.nodeIds.includes(node.id)}
+                        onCheckedChange={() => toggleNodeId(node.id)}
+                      />
+                      <span className="text-sm flex-1">{node.name}</span>
+                      <Badge variant={node.status === 1 ? 'default' : 'secondary'} className="text-xs">
+                        {node.status === 1 ? '在线' : '离线'}
+                      </Badge>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  已选 {form.nodeIds.length} / {nodes.length} 个节点。不选择任何节点表示允许访问全部节点。
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>

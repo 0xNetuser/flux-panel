@@ -33,7 +33,7 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
   const [protocol, setProtocol] = useState('vmess');
   const [tag, setTag] = useState('');
   const [port, setPort] = useState('');
-  const [listen, setListen] = useState('0.0.0.0');
+  const [listen, setListen] = useState('::');
   const [remark, setRemark] = useState('');
 
   // Structured form states
@@ -62,7 +62,7 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
       setProtocol(editingInbound.protocol || 'vmess');
       setTag(editingInbound.tag || '');
       setPort(editingInbound.port?.toString() || '');
-      setListen(editingInbound.listen || '0.0.0.0');
+      setListen(editingInbound.listen || '::');
       setRemark(editingInbound.remark || '');
 
       const settingsStr = editingInbound.settingsJson || editingInbound.settings || '{}';
@@ -91,7 +91,7 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
       setProtocol('vmess');
       setTag('');
       setPort('');
-      setListen('0.0.0.0');
+      setListen('::');
       setRemark('');
       setProtocolForm({});
       setTransportForm({ network: 'tcp' });
@@ -234,8 +234,8 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
               <Input type="number" value={port} onChange={e => setPort(e.target.value)} placeholder={portPlaceholder} />
             </div>
             <div className="space-y-2">
-              <Label className="inline-flex items-center gap-1">监听地址 <FieldTip content="监听的 IP 地址，0.0.0.0 表示监听所有网络接口" /></Label>
-              <Input value={listen} onChange={e => setListen(e.target.value)} placeholder="0.0.0.0" />
+              <Label className="inline-flex items-center gap-1">监听地址 <FieldTip content="监听的 IP 地址，:: 表示同时监听 IPv4 和 IPv6，0.0.0.0 仅监听 IPv4" /></Label>
+              <Input value={listen} onChange={e => setListen(e.target.value)} placeholder="::" />
             </div>
           </div>
 

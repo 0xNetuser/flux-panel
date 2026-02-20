@@ -48,11 +48,11 @@ func CreateTunnel(d dto.TunnelDto) dto.R {
 		protocol = d.Protocol
 	}
 
-	tcpListenAddr := "0.0.0.0"
+	tcpListenAddr := "::"
 	if d.TcpListenAddr != "" {
 		tcpListenAddr = d.TcpListenAddr
 	}
-	udpListenAddr := "0.0.0.0"
+	udpListenAddr := "::"
 	if d.UdpListenAddr != "" {
 		udpListenAddr = d.UdpListenAddr
 	}

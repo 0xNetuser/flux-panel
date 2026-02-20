@@ -404,7 +404,7 @@ export default function XrayInboundPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-xs font-mono">{getTransportInfo(ib)}</TableCell>
-                      <TableCell className="text-sm font-mono">{ib.listen || '0.0.0.0'}:{ib.port}</TableCell>
+                      <TableCell className="text-sm font-mono">{ib.listen || '::'}:{ib.port}</TableCell>
                       <TableCell>{getNodeName(ib.nodeId)}</TableCell>
                       <TableCell>{ib.clientCount ?? ib.clients ?? 0}</TableCell>
                       <TableCell>

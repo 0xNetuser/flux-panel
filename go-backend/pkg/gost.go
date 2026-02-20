@@ -135,9 +135,9 @@ func buildServiceConfig(name string, inPort int, limiter *int, remoteAddr string
 	}
 
 	if protocol == "tcp" {
-		svc["addr"] = fmt.Sprintf("%s:%d", tunnel.TcpListenAddr, inPort)
+		svc["addr"] = formatListenAddr(tunnel.TcpListenAddr, inPort)
 	} else {
-		svc["addr"] = fmt.Sprintf("%s:%d", tunnel.UdpListenAddr, inPort)
+		svc["addr"] = formatListenAddr(tunnel.UdpListenAddr, inPort)
 	}
 
 	if interfaceName != "" {
@@ -234,4 +234,12 @@ func buildChainData(name string, remoteAddr string, protocol string, interfaceNa
 			},
 		},
 	}
+}
+
+// formatListenAddr formats an IP:port pair, wrapping IPv6 addresses in brackets.
+func formatListenAddr(ip string, port int) string {
+	if strings.Contains(ip, ":") {
+		return fmt.Sprintf("[%s]:%d", ip, port)
+	}
+	return fmt.Sprintf("%s:%d", ip, port)
 }

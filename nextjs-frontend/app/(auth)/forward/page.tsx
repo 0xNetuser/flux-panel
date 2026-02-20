@@ -322,7 +322,7 @@ export default function ForwardPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>入口IP (可选)</Label>
-                <Input value={form.listenIp} onChange={e => setForm(p => ({ ...p, listenIp: e.target.value }))} placeholder="默认 0.0.0.0" />
+                <Input value={form.listenIp} onChange={e => setForm(p => ({ ...p, listenIp: e.target.value }))} placeholder="默认 ::" />
               </div>
               <div className="space-y-2">
                 <Label>入口端口 (可选)</Label>

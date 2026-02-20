@@ -108,7 +108,7 @@ func CreateXrayInbound(d dto.XrayInboundDto, userId int64, roleId int) dto.R {
 		return dto.Err("该节点端口已被其他入站使用")
 	}
 
-	listen := "0.0.0.0"
+	listen := "::"
 	if d.Listen != "" {
 		listen = d.Listen
 	}

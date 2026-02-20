@@ -86,7 +86,7 @@ export default function ForwardPage() {
     setForm({
       name: forward.name,
       tunnelId: forward.tunnelId?.toString(),
-      remoteAddr: forward.remoteAddr,
+      remoteAddr: forward.remoteAddr?.includes(',') ? forward.remoteAddr.split(',').join('\n') : (forward.remoteAddr || ''),
       inPort: forward.inPort?.toString() || '',
       listenIp: forward.listenIp || '',
       strategy: forward.strategy || 'round',
@@ -103,7 +103,7 @@ export default function ForwardPage() {
     const data: any = {
       name: form.name,
       tunnelId: parseInt(form.tunnelId),
-      remoteAddr: form.remoteAddr,
+      remoteAddr: form.remoteAddr.split('\n').map(s => s.trim()).filter(Boolean).join(','),
       listenIp: form.listenIp || undefined,
       strategy: form.strategy,
       interfaceName: form.interfaceName || null,
@@ -319,12 +319,12 @@ export default function ForwardPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>目标地址</Label>
+              <Label>目标地址 <span className="text-muted-foreground font-normal">（多个地址每行一个）</span></Label>
               <textarea
                 className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 font-mono"
-                value={form.remoteAddr.split(',').filter(Boolean).join('\n')}
-                onChange={e => setForm(p => ({ ...p, remoteAddr: e.target.value.split('\n').map(s => s.trim()).filter(Boolean).join(',') }))}
-                placeholder={"每行一个目标地址，例如:\n1.2.3.4:8080\n5.6.7.8:8080"}
+                value={form.remoteAddr}
+                onChange={e => setForm(p => ({ ...p, remoteAddr: e.target.value }))}
+                placeholder={"1.2.3.4:8080\n5.6.7.8:8080"}
                 rows={3}
               />
             </div>

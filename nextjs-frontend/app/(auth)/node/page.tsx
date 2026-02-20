@@ -71,7 +71,7 @@ export default function NodePage() {
     setEditingNode(node);
     setForm({
       name: node.name || '',
-      entryIps: node.entryIps || '',
+      entryIps: node.entryIps?.includes(',') ? node.entryIps.split(',').join('\n') : (node.entryIps || ''),
       serverIp: node.serverIp || '',
       portSta: node.portSta?.toString() || '',
       portEnd: node.portEnd?.toString() || '',
@@ -88,7 +88,7 @@ export default function NodePage() {
     }
     const data: any = {
       name: form.name,
-      entryIps: form.entryIps || '',
+      entryIps: form.entryIps.split('\n').map(s => s.trim()).filter(Boolean).join(','),
       serverIp: form.serverIp,
       secret: form.secret || undefined,
     };
@@ -327,8 +327,8 @@ export default function NodePage() {
             <div className="space-y-2">
               <Label>入口IP列表</Label>
               <Textarea
-                value={form.entryIps.split(',').filter(Boolean).join('\n')}
-                onChange={e => setForm(p => ({ ...p, entryIps: e.target.value.split('\n').map(s => s.trim()).filter(Boolean).join(',') }))}
+                value={form.entryIps}
+                onChange={e => setForm(p => ({ ...p, entryIps: e.target.value }))}
                 placeholder={"每行一个IP，例如:\n1.2.3.4\n5.6.7.8\n2001:db8::1"}
                 rows={3}
                 className="font-mono text-sm"

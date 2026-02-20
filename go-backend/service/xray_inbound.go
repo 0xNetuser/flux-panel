@@ -343,7 +343,6 @@ func mergeClientsIntoSettings(inbound *model.XrayInbound) string {
 		case "vless":
 			obj["id"] = c.UuidOrPassword
 			obj["flow"] = c.Flow
-			obj["encryption"] = "none"
 		case "trojan":
 			obj["password"] = c.UuidOrPassword
 		case "shadowsocks":

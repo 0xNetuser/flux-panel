@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -20,6 +19,7 @@ export interface TransportForm {
   wsPath?: string;
   wsHost?: string;
   wsHeaders?: Record<string, string>;
+  wsHeartbeatPeriod?: number;
   // gRPC
   grpcServiceName?: string;
   grpcAuthority?: string;
@@ -32,6 +32,8 @@ export interface TransportForm {
   xhttpPath?: string;
   xhttpHost?: string;
   xhttpHeaders?: Record<string, string>;
+  xhttpMode?: string;
+  xhttpExtra?: string; // JSON string for advanced extra settings
   // kcp
   kcpMtu?: number;
   kcpTti?: number;
@@ -170,6 +172,16 @@ export default function TransportSettings({ value, onChange }: Props) {
             <Input value={value.wsHost ?? ''} onChange={e => update({ wsHost: e.target.value })} placeholder="example.com" className="text-sm" />
           </div>
           <HeadersEditor headers={value.wsHeaders ?? {}} onChange={h => update({ wsHeaders: h })} />
+          <div className="space-y-2">
+            <Label className="text-xs">Heartbeat Period (秒)</Label>
+            <Input
+              type="number"
+              value={value.wsHeartbeatPeriod ?? 0}
+              onChange={e => update({ wsHeartbeatPeriod: parseInt(e.target.value) || 0 })}
+              placeholder="0 = 禁用"
+              className="text-sm"
+            />
+          </div>
           <div className="flex items-center justify-between">
             <Label className="text-xs">Accept Proxy Protocol</Label>
             <Switch checked={value.acceptProxyProtocol ?? false} onCheckedChange={v => update({ acceptProxyProtocol: v })} />
@@ -226,6 +238,30 @@ export default function TransportSettings({ value, onChange }: Props) {
             <Input value={value.xhttpHost ?? ''} onChange={e => update({ xhttpHost: e.target.value })} placeholder="example.com" className="text-sm" />
           </div>
           <HeadersEditor headers={value.xhttpHeaders ?? {}} onChange={h => update({ xhttpHeaders: h })} />
+          <div className="space-y-2">
+            <Label className="text-xs">Mode</Label>
+            <Select value={value.xhttpMode ?? 'auto'} onValueChange={v => update({ xhttpMode: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">auto</SelectItem>
+                <SelectItem value="packet-up">packet-up</SelectItem>
+                <SelectItem value="stream-up">stream-up</SelectItem>
+                <SelectItem value="stream-one">stream-one</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs">Extra (高级 JSON)</Label>
+            <textarea
+              className="w-full rounded-md border bg-background px-3 py-2 text-xs font-mono min-h-[80px] resize-y"
+              value={value.xhttpExtra ?? '{}'}
+              onChange={e => update({ xhttpExtra: e.target.value })}
+              placeholder='{"scMaxEachPostBytes":"1000000","scMaxBufferedPosts":30,...}'
+            />
+            <p className="text-xs text-muted-foreground">
+              可配置 scMaxBufferedPosts, scMaxEachPostBytes, noSSEHeader, xPaddingBytes 等高级选项
+            </p>
+          </div>
         </div>
       )}
 
@@ -316,6 +352,9 @@ export function buildTransportJson(form: TransportForm): Record<string, any> {
       if (form.wsHost) headers['Host'] = form.wsHost;
       if (Object.keys(headers).length > 0) wsSettings.headers = headers;
       if (form.acceptProxyProtocol) wsSettings.acceptProxyProtocol = true;
+      if (form.wsHeartbeatPeriod && form.wsHeartbeatPeriod > 0) {
+        wsSettings.heartbeatPeriod = form.wsHeartbeatPeriod;
+      }
       stream.wsSettings = wsSettings;
       break;
     }
@@ -346,6 +385,16 @@ export function buildTransportJson(form: TransportForm): Record<string, any> {
       if (form.xhttpHost) settings.host = form.xhttpHost;
       const headers = form.xhttpHeaders || {};
       if (Object.keys(headers).length > 0) settings.headers = headers;
+      if (form.xhttpMode && form.xhttpMode !== 'auto') settings.mode = form.xhttpMode;
+      // Merge extra JSON into settings
+      if (form.xhttpExtra) {
+        try {
+          const extra = JSON.parse(form.xhttpExtra);
+          Object.assign(settings, extra);
+        } catch {
+          // ignore invalid JSON
+        }
+      }
       stream.xhttpSettings = settings;
       break;
     }
@@ -393,6 +442,7 @@ export function parseTransportJson(streamObj: Record<string, any>): TransportFor
       form.wsHost = headers['Host'] || '';
       delete headers['Host'];
       form.wsHeaders = headers;
+      form.wsHeartbeatPeriod = ws.heartbeatPeriod ?? 0;
       form.acceptProxyProtocol = ws.acceptProxyProtocol ?? false;
       break;
     }
@@ -416,6 +466,14 @@ export function parseTransportJson(streamObj: Record<string, any>): TransportFor
       form.xhttpPath = x.path || '/';
       form.xhttpHost = x.host || '';
       form.xhttpHeaders = x.headers || {};
+      form.xhttpMode = x.mode || 'auto';
+      // Collect extra fields into a JSON string
+      const knownKeys = new Set(['path', 'host', 'headers', 'mode']);
+      const extra: Record<string, any> = {};
+      for (const [k, v] of Object.entries(x)) {
+        if (!knownKeys.has(k)) extra[k] = v;
+      }
+      form.xhttpExtra = Object.keys(extra).length > 0 ? JSON.stringify(extra, null, 2) : '{}';
       break;
     }
     case 'kcp': {

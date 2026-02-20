@@ -251,7 +251,7 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
                 <TabsTrigger value="sniffing">嗅探</TabsTrigger>
               </TabsList>
               <TabsContent value="protocol" className="mt-4">
-                <ProtocolSettings protocol={protocol} value={protocolForm} onChange={setProtocolForm} />
+                <ProtocolSettings protocol={protocol} value={protocolForm} onChange={setProtocolForm} transportNetwork={transportForm.network} securityType={securityForm.security} />
               </TabsContent>
               <TabsContent value="transport" className="mt-4">
                 <TransportSettings value={transportForm} onChange={setTransportForm} />

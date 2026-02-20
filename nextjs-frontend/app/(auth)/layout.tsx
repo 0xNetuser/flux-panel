@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import {
   LayoutDashboard, ArrowRightLeft, Link2, Server, Users, Clock, Settings,
-  Menu, ChevronDown, LogOut, KeyRound, Shield, Inbox, UserCheck, Award, Rss,
+  Menu, ChevronDown, LogOut, KeyRound, Shield, Inbox, Award, Rss,
   Activity,
 } from 'lucide-react';
 import { useAuth, logout } from '@/lib/hooks/use-auth';
@@ -34,7 +34,6 @@ const navItems: NavItem[] = [
   { path: '/limit', label: '限速规则', icon: <Clock className="h-4 w-4" />, adminOnly: true, section: 'GOST' },
   // Xray
   { path: '/xray/inbound', label: '入站管理', icon: <Inbox className="h-4 w-4" />, section: 'Xray' },
-  { path: '/xray/client', label: '客户端管理', icon: <UserCheck className="h-4 w-4" />, section: 'Xray' },
   { path: '/xray/certificate', label: '证书管理', icon: <Award className="h-4 w-4" />, section: 'Xray' },
   { path: '/xray/subscription', label: '订阅管理', icon: <Rss className="h-4 w-4" />, section: 'Xray' },
   // System

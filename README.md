@@ -54,7 +54,7 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 
 ```bash
 # 下载 docker-compose 配置文件
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.8.12/docker-compose.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.8.13/docker-compose.yml -o docker-compose.yml
 ```
 
 **2. 创建环境变量文件**
@@ -121,7 +121,7 @@ docker compose up -d
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.8.12
+  0xnetuser/gost-node:1.8.13
 ```
 
 也可以使用 docker-compose，参考项目中的 `docker-compose-node.yml`：
@@ -129,7 +129,7 @@ docker run -d --network=host --restart=unless-stopped --name gost-node \
 ```yaml
 services:
   gost-node:
-    image: 0xnetuser/gost-node:1.8.12
+    image: 0xnetuser/gost-node:1.8.13
     container_name: gost-node
     network_mode: host
     restart: unless-stopped
@@ -178,7 +178,7 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 
 ```bash
 # 下载最新 docker-compose 配置（覆盖旧文件）
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.8.12/docker-compose.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.8.13/docker-compose.yml -o docker-compose.yml
 
 # 拉取最新镜像并重启
 docker compose pull && docker compose up -d
@@ -200,7 +200,7 @@ docker stop gost-node && docker rm gost-node
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.8.12
+  0xnetuser/gost-node:1.8.13
 ```
 
 如果使用 docker-compose 部署，更新 `docker-compose-node.yml` 中的镜像版本后：
@@ -223,16 +223,18 @@ curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && c
 
 ## 更新日志
 
-### v1.8.12
+### v1.8.13
 
-- **节点多入口 IP 支持**：节点新增 `entryIps` 字段，支持配置多个入口 IP（逗号分隔），创建转发/入站时从下拉框选择
+- **节点多入口 IP 支持**：节点新增 `entryIps` 字段，支持配置多个入口 IP，创建转发/入站时从下拉框选择
 - **网卡自动探测**：节点代理每 2 秒上报物理网卡信息（名称 + IP 列表），面板端缓存并展示在创建表单中
 - **入口/出口网卡选择**：转发创建表单新增入口网卡和出口网卡下拉框，自动列出节点可用网卡及 IP，支持自定义输入
 - **负载策略与灾备切换**：转发创建表单新增负载策略选择（轮询/随机/灾备切换/哈希），`fifo` 策略配合 `maxFails=1, failTimeout=600s` 实现自动灾备切换
-- **多 IP 监听**：单条转发支持同时监听多个 IP，逗号分隔存入 `listenIp`，每个 IP 生成独立的 GOST 服务组
+- **多 IP 监听**：单条转发支持同时监听多个 IP，每个 IP 生成独立的 GOST 服务组
 - **Docker 虚拟网卡过滤**：节点网卡探测自动过滤 Docker/K8s 虚拟网卡（docker0、veth、br-、cni、flannel、kube-、cali、virbr），避免下拉框污染
 - **Xray 入站监听地址下拉**：入站创建表单的监听地址改为下拉框，自动展示所选节点的网卡 IP
 - **Reconcile 修复**：reconcile 同步时正确应用转发自定义 `listenIp`，多 IP 暂停使用 `PauseServiceMultiIP`
+- **多 IP 每行显示**：节点入口 IP 列表在表格和表单中改为每行一个 IP，更直观
+- **迁移脚本精简**：`panel_install.sh` 迁移 SQL 从 660 行精简到 56 行，建表和加列交由 GORM AutoMigrate 自动处理
 
 ### v1.8.11
 

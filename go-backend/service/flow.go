@@ -171,13 +171,20 @@ func processFlowData(flowData dto.FlowDto) string {
 	var trafficRatio float64 = 1.0
 	var tunnel model.Tunnel
 	if err := DB.First(&tunnel, forward.TunnelId).Error; err == nil {
-		flowType = tunnel.Flow
-		trafficRatio = tunnel.TrafficRatio
+		if tunnel.Flow > 0 {
+			flowType = tunnel.Flow
+		}
+		if tunnel.TrafficRatio > 0 {
+			trafficRatio = tunnel.TrafficRatio
+		}
 	}
 
 	// Apply traffic ratio and flow type
 	d := int64(math.Floor(float64(flowData.D) * trafficRatio * float64(flowType)))
 	u := int64(math.Floor(float64(flowData.U) * trafficRatio * float64(flowType)))
+
+	log.Printf("[GOST流量] 处理: fwd=%s user=%s tunnel=%s flowType=%d ratio=%.2f raw(u=%d,d=%d) calc(u=%d,d=%d)",
+		forwardId, userId, userTunnelId, flowType, trafficRatio, flowData.U, flowData.D, u, d)
 
 	// Update forward flow
 	fwdLock := getForwardLock(forwardId)

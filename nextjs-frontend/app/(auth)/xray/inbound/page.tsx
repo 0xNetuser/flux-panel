@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Fragment } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -365,8 +365,8 @@ export default function XrayInboundPage() {
                 <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
               ) : (
                 inbounds.map((ib) => (
-                  <>
-                    <TableRow key={ib.id} className="cursor-pointer" onClick={() => handleToggleExpand(ib.id)}>
+                  <Fragment key={ib.id}>
+                    <TableRow className="cursor-pointer" onClick={() => handleToggleExpand(ib.id)}>
                       <TableCell className="w-8 px-2">
                         {expandedInbound === ib.id
                           ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -405,7 +405,7 @@ export default function XrayInboundPage() {
 
                     {/* Expanded client sub-table */}
                     {expandedInbound === ib.id && (
-                      <TableRow key={`${ib.id}-clients`}>
+                      <TableRow>
                         <TableCell colSpan={9} className="p-0 bg-muted/30">
                           <div className="p-4">
                             <div className="flex items-center justify-between mb-3">
@@ -504,7 +504,7 @@ export default function XrayInboundPage() {
                         </TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </Fragment>
                 ))
               )}
             </TableBody>
@@ -587,10 +587,10 @@ export default function XrayInboundPage() {
               {showFlowSelect ? (
                 <div className="space-y-2">
                   <Label>Flow</Label>
-                  <Select value={clientForm.flow || ''} onValueChange={v => setClientForm(p => ({ ...p, flow: v }))}>
+                  <Select value={clientForm.flow || '_none'} onValueChange={v => setClientForm(p => ({ ...p, flow: v === '_none' ? '' : v }))}>
                     <SelectTrigger><SelectValue placeholder="选择 Flow" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">无</SelectItem>
+                      <SelectItem value="_none">无</SelectItem>
                       <SelectItem value="xtls-rprx-vision">xtls-rprx-vision</SelectItem>
                       <SelectItem value="xtls-rprx-vision-udp443">xtls-rprx-vision-udp443</SelectItem>
                     </SelectContent>

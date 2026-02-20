@@ -8,6 +8,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func FlowDebug(c *gin.Context) {
+	secret := c.Query("secret")
+	c.JSON(http.StatusOK, service.FlowDebug(secret))
+}
+
 const maxFlowBodySize = 10 << 20 // 10 MB
 
 // getNodeSecret extracts the node secret from the request.

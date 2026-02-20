@@ -293,6 +293,66 @@ func pauseForwardServices(forwards []model.Forward, serviceName string) {
 	}
 }
 
+func FlowDebug(secret string) map[string]interface{} {
+	result := map[string]interface{}{}
+
+	// 1. Check if secret matches a node
+	var node model.Node
+	if secret == "" {
+		result["node"] = "未提供 secret 参数"
+	} else if err := DB.Where("secret = ?", secret).First(&node).Error; err != nil {
+		result["node"] = "secret 无效，未匹配到节点"
+	} else {
+		result["node"] = map[string]interface{}{
+			"id":   node.ID,
+			"name": node.Name,
+		}
+	}
+
+	// 2. List some forwards with flow data
+	var forwards []model.Forward
+	DB.Order("in_flow + out_flow DESC").Limit(5).Find(&forwards)
+	fwdList := []map[string]interface{}{}
+	for _, f := range forwards {
+		fwdList = append(fwdList, map[string]interface{}{
+			"id": f.ID, "inFlow": f.InFlow, "outFlow": f.OutFlow,
+		})
+	}
+	result["topForwards"] = fwdList
+
+	// 3. List users with flow data
+	var users []model.User
+	DB.Select("id, user, in_flow, out_flow").Order("in_flow + out_flow DESC").Limit(5).Find(&users)
+	userList := []map[string]interface{}{}
+	for _, u := range users {
+		userList = append(userList, map[string]interface{}{
+			"id": u.ID, "user": u.User, "inFlow": u.InFlow, "outFlow": u.OutFlow,
+		})
+	}
+	result["topUsers"] = userList
+
+	// 4. List xray clients with traffic
+	var xrayClients []model.XrayClient
+	DB.Select("id, email, up_traffic, down_traffic").Order("up_traffic + down_traffic DESC").Limit(5).Find(&xrayClients)
+	xcList := []map[string]interface{}{}
+	for _, xc := range xrayClients {
+		xcList = append(xcList, map[string]interface{}{
+			"id": xc.ID, "email": xc.Email, "upTraffic": xc.UpTraffic, "downTraffic": xc.DownTraffic,
+		})
+	}
+	result["topXrayClients"] = xcList
+
+	// 5. Test gorm.Expr with a dry-run
+	testSQL := DB.ToSQL(func(tx *gorm.DB) *gorm.DB {
+		return tx.Model(&model.User{}).Where("id = ?", 1).UpdateColumns(map[string]interface{}{
+			"in_flow": gorm.Expr("in_flow + ?", 100),
+		})
+	})
+	result["gormExprTestSQL"] = testSQL
+
+	return result
+}
+
 func decryptIfNeeded(rawData, secret string) string {
 	if rawData == "" {
 		return rawData

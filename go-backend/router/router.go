@@ -34,6 +34,7 @@ func Setup(r *gin.Engine) {
 	r.GET("/flow/test", handler.FlowTest)
 	r.POST("/flow/test", handler.FlowTest)
 	r.POST("/flow/xray-upload", handler.FlowXrayUpload)
+	r.GET("/flow/debug", handler.FlowDebug)
 
 	// Node install
 	r.GET("/node-install/script", handler.NodeInstallScript)

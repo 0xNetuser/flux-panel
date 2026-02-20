@@ -261,7 +261,7 @@ export default function NodePage() {
                 nodes.map((n) => (
                   <TableRow key={n.id}>
                     <TableCell className="font-medium">{n.name}</TableCell>
-                    <TableCell className="text-sm">{n.entryIps ? n.entryIps.split(',').join(' / ') : (n.ip || '-')}</TableCell>
+                    <TableCell className="text-sm whitespace-pre-line">{n.entryIps ? n.entryIps.split(',').join('\n') : (n.ip || '-')}</TableCell>
                     <TableCell className="text-sm">{n.serverIp}</TableCell>
                     <TableCell>{n.portSta} - {n.portEnd}</TableCell>
                     <TableCell>
@@ -323,13 +323,13 @@ export default function NodePage() {
             <div className="space-y-2">
               <Label>入口IP列表</Label>
               <Textarea
-                value={form.entryIps}
-                onChange={e => setForm(p => ({ ...p, entryIps: e.target.value }))}
-                placeholder={"多个IP用逗号分隔，例如:\n1.2.3.4,5.6.7.8,2001:db8::1"}
-                rows={2}
+                value={form.entryIps.split(',').filter(Boolean).join('\n')}
+                onChange={e => setForm(p => ({ ...p, entryIps: e.target.value.split('\n').map(s => s.trim()).filter(Boolean).join(',') }))}
+                placeholder={"每行一个IP，例如:\n1.2.3.4\n5.6.7.8\n2001:db8::1"}
+                rows={3}
                 className="font-mono text-sm"
               />
-              <p className="text-xs text-muted-foreground">面向用户展示的入口IP，用逗号分隔</p>
+              <p className="text-xs text-muted-foreground">面向用户展示的入口IP，每行一个</p>
             </div>
             <div className="space-y-2">
               <Label>服务器IP</Label>

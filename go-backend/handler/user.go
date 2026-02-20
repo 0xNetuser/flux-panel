@@ -60,15 +60,10 @@ func UserUpdatePassword(c *gin.Context) {
 	var d struct {
 		CurrentPassword string `json:"currentPassword"`
 		NewPassword     string `json:"newPassword"`
-		ConfirmPassword string `json:"confirmPassword"`
-		NewUsername     string `json:"newUsername"`
+		NewUsername      string `json:"newUsername"`
 	}
 	if err := c.ShouldBindJSON(&d); err != nil {
 		c.JSON(http.StatusOK, dto.Err("参数错误"))
-		return
-	}
-	if d.NewPassword != d.ConfirmPassword {
-		c.JSON(http.StatusOK, dto.Err("两次输入的密码不一致"))
 		return
 	}
 	userId := c.GetInt64("userId")

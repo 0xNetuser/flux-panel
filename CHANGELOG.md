@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.8.0 — Xray 版本远程切换
+## v1.8.1 — Xray 版本远程切换
 
 ### Features
 

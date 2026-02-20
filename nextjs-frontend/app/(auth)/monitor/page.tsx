@@ -1,18 +1,21 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Server, Cpu, HardDrive, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Server, Cpu, HardDrive, RefreshCw, Filter, Info } from 'lucide-react';
+import { Tooltip as UiTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { getNodeHealth, getLatencyHistory, getTrafficOverview } from '@/lib/api/monitor';
 import { post } from '@/lib/api/client';
 import {
-  AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
+
+const LATENCY_COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c43', '#a4de6c', '#d0ed57', '#8dd1e1', '#83a6ed'];
 
 function formatBytes(bytes: number) {
   if (bytes === 0) return '0 B';
@@ -71,12 +74,16 @@ export default function MonitorPage() {
   const [forwards, setForwards] = useState<ForwardItem[]>([]);
   const [trafficData, setTrafficData] = useState<any[]>([]);
   const [granularity, setGranularity] = useState('hour');
-  const [expandedForward, setExpandedForward] = useState<number | null>(null);
-  const [latencyData, setLatencyData] = useState<LatencyRecord[]>([]);
+  const [latencyRange, setLatencyRange] = useState('6');
+  const [selectedForwards, setSelectedForwards] = useState<Set<number>>(new Set());
+  const [latencyChartData, setLatencyChartData] = useState<any[]>([]);
+  const [latencyStatsData, setLatencyStatsData] = useState<Record<number, { avg: number; last: number; successRate: number }>>({});
+  const [filterOpen, setFilterOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [latencyStats, setLatencyStats] = useState<Record<number, { avg: number; last: number; successRate: number }>>({});
   const initialLoad = useRef(true);
+  const filterRef = useRef<HTMLDivElement>(null);
+  const forwardsInitialized = useRef(false);
 
   const loadData = useCallback(async () => {
     if (initialLoad.current) setLoading(true);
@@ -98,8 +105,11 @@ export default function MonitorPage() {
     if (forwardRes.code === 0) {
       const fwds = forwardRes.data || [];
       setForwards(fwds);
-      // Load latest latency stats for active forwards
-      await loadLatencyStats(fwds.filter((f: ForwardItem) => f.status === 1));
+      if (!forwardsInitialized.current) {
+        const activeIds = new Set<number>(fwds.filter((f: ForwardItem) => f.status === 1).map((f: ForwardItem) => f.id));
+        setSelectedForwards(activeIds);
+        forwardsInitialized.current = true;
+      }
     }
 
     setLoading(false);
@@ -107,54 +117,85 @@ export default function MonitorPage() {
     initialLoad.current = false;
   }, [granularity]);
 
-  const loadLatencyStats = async (activeForwards: ForwardItem[]) => {
-    const stats: Record<number, { avg: number; last: number; successRate: number }> = {};
+  const loadLatencyChartData = useCallback(async () => {
+    const activeForwards = forwards.filter((f) => f.status === 1 && selectedForwards.has(f.id));
+    if (activeForwards.length === 0) {
+      setLatencyChartData([]);
+      setLatencyStatsData({});
+      return;
+    }
+
+    const hours = parseInt(latencyRange);
+    const allData: Record<number, LatencyRecord[]> = {};
     await Promise.all(
       activeForwards.map(async (f) => {
-        const res = await getLatencyHistory(f.id, 1);
-        if (res.code === 0 && res.data && res.data.length > 0) {
-          const records = res.data as LatencyRecord[];
-          const successes = records.filter((r) => r.success);
-          const avg = successes.length > 0
-            ? successes.reduce((sum, r) => sum + r.latency, 0) / successes.length
-            : -1;
-          const last = records[records.length - 1];
-          stats[f.id] = {
-            avg: Math.round(avg * 100) / 100,
-            last: last.success ? Math.round(last.latency * 100) / 100 : -1,
-            successRate: Math.round((successes.length / records.length) * 100),
-          };
+        const res = await getLatencyHistory(f.id, hours);
+        if (res.code === 0 && res.data) {
+          allData[f.id] = res.data as LatencyRecord[];
         }
       })
     );
-    setLatencyStats(stats);
-  };
+
+    // Compute stats
+    const stats: Record<number, { avg: number; last: number; successRate: number }> = {};
+    for (const f of activeForwards) {
+      const records = allData[f.id] || [];
+      if (records.length === 0) continue;
+      const successes = records.filter((r) => r.success);
+      const avg = successes.length > 0
+        ? successes.reduce((sum, r) => sum + r.latency, 0) / successes.length
+        : -1;
+      const last = records[records.length - 1];
+      stats[f.id] = {
+        avg: Math.round(avg * 100) / 100,
+        last: last.success ? Math.round(last.latency * 100) / 100 : -1,
+        successRate: records.length > 0 ? Math.round((successes.length / records.length) * 100) : 0,
+      };
+    }
+    setLatencyStatsData(stats);
+
+    // Merge data by recordTime
+    const timeMap = new Map<number, Record<string, any>>();
+    for (const f of activeForwards) {
+      const records = allData[f.id] || [];
+      for (const r of records) {
+        if (!timeMap.has(r.recordTime)) {
+          timeMap.set(r.recordTime, { time: formatTime(r.recordTime), _ts: r.recordTime });
+        }
+        const row = timeMap.get(r.recordTime)!;
+        row[f.name] = r.success ? r.latency : null;
+      }
+    }
+
+    const merged = Array.from(timeMap.values()).sort((a, b) => a._ts - b._ts);
+    setLatencyChartData(merged);
+  }, [forwards, selectedForwards, latencyRange]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
   // Auto-refresh every 30 seconds
   useEffect(() => {
-    const timer = setInterval(() => {
-      loadData();
-    }, 30000);
+    const timer = setInterval(() => { loadData(); }, 30000);
     return () => clearInterval(timer);
   }, [loadData]);
 
-  const toggleExpand = async (forwardId: number) => {
-    if (expandedForward === forwardId) {
-      setExpandedForward(null);
-      return;
+  // Load latency chart data when selection or range changes
+  useEffect(() => {
+    if (forwards.length > 0) {
+      loadLatencyChartData();
     }
-    setExpandedForward(forwardId);
-    const res = await getLatencyHistory(forwardId, 6);
-    if (res.code === 0) {
-      setLatencyData((res.data || []).map((r: LatencyRecord) => ({
-        ...r,
-        time: formatTime(r.recordTime),
-        latency: r.success ? r.latency : null,
-      })));
-    }
-  };
+  }, [loadLatencyChartData]);
+
+  // Click outside to close filter panel
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setFilterOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   if (!isAdmin) {
     return (
@@ -216,9 +257,25 @@ export default function MonitorPage() {
                     <div className="flex items-center justify-between">
                       <span>Xray</span>
                       {node.xrayRunning ? (
-                        <Badge variant="default" className="text-xs">
-                          {node.xrayVersion || '运行中'}
-                        </Badge>
+                        <div className="flex items-center gap-1">
+                          <Badge variant="default" className="text-xs">
+                            {node.xrayVersion?.match(/Xray\s+([\d.]+)/)?.[1] ? `Xray ${node.xrayVersion.match(/Xray\s+([\d.]+)/)![1]}` : (node.xrayVersion || '运行中')}
+                          </Badge>
+                          {node.xrayVersion && (
+                            <TooltipProvider>
+                              <UiTooltip>
+                                <TooltipTrigger asChild>
+                                  <button type="button" className="text-muted-foreground hover:text-foreground">
+                                    <Info className="h-3 w-3" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" className="max-w-xs break-all">
+                                  {node.xrayVersion}
+                                </TooltipContent>
+                              </UiTooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
                       ) : (
                         <Badge variant="secondary" className="text-xs">未运行</Badge>
                       )}
@@ -271,80 +328,121 @@ export default function MonitorPage() {
         </CardContent>
       </Card>
 
-      {/* Forward Latency Table */}
+      {/* Forward Latency Chart */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">转发延迟</CardTitle>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">转发延迟</CardTitle>
+            <div className="flex items-center gap-2">
+              <Select value={latencyRange} onValueChange={(v) => setLatencyRange(v)}>
+                <SelectTrigger className="w-24">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">1小时</SelectItem>
+                  <SelectItem value="6">6小时</SelectItem>
+                  <SelectItem value="24">24小时</SelectItem>
+                  <SelectItem value="168">7天</SelectItem>
+                </SelectContent>
+              </Select>
+              <div className="relative" ref={filterRef}>
+                <Button variant="outline" size="sm" onClick={() => setFilterOpen(!filterOpen)}>
+                  <Filter className="h-4 w-4 mr-1" />
+                  {selectedForwards.size === forwards.filter(f => f.status === 1).length
+                    ? '全部转发'
+                    : `已选 ${selectedForwards.size} 项`}
+                </Button>
+                {filterOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-50 bg-popover border rounded-md shadow-md p-3 min-w-[200px]">
+                    {forwards.filter(f => f.status === 1).map((f) => (
+                      <label key={f.id} className="flex items-center gap-2 py-1 cursor-pointer">
+                        <Checkbox
+                          checked={selectedForwards.has(f.id)}
+                          onCheckedChange={(checked) => {
+                            setSelectedForwards((prev) => {
+                              const next = new Set(prev);
+                              if (checked) next.add(f.id);
+                              else next.delete(f.id);
+                              return next;
+                            });
+                          }}
+                        />
+                        <span className="text-sm">{f.name}</span>
+                      </label>
+                    ))}
+                    {forwards.filter(f => f.status === 1).length === 0 && (
+                      <p className="text-sm text-muted-foreground">暂无运行中的转发</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-8"></TableHead>
-                <TableHead>名称</TableHead>
-                <TableHead>目标地址</TableHead>
-                <TableHead className="text-right">最近延迟</TableHead>
-                <TableHead className="text-right">平均延迟</TableHead>
-                <TableHead className="text-right">成功率</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {forwards.filter(f => f.status === 1).map((f) => {
-                const stat = latencyStats[f.id];
-                const isExpanded = expandedForward === f.id;
-                return (
-                  <Fragment key={f.id}>
-                    <TableRow className="cursor-pointer hover:bg-accent/50" onClick={() => toggleExpand(f.id)}>
-                      <TableCell>
-                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                      </TableCell>
-                      <TableCell className="font-medium">{f.name}</TableCell>
-                      <TableCell className="font-mono text-xs">{f.remoteAddr}</TableCell>
-                      <TableCell className="text-right">
-                        {stat ? (stat.last >= 0 ? `${stat.last}ms` : '超时') : '-'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {stat ? (stat.avg >= 0 ? `${stat.avg}ms` : '-') : '-'}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {stat ? (
-                          <Badge variant={stat.successRate >= 80 ? 'default' : 'destructive'}>
-                            {stat.successRate}%
-                          </Badge>
-                        ) : '-'}
-                      </TableCell>
-                    </TableRow>
-                    {isExpanded && (
-                      <TableRow>
-                        <TableCell colSpan={6} className="p-4">
-                          {latencyData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height={200}>
-                              <LineChart data={latencyData}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="time" fontSize={11} />
-                                <YAxis fontSize={11} unit="ms" />
-                                <Tooltip formatter={(v) => `${v}ms`} />
-                                <Line type="monotone" dataKey="latency" name="延迟" stroke="#8884d8" dot={false} connectNulls />
-                              </LineChart>
-                            </ResponsiveContainer>
+          {forwards.filter(f => f.status === 1).length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">暂无运行中的转发</div>
+          ) : selectedForwards.size === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">请选择至少一个转发</div>
+          ) : latencyChartData.length > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={350}>
+                <LineChart data={latencyChartData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="time" fontSize={11} />
+                  <YAxis fontSize={11} unit="ms" />
+                  <Tooltip formatter={(v: any) => (v != null ? `${v}ms` : '失败')} />
+                  <Legend />
+                  {forwards
+                    .filter((f) => f.status === 1 && selectedForwards.has(f.id))
+                    .map((f, i) => (
+                      <Line
+                        key={f.id}
+                        type="monotone"
+                        dataKey={f.name}
+                        stroke={LATENCY_COLORS[i % LATENCY_COLORS.length]}
+                        dot={false}
+                        connectNulls={false}
+                      />
+                    ))}
+                </LineChart>
+              </ResponsiveContainer>
+
+              {/* Statistics Summary */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mt-4">
+                {forwards
+                  .filter((f) => f.status === 1 && selectedForwards.has(f.id))
+                  .map((f) => {
+                    const stat = latencyStatsData[f.id];
+                    return (
+                      <div key={f.id} className="border rounded-md p-3 space-y-1">
+                        <div className="font-medium text-sm truncate">{f.name}</div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>最近延迟</span>
+                          <span>{stat ? (stat.last >= 0 ? `${stat.last}ms` : '超时') : '-'}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>平均延迟</span>
+                          <span>{stat ? (stat.avg >= 0 ? `${stat.avg}ms` : '-') : '-'}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">成功率</span>
+                          {stat ? (
+                            <Badge variant={stat.successRate >= 80 ? 'default' : 'destructive'} className="text-xs">
+                              {stat.successRate}%
+                            </Badge>
                           ) : (
-                            <p className="text-center text-muted-foreground py-4">暂无延迟数据</p>
+                            <span className="text-muted-foreground">-</span>
                           )}
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </Fragment>
-                );
-              })}
-              {forwards.filter(f => f.status === 1).length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                    暂无运行中的转发
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-12 text-muted-foreground">暂无延迟数据</div>
+          )}
         </CardContent>
       </Card>
     </div>

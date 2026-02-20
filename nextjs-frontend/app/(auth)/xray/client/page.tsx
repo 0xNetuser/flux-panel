@@ -126,6 +126,7 @@ export default function XrayClientPage() {
 
     const data: any = {
       inboundId: parseInt(form.inboundId),
+      email: form.email || undefined,
       uuidOrPassword: form.uuid || undefined,
       flow: form.flow || undefined,
       alterId: parseInt(form.alterId) || 0,

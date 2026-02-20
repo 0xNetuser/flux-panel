@@ -246,6 +246,9 @@ func UpdateXrayClient(d dto.XrayClientUpdateDto, userId int64, roleId int) dto.R
 	}
 
 	updates := map[string]interface{}{"updated_time": time.Now().UnixMilli()}
+	if d.Email != "" {
+		updates["email"] = d.Email
+	}
 	if d.Flow != "" {
 		updates["flow"] = d.Flow
 	}

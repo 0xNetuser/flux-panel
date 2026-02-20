@@ -952,8 +952,7 @@ CREATE TABLE IF NOT EXISTS \`xray_inbound\` (
   \`enable\` tinyint(4) DEFAULT 1,
   \`created_time\` bigint(20) NOT NULL,
   \`updated_time\` bigint(20) NOT NULL,
-  PRIMARY KEY (\`id\`),
-  UNIQUE KEY \`uk_node_tag\` (\`node_id\`, \`tag\`)
+  PRIMARY KEY (\`id\`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS \`xray_client\` (

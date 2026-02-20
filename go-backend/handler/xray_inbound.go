@@ -66,3 +66,7 @@ func XrayInboundDisable(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, service.DisableXrayInbound(d.ID, GetUserId(c), GetRoleId(c)))
 }
+
+func XrayInboundGenKey(c *gin.Context) {
+	c.JSON(http.StatusOK, service.GenerateX25519KeyPair())
+}

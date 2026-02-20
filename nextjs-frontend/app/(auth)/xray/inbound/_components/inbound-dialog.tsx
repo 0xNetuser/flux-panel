@@ -47,6 +47,9 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
   const [rawStreamSettingsJson, setRawStreamSettingsJson] = useState('{}');
   const [rawSniffingJson, setRawSniffingJson] = useState('{}');
 
+  // Generate random port placeholder for new inbound
+  const [portPlaceholder] = useState(() => String(Math.floor(Math.random() * 50001) + 10000));
+
   // Initialize form when dialog opens or editing target changes
   useEffect(() => {
     if (!open) return;
@@ -225,7 +228,7 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
             </div>
             <div className="space-y-2">
               <Label>端口</Label>
-              <Input type="number" value={port} onChange={e => setPort(e.target.value)} placeholder="443" />
+              <Input type="number" value={port} onChange={e => setPort(e.target.value)} placeholder={portPlaceholder} />
             </div>
             <div className="space-y-2">
               <Label>监听地址</Label>

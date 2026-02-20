@@ -6,6 +6,7 @@ type ForwardDto struct {
 	RemoteAddr    string `json:"remoteAddr" binding:"required"`
 	Strategy      string `json:"strategy"`
 	InPort        *int   `json:"inPort"`
+	ListenIp      string `json:"listenIp"`
 	InterfaceName string `json:"interfaceName"`
 }
 
@@ -17,6 +18,7 @@ type ForwardUpdateDto struct {
 	RemoteAddr    string `json:"remoteAddr" binding:"required"`
 	Strategy      string `json:"strategy"`
 	InPort        *int   `json:"inPort"`
+	ListenIp      string `json:"listenIp"`
 	InterfaceName string `json:"interfaceName"`
 }
 

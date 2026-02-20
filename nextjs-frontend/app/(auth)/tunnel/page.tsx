@@ -299,7 +299,7 @@ export default function TunnelPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>入口节点</Label>
-                <Select value={form.inNodeId} onValueChange={v => setForm(p => ({ ...p, inNodeId: v }))}>
+                <Select value={form.inNodeId} onValueChange={v => setForm(p => ({ ...p, inNodeId: v, ...(p.type === 'port' ? { outNodeId: v } : {}) }))}>
                   <SelectTrigger><SelectValue placeholder="选择入口节点" /></SelectTrigger>
                   <SelectContent>
                     {nodes.map((n: any) => (
@@ -309,8 +309,8 @@ export default function TunnelPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>出口节点</Label>
-                <Select value={form.outNodeId} onValueChange={v => setForm(p => ({ ...p, outNodeId: v }))}>
+                <Label>出口节点{form.type === 'port' ? ' (同入口)' : ''}</Label>
+                <Select value={form.outNodeId} onValueChange={v => setForm(p => ({ ...p, outNodeId: v }))} disabled={form.type === 'port'}>
                   <SelectTrigger><SelectValue placeholder="选择出口节点" /></SelectTrigger>
                   <SelectContent>
                     {nodes.map((n: any) => (
@@ -323,7 +323,7 @@ export default function TunnelPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>类型</Label>
-                <Select value={form.type} onValueChange={v => setForm(p => ({ ...p, type: v, protocol: v === 'port' ? 'tcp+udp' : 'tls' }))}>
+                <Select value={form.type} onValueChange={v => setForm(p => ({ ...p, type: v, protocol: v === 'port' ? 'tcp+udp' : 'tls', ...(v === 'port' ? { outNodeId: p.inNodeId } : {}) }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="port">端口转发</SelectItem>

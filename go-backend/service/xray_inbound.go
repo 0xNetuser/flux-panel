@@ -1,12 +1,41 @@
 package service
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"flux-panel/go-backend/dto"
 	"flux-panel/go-backend/model"
 	"flux-panel/go-backend/pkg"
 	"log"
 	"time"
+
+	"golang.org/x/crypto/curve25519"
 )
+
+// ---------------------------------------------------------------------------
+// X25519 key pair generation
+// ---------------------------------------------------------------------------
+
+func GenerateX25519KeyPair() dto.R {
+	var privKey [32]byte
+	if _, err := rand.Read(privKey[:]); err != nil {
+		return dto.Err("生成随机私钥失败")
+	}
+	// Clamping
+	privKey[0] &= 248
+	privKey[31] &= 127
+	privKey[31] |= 64
+
+	pubKey, err := curve25519.X25519(privKey[:], curve25519.Basepoint)
+	if err != nil {
+		return dto.Err("计算公钥失败")
+	}
+
+	return dto.Ok(map[string]string{
+		"privateKey": base64.RawURLEncoding.EncodeToString(privKey[:]),
+		"publicKey":  base64.RawURLEncoding.EncodeToString(pubKey),
+	})
+}
 
 // ---------------------------------------------------------------------------
 // Xray permission helpers
@@ -77,13 +106,6 @@ func CreateXrayInbound(d dto.XrayInboundDto, userId int64, roleId int) dto.R {
 		return dto.Err("该节点端口已被其他入站使用")
 	}
 
-	// Check tag uniqueness
-	var tagCount int64
-	DB.Model(&model.XrayInbound{}).Where("node_id = ? AND tag = ?", d.NodeId, d.Tag).Count(&tagCount)
-	if tagCount > 0 {
-		return dto.Err("该节点标签已存在")
-	}
-
 	listen := "0.0.0.0"
 	if d.Listen != "" {
 		listen = d.Listen
@@ -135,7 +157,40 @@ func ListXrayInbounds(nodeId *int64, userId int64, roleId int) dto.R {
 
 	var list []model.XrayInbound
 	query.Find(&list)
-	return dto.Ok(list)
+
+	// Build client count map
+	type countRow struct {
+		InboundId   int64
+		ClientCount int
+	}
+	var counts []countRow
+	DB.Model(&model.XrayClient{}).Select("inbound_id, COUNT(*) as client_count").Group("inbound_id").Find(&counts)
+	countMap := make(map[int64]int, len(counts))
+	for _, c := range counts {
+		countMap[c.InboundId] = c.ClientCount
+	}
+
+	// Build response with client count
+	result := make([]map[string]interface{}, 0, len(list))
+	for _, ib := range list {
+		result = append(result, map[string]interface{}{
+			"id":                 ib.ID,
+			"nodeId":             ib.NodeId,
+			"tag":                ib.Tag,
+			"protocol":           ib.Protocol,
+			"listen":             ib.Listen,
+			"port":               ib.Port,
+			"settingsJson":       ib.SettingsJson,
+			"streamSettingsJson": ib.StreamSettingsJson,
+			"sniffingJson":       ib.SniffingJson,
+			"remark":             ib.Remark,
+			"enable":             ib.Enable,
+			"createdTime":        ib.CreatedTime,
+			"updatedTime":        ib.UpdatedTime,
+			"clientCount":        countMap[ib.ID],
+		})
+	}
+	return dto.Ok(result)
 }
 
 func UpdateXrayInbound(d dto.XrayInboundUpdateDto, userId int64, roleId int) dto.R {

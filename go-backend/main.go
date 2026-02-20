@@ -55,7 +55,12 @@ func main() {
 		&model.XrayClient{},
 		&model.XrayTlsCert{},
 		&model.UserNode{},
+		&model.StatisticsForwardFlow{},
+		&model.MonitorLatency{},
 	)
+
+	// Drop legacy unique constraints that are no longer needed
+	db.Exec("ALTER TABLE `xray_inbound` DROP INDEX `uk_node_tag`")
 
 	// Ensure default config exists (replaces gost.sql seed data)
 	ensureDefaultConfig(db)
@@ -138,6 +143,7 @@ func main() {
 	// Start scheduled tasks
 	task.StartResetFlowTask(db)
 	task.StartStatisticsTask()
+	task.StartLatencyMonitor()
 	service.StartXrayScheduler()
 
 	// Setup Gin
@@ -228,6 +234,23 @@ func ensureDefaultConfig(db *gorm.DB) {
 			Time:  time.Now().UnixMilli(),
 		})
 		log.Println("默认配置已初始化 (app_name=flux)")
+	}
+
+	// Ensure monitor config defaults exist
+	monitorDefaults := map[string]string{
+		"monitor_interval":       "60",
+		"monitor_retention_days": "7",
+	}
+	for name, defaultVal := range monitorDefaults {
+		var c int64
+		db.Model(&model.ViteConfig{}).Where("name = ?", name).Count(&c)
+		if c == 0 {
+			db.Create(&model.ViteConfig{
+				Name:  name,
+				Value: defaultVal,
+				Time:  time.Now().UnixMilli(),
+			})
+		}
 	}
 }
 

@@ -118,6 +118,7 @@ func Setup(r *gin.Engine) {
 		auth.POST("/xray/inbound/delete", handler.XrayInboundDelete)
 		auth.POST("/xray/inbound/enable", handler.XrayInboundEnable)
 		auth.POST("/xray/inbound/disable", handler.XrayInboundDisable)
+		auth.POST("/xray/inbound/genkey", handler.XrayInboundGenKey)
 
 		// Xray Client (permission checked in service layer)
 		auth.POST("/xray/client/create", handler.XrayClientCreate)
@@ -143,6 +144,12 @@ func Setup(r *gin.Engine) {
 		// Xray Subscription
 		auth.POST("/xray/sub/token", handler.XraySubToken)
 		auth.POST("/xray/sub/links", handler.XraySubLinks)
+
+		// Monitor
+		auth.POST("/monitor/node-health", middleware.Admin(), handler.MonitorNodeHealth)
+		auth.POST("/monitor/latency-history", middleware.Admin(), handler.MonitorLatencyHistory)
+		auth.POST("/monitor/forward-flow", middleware.Admin(), handler.MonitorForwardFlowHistory)
+		auth.POST("/monitor/traffic-overview", middleware.Admin(), handler.MonitorTrafficOverview)
 
 		// Dashboard
 		auth.POST("/dashboard/stats", handler.DashboardStats)

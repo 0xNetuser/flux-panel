@@ -116,6 +116,7 @@ func CreateForward(d dto.ForwardDto, userId int64, roleId int, userName string) 
 		TunnelId:      d.TunnelId,
 		RemoteAddr:    d.RemoteAddr,
 		Strategy:      d.Strategy,
+		ListenIp:      d.ListenIp,
 		InterfaceName: d.InterfaceName,
 		InPort:        inPort,
 		OutPort:       outPort,
@@ -134,7 +135,13 @@ func CreateForward(d dto.ForwardDto, userId int64, roleId int, userName string) 
 		return dto.Err(nodeErr)
 	}
 
-	// 6. Create GOST services
+	// 6. Override tunnel listen address if forward has custom listenIp
+	if forward.ListenIp != "" {
+		tunnel.TcpListenAddr = forward.ListenIp
+		tunnel.UdpListenAddr = forward.ListenIp
+	}
+
+	// 7. Create GOST services
 	serviceName := buildServiceName(forward.ID, forward.UserId, userTunnel)
 	gostErr := createGostServices(&forward, &tunnel, limiter, inNode, outNode, serviceName)
 	if gostErr != "" {
@@ -148,7 +155,7 @@ func CreateForward(d dto.ForwardDto, userId int64, roleId int, userName string) 
 func GetAllForwards(userId int64, roleId int) dto.R {
 	var forwards []ForwardWithTunnel
 
-	query := `SELECT f.*, t.name as tunnel_name, t.in_ip, t.type as tunnel_type, t.out_ip
+	query := `SELECT f.*, t.name as tunnel_name, COALESCE(NULLIF(f.listen_ip,''), t.in_ip) as in_ip, t.type as tunnel_type, t.out_ip
 		FROM forward f LEFT JOIN tunnel t ON f.tunnel_id = t.id`
 
 	if roleId != adminRoleId {
@@ -265,6 +272,7 @@ func UpdateForward(d dto.ForwardUpdateDto, userId int64, roleId int) dto.R {
 		TunnelId:      d.TunnelId,
 		RemoteAddr:    d.RemoteAddr,
 		Strategy:      d.Strategy,
+		ListenIp:      d.ListenIp,
 		InterfaceName: d.InterfaceName,
 		UpdatedTime:   time.Now().UnixMilli(),
 	}
@@ -290,6 +298,12 @@ func UpdateForward(d dto.ForwardUpdateDto, userId int64, roleId int) dto.R {
 	inNode, outNode, nodeErr := getRequiredNodes(&tunnel)
 	if nodeErr != "" {
 		return dto.Err(nodeErr)
+	}
+
+	// 7.5 Override tunnel listen address if forward has custom listenIp
+	if updatedForward.ListenIp != "" {
+		tunnel.TcpListenAddr = updatedForward.ListenIp
+		tunnel.UdpListenAddr = updatedForward.ListenIp
 	}
 
 	// 8. Update GOST services
@@ -328,6 +342,7 @@ func UpdateForward(d dto.ForwardUpdateDto, userId int64, roleId int) dto.R {
 		"tunnel_id":      updatedForward.TunnelId,
 		"remote_addr":    updatedForward.RemoteAddr,
 		"strategy":       updatedForward.Strategy,
+		"listen_ip":      updatedForward.ListenIp,
 		"interface_name": updatedForward.InterfaceName,
 		"in_port":        updatedForward.InPort,
 		"out_port":       updatedForward.OutPort,
@@ -656,6 +671,12 @@ func UpdateForwardA(forward *model.Forward) {
 	var tunnel model.Tunnel
 	if err := DB.First(&tunnel, forward.TunnelId).Error; err != nil {
 		return
+	}
+
+	// Override tunnel listen address if forward has custom listenIp
+	if forward.ListenIp != "" {
+		tunnel.TcpListenAddr = forward.ListenIp
+		tunnel.UdpListenAddr = forward.ListenIp
 	}
 
 	userTunnel := getUserTunnel(forward.UserId, tunnel.ID)

@@ -22,7 +22,7 @@ export default function ForwardPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingForward, setEditingForward] = useState<any>(null);
-  const [form, setForm] = useState({ name: '', tunnelId: '', remoteAddr: '', inPort: '', strategy: 'round', interfaceName: '' });
+  const [form, setForm] = useState({ name: '', tunnelId: '', remoteAddr: '', inPort: '', listenIp: '', strategy: 'round', interfaceName: '' });
   const [diagnoseDialogOpen, setDiagnoseDialogOpen] = useState(false);
   const [diagnoseResult, setDiagnoseResult] = useState<any>(null);
   const [diagnosing, setDiagnosing] = useState<number | null>(null);
@@ -39,7 +39,7 @@ export default function ForwardPage() {
 
   const handleCreate = () => {
     setEditingForward(null);
-    setForm({ name: '', tunnelId: '', remoteAddr: '', inPort: '', strategy: 'round', interfaceName: '' });
+    setForm({ name: '', tunnelId: '', remoteAddr: '', inPort: '', listenIp: '', strategy: 'round', interfaceName: '' });
     setDialogOpen(true);
   };
 
@@ -50,6 +50,7 @@ export default function ForwardPage() {
       tunnelId: forward.tunnelId?.toString(),
       remoteAddr: forward.remoteAddr,
       inPort: forward.inPort?.toString() || '',
+      listenIp: forward.listenIp || '',
       strategy: forward.strategy || 'round',
       interfaceName: forward.interfaceName || '',
     });
@@ -65,6 +66,7 @@ export default function ForwardPage() {
       name: form.name,
       tunnelId: parseInt(form.tunnelId),
       remoteAddr: form.remoteAddr,
+      listenIp: form.listenIp || undefined,
       strategy: form.strategy,
       interfaceName: form.interfaceName || null,
     };
@@ -268,9 +270,15 @@ export default function ForwardPage() {
               <Label>目标地址</Label>
               <Input value={form.remoteAddr} onChange={e => setForm(p => ({ ...p, remoteAddr: e.target.value }))} placeholder="ip:port" />
             </div>
-            <div className="space-y-2">
-              <Label>入口端口 (可选)</Label>
-              <Input value={form.inPort} onChange={e => setForm(p => ({ ...p, inPort: e.target.value }))} placeholder="自动分配" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>入口IP (可选)</Label>
+                <Input value={form.listenIp} onChange={e => setForm(p => ({ ...p, listenIp: e.target.value }))} placeholder="默认 0.0.0.0" />
+              </div>
+              <div className="space-y-2">
+                <Label>入口端口 (可选)</Label>
+                <Input value={form.inPort} onChange={e => setForm(p => ({ ...p, inPort: e.target.value }))} placeholder="自动分配" />
+              </div>
             </div>
           </div>
           <DialogFooter>

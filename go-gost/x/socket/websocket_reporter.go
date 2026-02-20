@@ -32,6 +32,8 @@ type SystemInfo struct {
 	BytesTransmitted uint64  `json:"bytes_transmitted"` // 发送字节数
 	CPUUsage         float64 `json:"cpu_usage"`         // CPU使用率（百分比）
 	MemoryUsage      float64 `json:"memory_usage"`      // 内存使用率（百分比）
+	XrayRunning      bool    `json:"xray_running"`      // Xray 是否运行
+	XrayVersion      string  `json:"xray_version"`      // Xray 版本号
 }
 
 // NetworkStats 网络统计信息
@@ -308,13 +310,21 @@ func (w *WebSocketReporter) collectSystemInfo() SystemInfo {
 	cpuInfo := getCPUInfo()
 	memoryInfo := getMemoryInfo()
 
-	return SystemInfo{
+	info := SystemInfo{
 		Uptime:           getUptime(),
 		BytesReceived:    networkStats.BytesReceived,
 		BytesTransmitted: networkStats.BytesTransmitted,
 		CPUUsage:         cpuInfo.Usage,
 		MemoryUsage:      memoryInfo.Usage,
 	}
+
+	// Attach Xray status if manager is available
+	if w.xrayManager != nil {
+		info.XrayRunning = w.xrayManager.IsRunning()
+		info.XrayVersion = w.xrayManager.GetVersion()
+	}
+
+	return info
 }
 
 // sendSystemInfo 发送系统信息

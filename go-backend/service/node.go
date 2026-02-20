@@ -203,7 +203,7 @@ func GenerateDockerInstallCommand(id int64, clientAddr string) dto.R {
 	if imageTag == "" || imageTag == "dev" {
 		imageTag = "latest"
 	}
-	cmd := fmt.Sprintf(`mkdir -p ~/.flux && docker run -d --name gost-node --restart unless-stopped --network host -v ~/.flux:/etc/gost -e PANEL_ADDR=%s -e SECRET=%s 0xnetuser/gost-node:%s`,
+	cmd := fmt.Sprintf(`docker stop gost-node 2>/dev/null; docker rm gost-node 2>/dev/null; mkdir -p ~/.flux && docker run -d --name gost-node --restart unless-stopped --network host -v ~/.flux:/etc/gost -e PANEL_ADDR=%s -e SECRET=%s 0xnetuser/gost-node:%s`,
 		panelAddr, node.Secret, imageTag)
 
 	return dto.Ok(cmd)

@@ -10,6 +10,7 @@ type Forward struct {
 	OutPort       int    `gorm:"column:out_port" json:"outPort"`
 	RemoteAddr    string `gorm:"column:remote_addr" json:"remoteAddr"`
 	Strategy      string `gorm:"column:strategy" json:"strategy"`
+	ListenIp      string `gorm:"column:listen_ip" json:"listenIp"`
 	InterfaceName string `gorm:"column:interface_name" json:"interfaceName"`
 	InFlow        int64  `gorm:"column:in_flow" json:"inFlow"`
 	OutFlow       int64  `gorm:"column:out_flow" json:"outFlow"`

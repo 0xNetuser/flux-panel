@@ -7,6 +7,8 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RefreshCw } from 'lucide-react';
+import { genXrayKey } from '@/lib/api/xray-inbound';
+import { toast } from 'sonner';
 
 // ── Types ──
 
@@ -49,31 +51,14 @@ export default function SecuritySettings({ value, onChange }: Props) {
   const update = (patch: Partial<SecurityForm>) => onChange({ ...value, ...patch });
 
   const generateX25519 = async () => {
-    try {
-      const keyPair = await crypto.subtle.generateKey({ name: 'X25519' } as any, true, ['deriveBits']) as CryptoKeyPair;
-      const privRaw = await crypto.subtle.exportKey('raw', keyPair.privateKey);
-      const pubRaw = await crypto.subtle.exportKey('raw', keyPair.publicKey);
-      const toBase64Url = (buf: ArrayBuffer) => {
-        const bytes = new Uint8Array(buf);
-        let binary = '';
-        bytes.forEach(b => binary += String.fromCharCode(b));
-        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-      };
+    const res = await genXrayKey();
+    if (res.code === 0 && res.data) {
       update({
-        realityPrivateKey: toBase64Url(privRaw),
-        realityPublicKey: toBase64Url(pubRaw),
+        realityPrivateKey: res.data.privateKey,
+        realityPublicKey: res.data.publicKey,
       });
-    } catch {
-      // Fallback: generate random hex strings
-      const randomHex = (len: number) => {
-        const arr = new Uint8Array(len);
-        crypto.getRandomValues(arr);
-        return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
-      };
-      update({
-        realityPrivateKey: randomHex(32),
-        realityPublicKey: randomHex(32),
-      });
+    } else {
+      toast.error(res.msg || '生成密钥对失败');
     }
   };
 

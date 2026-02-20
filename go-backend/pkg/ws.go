@@ -66,6 +66,8 @@ type NodeSystemInfo struct {
 	MemoryUsage      float64 `json:"memUsage"`
 	BytesReceived    uint64  `json:"bytesReceived"`
 	BytesTransmitted uint64  `json:"bytesTransmitted"`
+	XrayRunning      bool    `json:"xrayRunning"`
+	XrayVersion      string  `json:"xrayVersion"`
 }
 
 // GetNodeSystemInfo returns the latest cached system info for a node, or nil.
@@ -236,6 +238,8 @@ func (m *WSManager) readNodeMessages(nodeId int64, ns *NodeSession) {
 				MemoryUsage      float64 `json:"memory_usage"`
 				BytesReceived    uint64  `json:"bytes_received"`
 				BytesTransmitted uint64  `json:"bytes_transmitted"`
+				XrayRunning      bool    `json:"xray_running"`
+				XrayVersion      string  `json:"xray_version"`
 			}
 			if json.Unmarshal([]byte(decrypted), &sysInfo) == nil {
 				m.nodeSystemInfo.Store(nodeId, &NodeSystemInfo{
@@ -244,6 +248,8 @@ func (m *WSManager) readNodeMessages(nodeId int64, ns *NodeSession) {
 					MemoryUsage:      sysInfo.MemoryUsage,
 					BytesReceived:    sysInfo.BytesReceived,
 					BytesTransmitted: sysInfo.BytesTransmitted,
+					XrayRunning:      sysInfo.XrayRunning,
+					XrayVersion:      sysInfo.XrayVersion,
 				})
 			}
 

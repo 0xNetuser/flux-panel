@@ -54,7 +54,7 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 
 ```bash
 # 下载 docker-compose 配置文件
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.8.8/docker-compose.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.8.9/docker-compose.yml -o docker-compose.yml
 ```
 
 **2. 创建环境变量文件**
@@ -121,7 +121,7 @@ docker compose up -d
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.8.8
+  0xnetuser/gost-node:1.8.9
 ```
 
 也可以使用 docker-compose，参考项目中的 `docker-compose-node.yml`：
@@ -129,7 +129,7 @@ docker run -d --network=host --restart=unless-stopped --name gost-node \
 ```yaml
 services:
   gost-node:
-    image: 0xnetuser/gost-node:1.8.8
+    image: 0xnetuser/gost-node:1.8.9
     container_name: gost-node
     network_mode: host
     restart: unless-stopped
@@ -178,7 +178,7 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 
 ```bash
 # 下载最新 docker-compose 配置（覆盖旧文件）
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.8.8/docker-compose.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.8.9/docker-compose.yml -o docker-compose.yml
 
 # 拉取最新镜像并重启
 docker compose pull && docker compose up -d
@@ -200,7 +200,7 @@ docker stop gost-node && docker rm gost-node
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.8.8
+  0xnetuser/gost-node:1.8.9
 ```
 
 如果使用 docker-compose 部署，更新 `docker-compose-node.yml` 中的镜像版本后：
@@ -222,6 +222,12 @@ curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && c
 ---
 
 ## 更新日志
+
+### v1.8.9
+
+- **GOST 流量统计根因修复**：`tunnel.Flow` 未设置时为 0，导致 `流量 × 0 = 0` 全部归零。`Flow <= 0` 时使用默认值
+- **Xray 流量统计根因修复**：Xray policy 缺少 `statsUserUplink/statsUserDownlink`，`-pattern user` 查询永远为空
+- **流量诊断端点**：新增 `/flow/debug` 接口，返回节点验证、流量 Top5、gorm.Expr SQL 验证
 
 ### v1.8.8
 

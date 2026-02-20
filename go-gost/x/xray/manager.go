@@ -362,13 +362,17 @@ func (m *XrayManager) buildBaseConfig(inbounds []InboundConfig) map[string]inter
 			},
 		},
 		"policy": map[string]interface{}{
+			"levels": map[string]interface{}{
+				"0": map[string]interface{}{
+					"statsUserUplink":   true,
+					"statsUserDownlink": true,
+				},
+			},
 			"system": map[string]interface{}{
 				"statsInboundUplink":    true,
 				"statsInboundDownlink":  true,
 				"statsOutboundUplink":   true,
 				"statsOutboundDownlink": true,
-				"statsUserUplink":       true,
-				"statsUserDownlink":     true,
 			},
 		},
 		"routing": map[string]interface{}{

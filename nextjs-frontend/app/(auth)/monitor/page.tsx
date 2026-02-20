@@ -208,7 +208,7 @@ export default function MonitorPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">监控</h2>
+        <h2 className="text-2xl font-bold">状态监控</h2>
         <Button variant="outline" size="sm" onClick={loadData} disabled={refreshing}>
           <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
           刷新

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { Plus, Trash2, Edit2, Terminal, Container, Copy, Eye, EyeOff, RefreshCw, ArrowUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { getNodeList, createNode, updateNode, deleteNode, getNodeInstallCommand, getNodeDockerCommand, reconcileNode } from '@/lib/api/node';
-import { switchXrayVersion } from '@/lib/api/xray-node';
+import { switchXrayVersion, getXrayVersions } from '@/lib/api/xray-node';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getVersion } from '@/lib/api/system';
 import { useAuth } from '@/lib/hooks/use-auth';
 
@@ -39,15 +40,24 @@ export default function NodePage() {
   const [showSecret, setShowSecret] = useState(false);
   const [panelVersion, setPanelVersion] = useState('');
 
+  const initialLoad = useRef(true);
+
   const loadData = useCallback(async () => {
-    setLoading(true);
+    if (initialLoad.current) setLoading(true);
     const [res, ver] = await Promise.all([getNodeList(), getVersion()]);
     if (res.code === 0) setNodes(res.data || []);
     if (ver) setPanelVersion(ver);
     setLoading(false);
+    initialLoad.current = false;
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    const timer = setInterval(() => { loadData(); }, 30000);
+    return () => clearInterval(timer);
+  }, [loadData]);
 
   const handleCreate = () => {
     setEditingNode(null);
@@ -134,16 +144,33 @@ export default function NodePage() {
   const [xrayVersionNode, setXrayVersionNode] = useState<any>(null);
   const [xrayTargetVersion, setXrayTargetVersion] = useState('');
   const [xraySwitching, setXraySwitching] = useState(false);
+  const [xrayVersions, setXrayVersions] = useState<{version: string, publishedAt: string}[]>([]);
+  const [xrayVersionsLoading, setXrayVersionsLoading] = useState(false);
+  const [xrayVersionsFailed, setXrayVersionsFailed] = useState(false);
 
-  const handleXrayVersionSwitch = (node: any) => {
+  const handleXrayVersionSwitch = async (node: any) => {
     setXrayVersionNode(node);
-    setXrayTargetVersion(node.xrayVersion && node.xrayVersion !== 'unknown' ? node.xrayVersion : '');
+    setXrayTargetVersion('');
+    setXrayVersionsFailed(false);
     setXrayVersionDialog(true);
+    setXrayVersionsLoading(true);
+    try {
+      const res = await getXrayVersions();
+      if (res.code === 0 && res.data) {
+        setXrayVersions(res.data);
+      } else {
+        setXrayVersionsFailed(true);
+      }
+    } catch {
+      setXrayVersionsFailed(true);
+    } finally {
+      setXrayVersionsLoading(false);
+    }
   };
 
   const handleXrayVersionSubmit = async () => {
     if (!xrayTargetVersion.trim()) {
-      toast.error('请输入目标版本号');
+      toast.error('请选择目标版本');
       return;
     }
     setXraySwitching(true);
@@ -355,12 +382,34 @@ export default function NodePage() {
             </div>
             <div className="space-y-2">
               <Label>目标版本</Label>
-              <Input
-                value={xrayTargetVersion}
-                onChange={e => setXrayTargetVersion(e.target.value)}
-                placeholder="例如: 25.1.30"
-              />
-              <p className="text-xs text-muted-foreground">输入 Xray-core GitHub Release 版本号（不带 v 前缀）</p>
+              {xrayVersionsFailed ? (
+                <>
+                  <Input
+                    value={xrayTargetVersion}
+                    onChange={e => setXrayTargetVersion(e.target.value)}
+                    placeholder="例如: 25.1.30"
+                  />
+                  <p className="text-xs text-muted-foreground">获取版本列表失败，请手动输入版本号</p>
+                </>
+              ) : (
+                <Select value={xrayTargetVersion} onValueChange={setXrayTargetVersion} disabled={xrayVersionsLoading}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={xrayVersionsLoading ? '加载中...' : '选择版本'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {xrayVersionsLoading ? (
+                      <SelectItem value="_loading" disabled>加载中...</SelectItem>
+                    ) : (
+                      xrayVersions.map((v) => (
+                        <SelectItem key={v.version} value={v.version}>
+                          {v.version}{xrayVersionNode?.xrayVersion === v.version ? ' (当前)' : ''}
+                          {v.publishedAt && <span className="text-muted-foreground ml-2 text-xs">{v.publishedAt.slice(0, 10)}</span>}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
           <DialogFooter>

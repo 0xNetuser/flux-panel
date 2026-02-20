@@ -39,7 +39,7 @@ const navItems: NavItem[] = [
   // System
   { path: '/node', label: '节点管理', icon: <Server className="h-4 w-4" />, adminOnly: true, section: '系统' },
   { path: '/user', label: '用户管理', icon: <Users className="h-4 w-4" />, adminOnly: true, section: '系统' },
-  { path: '/monitor', label: '监控', icon: <Activity className="h-4 w-4" />, adminOnly: true, section: '系统' },
+  { path: '/monitor', label: '状态监控', icon: <Activity className="h-4 w-4" />, adminOnly: true, section: '系统' },
   { path: '/config', label: '系统配置', icon: <Settings className="h-4 w-4" />, adminOnly: true, section: '系统' },
 ];
 

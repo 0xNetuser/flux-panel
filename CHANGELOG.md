@@ -1,5 +1,28 @@
 # Changelog
 
+## v1.8.6 — Xray 版本下拉选择 + 自动刷新 + 转发延迟显示
+
+### Features
+
+- **Xray 版本下拉选择**：切换 Xray 版本从手动输入改为下拉选择，后端请求 GitHub Releases API 获取可用版本列表（带 5 分钟内存缓存），前端展示版本号和发布日期，当前版本标注 `(当前)`，获取失败时 fallback 回手动输入
+- **转发延迟显示**：转发管理表格新增「延迟」列，显示每条转发的最新延迟（绿色 <200ms / 橙色 200-500ms / 红色 >500ms / 超时），数据来自延迟监控 API
+- **转发管理自动刷新**：转发列表和延迟数据每 30 秒自动刷新
+- **节点管理自动刷新**：节点列表每 30 秒自动刷新，首次加载后静默更新不显示 loading
+- **监控重命名**：侧边栏「监控」更名为「状态监控」，页面标题同步更新
+
+### Changed Files
+
+**后端：**
+- `go-backend/handler/xray_node.go` — 新增 `XrayNodeVersions` handler（GitHub API + 缓存）
+- `go-backend/router/router.go` — 新增 `GET /xray/node/versions` 路由
+
+**前端：**
+- `nextjs-frontend/lib/api/xray-node.ts` — 新增 `getXrayVersions` API
+- `nextjs-frontend/app/(auth)/node/page.tsx` — Xray 版本切换改为 Select 下拉 + 30 秒自动刷新
+- `nextjs-frontend/app/(auth)/forward/page.tsx` — 新增延迟列 + 30 秒自动刷新
+- `nextjs-frontend/app/(auth)/monitor/page.tsx` — 页面标题改为「状态监控」
+- `nextjs-frontend/app/(auth)/layout.tsx` — 侧边栏「监控」改为「状态监控」
+
 ## v1.8.5 — 修复 VLESS 客户端注入
 
 ### Fixes

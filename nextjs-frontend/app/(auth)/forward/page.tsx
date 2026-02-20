@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Trash2, Pause, Play, Edit2, Stethoscope, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { getForwardList, createForward, updateForward, deleteForward, pauseForwardService, resumeForwardService, diagnoseForward } from '@/lib/api/forward';
+import { getLatencyHistory } from '@/lib/api/monitor';
 import { userTunnel } from '@/lib/api/tunnel';
 import { useAuth } from '@/lib/hooks/use-auth';
 
@@ -26,16 +27,50 @@ export default function ForwardPage() {
   const [diagnoseDialogOpen, setDiagnoseDialogOpen] = useState(false);
   const [diagnoseResult, setDiagnoseResult] = useState<any>(null);
   const [diagnosing, setDiagnosing] = useState<number | null>(null);
+  const [latencyMap, setLatencyMap] = useState<Record<number, { latency: number; success: boolean } | null>>({});
+  const initialLoad = useRef(true);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    const [forwardRes, tunnelRes] = await Promise.all([getForwardList(), userTunnel()]);
-    if (forwardRes.code === 0) setForwards(forwardRes.data || []);
-    if (tunnelRes.code === 0) setTunnels(tunnelRes.data || []);
-    setLoading(false);
+  const loadLatency = useCallback(async (fwds: any[]) => {
+    const active = fwds.filter((f: any) => f.status === 1);
+    if (active.length === 0) { setLatencyMap({}); return; }
+    const results = await Promise.all(
+      active.map(async (f: any) => {
+        try {
+          const res = await getLatencyHistory(f.id, 1);
+          if (res.code === 0 && res.data && (res.data as any[]).length > 0) {
+            const records = res.data as any[];
+            const last = records[records.length - 1];
+            return { id: f.id, latency: last.latency, success: last.success };
+          }
+        } catch {}
+        return { id: f.id, latency: 0, success: false };
+      })
+    );
+    const map: Record<number, { latency: number; success: boolean }> = {};
+    for (const r of results) {
+      map[r.id] = { latency: r.latency, success: r.success };
+    }
+    setLatencyMap(map);
   }, []);
 
+  const loadData = useCallback(async () => {
+    if (initialLoad.current) setLoading(true);
+    const [forwardRes, tunnelRes] = await Promise.all([getForwardList(), userTunnel()]);
+    const fwds = forwardRes.code === 0 ? (forwardRes.data || []) : [];
+    if (forwardRes.code === 0) setForwards(fwds);
+    if (tunnelRes.code === 0) setTunnels(tunnelRes.data || []);
+    setLoading(false);
+    initialLoad.current = false;
+    loadLatency(fwds);
+  }, [loadLatency]);
+
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    const timer = setInterval(() => { loadData(); }, 30000);
+    return () => clearInterval(timer);
+  }, [loadData]);
 
   const handleCreate = () => {
     setEditingForward(null);
@@ -157,15 +192,16 @@ export default function ForwardPage() {
                 <TableHead>入口端口</TableHead>
                 <TableHead>目标地址</TableHead>
                 <TableHead>流量</TableHead>
+                <TableHead>延迟</TableHead>
                 <TableHead>状态</TableHead>
                 <TableHead>操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8">加载中...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8">加载中...</TableCell></TableRow>
               ) : forwards.length === 0 ? (
-                <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
               ) : (
                 forwards.map((f) => (
                   <TableRow key={f.id}>
@@ -174,6 +210,19 @@ export default function ForwardPage() {
                     <TableCell>{f.inIp}:{f.inPort}</TableCell>
                     <TableCell className="max-w-[200px] truncate">{f.remoteAddr}</TableCell>
                     <TableCell className="text-xs">{formatBytes(f.inFlow)} / {formatBytes(f.outFlow)}</TableCell>
+                    <TableCell className="text-xs">
+                      {f.status === 1 && latencyMap[f.id] ? (
+                        latencyMap[f.id]!.success ? (
+                          <span className={`font-mono ${latencyMap[f.id]!.latency > 500 ? 'text-red-600' : latencyMap[f.id]!.latency > 200 ? 'text-orange-600' : 'text-green-600'}`}>
+                            {latencyMap[f.id]!.latency.toFixed(1)}ms
+                          </span>
+                        ) : (
+                          <span className="text-destructive">超时</span>
+                        )
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={f.status === 1 ? 'default' : f.status === 0 ? 'secondary' : 'destructive'}>
                         {f.status === 1 ? '运行中' : f.status === 0 ? '已暂停' : '异常'}

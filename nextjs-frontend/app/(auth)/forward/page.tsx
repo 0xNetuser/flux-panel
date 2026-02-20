@@ -14,12 +14,14 @@ import { toast } from 'sonner';
 import { getForwardList, createForward, updateForward, deleteForward, pauseForwardService, resumeForwardService, diagnoseForward } from '@/lib/api/forward';
 import { getLatencyHistory } from '@/lib/api/monitor';
 import { userTunnel } from '@/lib/api/tunnel';
+import { getAccessibleNodeList } from '@/lib/api/node';
 import { useAuth } from '@/lib/hooks/use-auth';
 
 export default function ForwardPage() {
   const { isAdmin, gostEnabled } = useAuth();
   const [forwards, setForwards] = useState<any[]>([]);
   const [tunnels, setTunnels] = useState<any[]>([]);
+  const [nodes, setNodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingForward, setEditingForward] = useState<any>(null);
@@ -55,10 +57,11 @@ export default function ForwardPage() {
 
   const loadData = useCallback(async () => {
     if (initialLoad.current) setLoading(true);
-    const [forwardRes, tunnelRes] = await Promise.all([getForwardList(), userTunnel()]);
+    const [forwardRes, tunnelRes, nodeRes] = await Promise.all([getForwardList(), userTunnel(), getAccessibleNodeList()]);
     const fwds = forwardRes.code === 0 ? (forwardRes.data || []) : [];
     if (forwardRes.code === 0) setForwards(fwds);
     if (tunnelRes.code === 0) setTunnels(tunnelRes.data || []);
+    if (nodeRes.code === 0) setNodes(nodeRes.data || []);
     setLoading(false);
     initialLoad.current = false;
     loadLatency(fwds);
@@ -319,16 +322,107 @@ export default function ForwardPage() {
               <Label>目标地址</Label>
               <Input value={form.remoteAddr} onChange={e => setForm(p => ({ ...p, remoteAddr: e.target.value }))} placeholder="ip:port" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>入口IP (可选)</Label>
-                <Input value={form.listenIp} onChange={e => setForm(p => ({ ...p, listenIp: e.target.value }))} placeholder="默认 ::" />
-              </div>
-              <div className="space-y-2">
-                <Label>入口端口 (可选)</Label>
-                <Input value={form.inPort} onChange={e => setForm(p => ({ ...p, inPort: e.target.value }))} placeholder="自动分配" />
-              </div>
-            </div>
+            {(() => {
+              const selectedTunnel = tunnels.find((t: any) => t.id?.toString() === form.tunnelId);
+              const entryNode = selectedTunnel ? nodes.find((n: any) => n.id === selectedTunnel.inNodeId) : null;
+              const ifaces: { name: string; ips: string[] }[] = entryNode?.interfaces || [];
+              // Flatten all IPs from all interfaces for the IP-based dropdown
+              const allIps = ifaces.flatMap((iface: any) => iface.ips || []);
+              // Build listenIp options: check if current value is a known IP or NIC-derived
+              const knownValues = ['', '::', '0.0.0.0', ...allIps];
+              const isCustomListenIp = form.listenIp && !knownValues.includes(form.listenIp);
+              // Build interfaceName options: check if current value is a known NIC
+              const nicNames = ifaces.map((iface: any) => iface.name);
+              const isCustomInterface = form.interfaceName && !nicNames.includes(form.interfaceName);
+
+              return (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>入口网卡 (可选)</Label>
+                      <Select value={isCustomListenIp ? '__custom__' : (form.listenIp || '::')} onValueChange={v => {
+                        if (v === '__custom__') {
+                          setForm(p => ({ ...p, listenIp: p.listenIp || '' }));
+                        } else {
+                          setForm(p => ({ ...p, listenIp: v }));
+                        }
+                      }}>
+                        <SelectTrigger><SelectValue placeholder="选择入口" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="::">全部接口 (::)</SelectItem>
+                          <SelectItem value="0.0.0.0">仅IPv4 (0.0.0.0)</SelectItem>
+                          {ifaces.map((iface: any) =>
+                            (iface.ips || []).map((ip: string) => (
+                              <SelectItem key={`${iface.name}-${ip}`} value={ip}>
+                                {iface.name} — {ip}
+                              </SelectItem>
+                            ))
+                          )}
+                          <SelectItem value="__custom__">自定义...</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {isCustomListenIp && (
+                        <Input
+                          value={form.listenIp}
+                          onChange={e => setForm(p => ({ ...p, listenIp: e.target.value }))}
+                          placeholder="IP地址，多个用逗号分隔"
+                          className="mt-1"
+                        />
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <Label>出口网卡 (可选)</Label>
+                      <Select value={isCustomInterface ? '__custom__' : (form.interfaceName || '__none__')} onValueChange={v => {
+                        if (v === '__custom__') {
+                          setForm(p => ({ ...p, interfaceName: p.interfaceName || '' }));
+                        } else if (v === '__none__') {
+                          setForm(p => ({ ...p, interfaceName: '' }));
+                        } else {
+                          setForm(p => ({ ...p, interfaceName: v }));
+                        }
+                      }}>
+                        <SelectTrigger><SelectValue placeholder="默认路由" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">默认路由</SelectItem>
+                          {ifaces.map((iface: any) => (
+                            <SelectItem key={iface.name} value={iface.name}>
+                              {iface.name}{iface.ips?.length ? ` (${iface.ips.join(', ')})` : ''}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="__custom__">自定义...</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {isCustomInterface && (
+                        <Input
+                          value={form.interfaceName}
+                          onChange={e => setForm(p => ({ ...p, interfaceName: e.target.value }))}
+                          placeholder="网卡名称，如 eth0"
+                          className="mt-1"
+                        />
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>入口端口 (可选)</Label>
+                      <Input value={form.inPort} onChange={e => setForm(p => ({ ...p, inPort: e.target.value }))} placeholder="自动分配" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>负载策略</Label>
+                      <Select value={form.strategy} onValueChange={v => setForm(p => ({ ...p, strategy: v }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="round">轮询 (round)</SelectItem>
+                          <SelectItem value="random">随机 (random)</SelectItem>
+                          <SelectItem value="fifo">灾备切换 (fifo)</SelectItem>
+                          <SelectItem value="hash">哈希 (hash)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>

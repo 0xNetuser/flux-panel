@@ -8,7 +8,7 @@ export LC_ALL=C
 
 
 # 全局下载地址配置
-DOCKER_COMPOSE_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.8.11/docker-compose.yml"
+DOCKER_COMPOSE_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.8.12/docker-compose.yml"
 
 COUNTRY=$(curl -s https://ipinfo.io/country)
 if [ "$COUNTRY" = "CN" ]; then
@@ -835,6 +835,42 @@ SET @sql = (
     ),
     'ALTER TABLE \`forward\` ADD COLUMN \`interface_name\` VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL;',
     'SELECT "Column \`interface_name\` already exists in \`forward\`";'
+  )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- forward 表：添加 listen_ip 字段（如果不存在）
+SET @sql = (
+  SELECT IF(
+    NOT EXISTS (
+      SELECT 1
+      FROM information_schema.COLUMNS
+      WHERE table_schema = DATABASE()
+        AND table_name = 'forward'
+        AND column_name = 'listen_ip'
+    ),
+    'ALTER TABLE \`forward\` ADD COLUMN \`listen_ip\` VARCHAR(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT "监听IP，多个用逗号分隔";',
+    'SELECT "Column \`listen_ip\` already exists in \`forward\`";'
+  )
+);
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- node 表：添加 entry_ips 字段（如果不存在）
+SET @sql = (
+  SELECT IF(
+    NOT EXISTS (
+      SELECT 1
+      FROM information_schema.COLUMNS
+      WHERE table_schema = DATABASE()
+        AND table_name = 'node'
+        AND column_name = 'entry_ips'
+    ),
+    'ALTER TABLE \`node\` ADD COLUMN \`entry_ips\` VARCHAR(2000) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci DEFAULT NULL COMMENT "入口IP列表，逗号分隔";',
+    'SELECT "Column \`entry_ips\` already exists in \`node\`";'
   )
 );
 PREPARE stmt FROM @sql;

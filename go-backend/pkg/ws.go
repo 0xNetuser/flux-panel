@@ -59,15 +59,22 @@ type WSManager struct {
 	ValidateNodeSecret func(nodeId int64, secret string) int64
 }
 
+// NetInterface represents a network interface with its name and IP addresses.
+type NetInterface struct {
+	Name string   `json:"name"`
+	IPs  []string `json:"ips"`
+}
+
 // NodeSystemInfo holds the latest system metrics reported by a node.
 type NodeSystemInfo struct {
-	Uptime           uint64  `json:"uptime"`
-	CPUUsage         float64 `json:"cpuUsage"`
-	MemoryUsage      float64 `json:"memUsage"`
-	BytesReceived    uint64  `json:"bytesReceived"`
-	BytesTransmitted uint64  `json:"bytesTransmitted"`
-	XrayRunning      bool    `json:"xrayRunning"`
-	XrayVersion      string  `json:"xrayVersion"`
+	Uptime           uint64         `json:"uptime"`
+	CPUUsage         float64        `json:"cpuUsage"`
+	MemoryUsage      float64        `json:"memUsage"`
+	BytesReceived    uint64         `json:"bytesReceived"`
+	BytesTransmitted uint64         `json:"bytesTransmitted"`
+	XrayRunning      bool           `json:"xrayRunning"`
+	XrayVersion      string         `json:"xrayVersion"`
+	Interfaces       []NetInterface `json:"interfaces"`
 }
 
 // GetNodeSystemInfo returns the latest cached system info for a node, or nil.
@@ -240,9 +247,13 @@ func (m *WSManager) readNodeMessages(nodeId int64, ns *NodeSession) {
 				BytesTransmitted uint64  `json:"bytes_transmitted"`
 				XrayRunning      bool    `json:"xray_running"`
 				XrayVersion      string  `json:"xray_version"`
+				Interfaces       []struct {
+					Name string   `json:"name"`
+					IPs  []string `json:"ips"`
+				} `json:"interfaces"`
 			}
 			if json.Unmarshal([]byte(decrypted), &sysInfo) == nil {
-				m.nodeSystemInfo.Store(nodeId, &NodeSystemInfo{
+				info := &NodeSystemInfo{
 					Uptime:           sysInfo.Uptime,
 					CPUUsage:         sysInfo.CPUUsage,
 					MemoryUsage:      sysInfo.MemoryUsage,
@@ -250,7 +261,14 @@ func (m *WSManager) readNodeMessages(nodeId int64, ns *NodeSession) {
 					BytesTransmitted: sysInfo.BytesTransmitted,
 					XrayRunning:      sysInfo.XrayRunning,
 					XrayVersion:      sysInfo.XrayVersion,
-				})
+				}
+				for _, iface := range sysInfo.Interfaces {
+					info.Interfaces = append(info.Interfaces, NetInterface{
+						Name: iface.Name,
+						IPs:  iface.IPs,
+					})
+				}
+				m.nodeSystemInfo.Store(nodeId, info)
 			}
 
 			// Broadcast system info to admin sessions

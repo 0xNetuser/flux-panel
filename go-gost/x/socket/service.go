@@ -101,37 +101,48 @@ func updateServices(req updateServicesRequest) error {
 		}
 	}
 
-	// 第二阶段：按照原来的updateService逻辑，逐个更新服务
+	// 第二阶段：先关闭所有旧服务，释放端口
+	for _, serviceConfig := range req.Data {
+		name := strings.TrimSpace(serviceConfig.Name)
+		old := registry.ServiceRegistry().Get(name)
+		old.Close()
+		registry.ServiceRegistry().Unregister(name)
+	}
+
+	// 等待端口完全释放
+	time.Sleep(200 * time.Millisecond)
+
+	// 第三阶段：创建所有新服务
 	for _, serviceConfig := range req.Data {
 		name := strings.TrimSpace(serviceConfig.Name)
 		serviceConfig.Name = name
 
-		// 1. 获取旧服务
-		old := registry.ServiceRegistry().Get(name)
-
-		// 2. 关闭旧服务
-		old.Close()
-
-		// 3. 从注册表移除旧服务
-		registry.ServiceRegistry().Unregister(name)
-
-		// 4. 解析新服务配置
-		svc, err := parser.ParseService(&serviceConfig)
+		var svc service.Service
+		var err error
+		// 重试机制：端口释放可能需要时间
+		for attempt := 0; attempt < 3; attempt++ {
+			svc, err = parser.ParseService(&serviceConfig)
+			if err == nil {
+				break
+			}
+			if !strings.Contains(err.Error(), "address already in use") {
+				break
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
 		if err != nil {
 			return errors.New("create service " + name + " failed: " + err.Error())
 		}
 
-		// 5. 注册新服务
 		if err := registry.ServiceRegistry().Register(name, svc); err != nil {
 			svc.Close()
 			return errors.New("service " + name + " already exists")
 		}
 
-		// 6. 启动新服务
 		go svc.Serve()
 	}
 
-	// 第三阶段：更新配置
+	// 第四阶段：更新配置
 	config.OnUpdate(func(c *config.Config) error {
 		for _, serviceConfig := range req.Data {
 			for i := range c.Services {

@@ -87,6 +87,11 @@ func XrayApplyConfig(nodeId int64, inbounds []model.XrayInbound) *dto.GostRespon
 	return WS.SendMsg(nodeId, data, "XrayApplyConfig")
 }
 
+func XraySwitchVersion(nodeId int64, version string) *dto.GostResponse {
+	data := map[string]interface{}{"version": version}
+	return WS.SendMsg(nodeId, data, "XraySwitchVersion")
+}
+
 func XrayDeployCert(nodeId int64, domain, publicKey, privateKey string) *dto.GostResponse {
 	data := map[string]interface{}{
 		"domain":     domain,

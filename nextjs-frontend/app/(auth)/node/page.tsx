@@ -8,9 +8,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Edit2, Terminal, Container, Copy, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Edit2, Terminal, Container, Copy, Eye, EyeOff, RefreshCw, ArrowUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { getNodeList, createNode, updateNode, deleteNode, getNodeInstallCommand, getNodeDockerCommand, reconcileNode } from '@/lib/api/node';
+import { switchXrayVersion } from '@/lib/api/xray-node';
 import { getVersion } from '@/lib/api/system';
 import { useAuth } from '@/lib/hooks/use-auth';
 
@@ -129,6 +130,35 @@ export default function NodePage() {
   };
 
   const [reconcilingId, setReconcilingId] = useState<number | null>(null);
+  const [xrayVersionDialog, setXrayVersionDialog] = useState(false);
+  const [xrayVersionNode, setXrayVersionNode] = useState<any>(null);
+  const [xrayTargetVersion, setXrayTargetVersion] = useState('');
+  const [xraySwitching, setXraySwitching] = useState(false);
+
+  const handleXrayVersionSwitch = (node: any) => {
+    setXrayVersionNode(node);
+    setXrayTargetVersion('');
+    setXrayVersionDialog(true);
+  };
+
+  const handleXrayVersionSubmit = async () => {
+    if (!xrayTargetVersion.trim()) {
+      toast.error('请输入目标版本号');
+      return;
+    }
+    setXraySwitching(true);
+    try {
+      const res = await switchXrayVersion(xrayVersionNode.id, xrayTargetVersion.trim());
+      if (res.code === 0) {
+        toast.success('版本切换已开始，请稍候刷新查看');
+        setXrayVersionDialog(false);
+      } else {
+        toast.error(res.msg || '切换失败');
+      }
+    } finally {
+      setXraySwitching(false);
+    }
+  };
 
   const handleReconcile = async (id: number) => {
     setReconcilingId(id);
@@ -226,6 +256,9 @@ export default function NodePage() {
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(n)} title="编辑">
                           <Edit2 className="h-4 w-4" />
                         </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleXrayVersionSwitch(n)} title="Xray 版本切换">
+                          <ArrowUpDown className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleReconcile(n.id)} disabled={reconcilingId === n.id} title="同步配置">
                           <RefreshCw className={`h-4 w-4 ${reconcilingId === n.id ? 'animate-spin' : ''}`} />
                         </Button>
@@ -305,6 +338,36 @@ export default function NodePage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
             <Button onClick={handleSubmit}>{editingNode ? '更新' : '创建'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Xray Version Switch Dialog */}
+      <Dialog open={xrayVersionDialog} onOpenChange={setXrayVersionDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>切换 Xray 版本 — {xrayVersionNode?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>当前版本</Label>
+              <p className="text-sm text-muted-foreground">{xrayVersionNode?.xrayVersion || '未知'}</p>
+            </div>
+            <div className="space-y-2">
+              <Label>目标版本</Label>
+              <Input
+                value={xrayTargetVersion}
+                onChange={e => setXrayTargetVersion(e.target.value)}
+                placeholder="例如: 24.12.18"
+              />
+              <p className="text-xs text-muted-foreground">输入 Xray-core GitHub Release 版本号（不带 v 前缀）</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setXrayVersionDialog(false)}>取消</Button>
+            <Button onClick={handleXrayVersionSubmit} disabled={xraySwitching}>
+              {xraySwitching ? '切换中...' : '切换'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

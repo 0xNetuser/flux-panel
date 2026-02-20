@@ -55,3 +55,16 @@ func XrayNodeStatus(c *gin.Context) {
 	result := pkg.XrayStatus(d.NodeId)
 	c.JSON(http.StatusOK, dto.Ok(result))
 }
+
+func XrayNodeSwitchVersion(c *gin.Context) {
+	var d struct {
+		NodeId  int64  `json:"nodeId" binding:"required"`
+		Version string `json:"version" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&d); err != nil {
+		c.JSON(http.StatusOK, dto.Err("参数错误"))
+		return
+	}
+	result := pkg.XraySwitchVersion(d.NodeId, d.Version)
+	c.JSON(http.StatusOK, dto.Ok(result))
+}

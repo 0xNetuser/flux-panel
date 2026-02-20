@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.8.0 — Xray 版本远程切换
+
+### Features
+
+- **Xray 版本切换**：节点管理页面新增「Xray 版本切换」按钮，管理员可从面板远程升级/降级节点上的 Xray 版本，无需 SSH
+- **异步下载替换**：节点从 GitHub Releases 下载指定版本 Xray 二进制，自动备份旧版本、替换、重启，支持失败自动回滚
+- **实时版本显示**：节点列表 Xray 版本从 WebSocket 实时缓存读取，版本切换后自动刷新
+
+### Changed Files
+
+**节点端：**
+- `go-gost/x/xray/manager.go` — 新增 `SwitchVersion()` 方法（下载/解压/备份/替换/回滚）
+- `go-gost/x/socket/websocket_reporter.go` — 新增 `XraySwitchVersion` 命令路由
+
+**后端：**
+- `go-backend/pkg/xray.go` — 新增 `XraySwitchVersion()` WebSocket 发送函数
+- `go-backend/handler/xray_node.go` — 新增 `XrayNodeSwitchVersion` handler
+- `go-backend/router/router.go` — 新增 `POST /xray/node/switch-version` 路由
+- `go-backend/service/node.go` — 节点列表覆盖实时 Xray 版本
+
+**前端：**
+- `nextjs-frontend/lib/api/xray-node.ts` — 新增 `switchXrayVersion` API
+- `nextjs-frontend/app/(auth)/node/page.tsx` — 新增版本切换按钮和对话框
+
 ## v1.7.1 — 转发延迟图表优化
 
 ### Features

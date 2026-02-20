@@ -71,6 +71,9 @@ func GetAllNodes() dto.R {
 				item["uptime"] = info.Uptime
 				item["bytesReceived"] = info.BytesReceived
 				item["bytesTransmitted"] = info.BytesTransmitted
+				if info.XrayVersion != "" {
+					item["xrayVersion"] = info.XrayVersion
+				}
 			}
 		}
 

@@ -609,6 +609,9 @@ func (w *WebSocketReporter) routeCommand(cmd CommandMessage) {
 	case "XrayDeployCert":
 		err = w.handleXrayDeployCert(cmd.Data)
 		response.Type = "XrayDeployCertResponse"
+	case "XraySwitchVersion":
+		err = w.handleXraySwitchVersion(cmd.Data)
+		response.Type = "XraySwitchVersionResponse"
 
 	default:
 		err = fmt.Errorf("未知命令类型: %s", cmd.Type)
@@ -1119,6 +1122,36 @@ func (w *WebSocketReporter) handleXrayDeployCert(data interface{}) error {
 	}
 
 	fmt.Printf("📜 TLS cert deployed for domain: %s\n", req.Domain)
+	return nil
+}
+
+func (w *WebSocketReporter) handleXraySwitchVersion(data interface{}) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("序列化数据失败: %v", err)
+	}
+
+	var req struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal(jsonData, &req); err != nil {
+		return fmt.Errorf("解析版本切换请求失败: %v", err)
+	}
+
+	if req.Version == "" {
+		return fmt.Errorf("版本号不能为空")
+	}
+
+	mgr := w.getOrInitXrayManager()
+
+	// Async: run in goroutine, return immediately
+	go func() {
+		if err := mgr.SwitchVersion(req.Version); err != nil {
+			fmt.Printf("❌ Xray版本切换失败: %v\n", err)
+		}
+	}()
+
+	// Return immediately — result will be reflected in SystemInfo xray_version
 	return nil
 }
 

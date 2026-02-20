@@ -1,11 +1,15 @@
 package xray
 
 import (
+	"archive/zip"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"syscall"
 	"time"
@@ -154,6 +158,168 @@ func (m *XrayManager) GetVersion() string {
 // GetGrpcAddr returns the gRPC address
 func (m *XrayManager) GetGrpcAddr() string {
 	return m.grpcAddr
+}
+
+// SwitchVersion downloads and replaces the Xray binary with the specified version.
+// This method is designed to be called in a goroutine (async).
+func (m *XrayManager) SwitchVersion(version string) error {
+	// Map GOARCH to Xray release arch suffix
+	archMap := map[string]string{
+		"amd64": "64",
+		"arm64": "arm64-v8a",
+		"arm":   "arm32-v7a",
+	}
+	arch, ok := archMap[runtime.GOARCH]
+	if !ok {
+		return fmt.Errorf("unsupported architecture: %s", runtime.GOARCH)
+	}
+
+	downloadURL := fmt.Sprintf("https://github.com/XTLS/Xray-core/releases/download/v%s/Xray-linux-%s.zip", version, arch)
+	binaryPath := "/usr/local/bin/xray"
+	backupPath := "/usr/local/bin/xray.bak"
+
+	fmt.Printf("⬇️ Downloading Xray v%s from %s\n", version, downloadURL)
+
+	// 1. Download zip to temp file
+	tmpFile, err := os.CreateTemp("", "xray-*.zip")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %v", err)
+	}
+	tmpPath := tmpFile.Name()
+	defer os.Remove(tmpPath)
+
+	httpClient := &http.Client{Timeout: 5 * time.Minute}
+	resp, err := httpClient.Get(downloadURL)
+	if err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to download: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		tmpFile.Close()
+		return fmt.Errorf("download failed with status %d", resp.StatusCode)
+	}
+
+	if _, err := io.Copy(tmpFile, resp.Body); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to save download: %v", err)
+	}
+	tmpFile.Close()
+
+	// 2. Extract xray binary from zip
+	extractedBinary, err := extractXrayFromZip(tmpPath)
+	if err != nil {
+		return fmt.Errorf("failed to extract xray binary: %v", err)
+	}
+	defer os.Remove(extractedBinary)
+
+	// 3. Stop Xray
+	fmt.Printf("🛑 Stopping Xray for version switch...\n")
+	if err := m.Stop(); err != nil {
+		fmt.Printf("⚠️ Error stopping Xray: %v\n", err)
+	}
+	time.Sleep(500 * time.Millisecond)
+
+	// 4. Backup old binary
+	if _, err := os.Stat(binaryPath); err == nil {
+		if err := copyFile(binaryPath, backupPath); err != nil {
+			return fmt.Errorf("failed to backup old binary: %v", err)
+		}
+		fmt.Printf("📦 Backed up old binary to %s\n", backupPath)
+	}
+
+	// 5. Replace binary
+	if err := copyFile(extractedBinary, binaryPath); err != nil {
+		// Restore backup on failure
+		if _, statErr := os.Stat(backupPath); statErr == nil {
+			copyFile(backupPath, binaryPath)
+		}
+		m.Start()
+		return fmt.Errorf("failed to replace binary: %v", err)
+	}
+
+	if err := os.Chmod(binaryPath, 0755); err != nil {
+		// Restore backup on failure
+		if _, statErr := os.Stat(backupPath); statErr == nil {
+			copyFile(backupPath, binaryPath)
+		}
+		m.Start()
+		return fmt.Errorf("failed to chmod binary: %v", err)
+	}
+
+	// 6. Clear cached version
+	m.version = ""
+
+	// 7. Start Xray
+	fmt.Printf("🚀 Starting Xray v%s...\n", version)
+	if err := m.Start(); err != nil {
+		// Restore backup on failure
+		fmt.Printf("❌ Failed to start new version, restoring backup...\n")
+		if _, statErr := os.Stat(backupPath); statErr == nil {
+			copyFile(backupPath, binaryPath)
+			os.Chmod(binaryPath, 0755)
+		}
+		m.Start()
+		return fmt.Errorf("failed to start new version: %v", err)
+	}
+
+	fmt.Printf("✅ Xray switched to v%s successfully\n", version)
+	return nil
+}
+
+// extractXrayFromZip extracts the xray binary from a zip file
+func extractXrayFromZip(zipPath string) (string, error) {
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return "", err
+	}
+	defer r.Close()
+
+	for _, f := range r.File {
+		if f.Name == "xray" {
+			rc, err := f.Open()
+			if err != nil {
+				return "", err
+			}
+			defer rc.Close()
+
+			tmpOut, err := os.CreateTemp("", "xray-bin-*")
+			if err != nil {
+				return "", err
+			}
+
+			if _, err := io.Copy(tmpOut, rc); err != nil {
+				tmpOut.Close()
+				os.Remove(tmpOut.Name())
+				return "", err
+			}
+			tmpOut.Close()
+			return tmpOut.Name(), nil
+		}
+	}
+
+	return "", fmt.Errorf("xray binary not found in zip")
+}
+
+// copyFile copies a file from src to dst
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, in); err != nil {
+		return err
+	}
+	return out.Sync()
 }
 
 // ensureBaseConfig ensures a base Xray config file exists

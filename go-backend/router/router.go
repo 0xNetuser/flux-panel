@@ -140,6 +140,7 @@ func Setup(r *gin.Engine) {
 		auth.POST("/xray/node/stop", middleware.Admin(), handler.XrayNodeStop)
 		auth.POST("/xray/node/restart", middleware.Admin(), handler.XrayNodeRestart)
 		auth.POST("/xray/node/status", middleware.Admin(), handler.XrayNodeStatus)
+		auth.POST("/xray/node/switch-version", middleware.Admin(), handler.XrayNodeSwitchVersion)
 
 		// Xray Subscription
 		auth.POST("/xray/sub/token", handler.XraySubToken)

@@ -5,6 +5,7 @@ import (
 	"flux-panel/go-backend/dto"
 	"flux-panel/go-backend/model"
 	"flux-panel/go-backend/pkg"
+	"sort"
 	"time"
 )
 
@@ -108,41 +109,108 @@ func GetUserDashboardStats(userId int64) dto.R {
 	})
 }
 
-// getTrafficHistory returns 24h traffic data. If userId=0, aggregates all users.
+// getTrafficHistory returns 24h traffic data from statistics_forward_flow.
+// Uses cumulative snapshots with delta computation (same approach as monitor page).
+// If userId=0, aggregates all forwards; otherwise filters by user's forwards.
 func getTrafficHistory(userId int64) []map[string]interface{} {
-	var flows []struct {
-		Time string `gorm:"column:time"`
-		Flow int64  `gorm:"column:flow"`
-	}
+	cutoff := time.Now().Unix() - 25*3600 // fetch one extra hour for delta computation
 
-	query := DB.Model(&model.StatisticsFlow{}).
-		Select("time, SUM(flow) as flow").
-		Group("time").
-		Order("id DESC").
-		Limit(24)
-
+	var records []model.StatisticsForwardFlow
+	query := DB.Where("record_time >= ?", cutoff).Order("record_time ASC")
 	if userId > 0 {
-		query = query.Where("user_id = ?", userId)
+		var forwardIds []int64
+		DB.Model(&model.Forward{}).Where("user_id = ?", userId).Pluck("id", &forwardIds)
+		if len(forwardIds) == 0 {
+			return buildEmptyTrafficHistory()
+		}
+		query = query.Where("forward_id IN ?", forwardIds)
 	}
-	query.Find(&flows)
+	query.Find(&records)
 
-	// Build result with 24 hours, padding missing hours with 0
-	hourMap := make(map[string]int64)
-	for _, f := range flows {
-		hourMap[f.Time] = f.Flow
+	if len(records) == 0 {
+		return buildEmptyTrafficHistory()
 	}
 
+	// Group by (forwardId, bucket) → last snapshot
+	bucketSize := int64(3600)
+	type fwBucketKey struct {
+		ForwardId int64
+		Bucket    int64
+	}
+	fwBucketSnapshot := make(map[fwBucketKey]int64) // total flow
+	for _, r := range records {
+		key := fwBucketKey{r.ForwardId, (r.RecordTime / bucketSize) * bucketSize}
+		fwBucketSnapshot[key] = r.InFlow + r.OutFlow
+	}
+
+	// Collect unique forward IDs and sorted buckets
+	fwIds := make(map[int64]bool)
+	allBuckets := make(map[int64]bool)
+	for k := range fwBucketSnapshot {
+		fwIds[k.ForwardId] = true
+		allBuckets[k.Bucket] = true
+	}
+
+	sortedBuckets := make([]int64, 0, len(allBuckets))
+	for b := range allBuckets {
+		sortedBuckets = append(sortedBuckets, b)
+	}
+	sort.Slice(sortedBuckets, func(i, j int) bool { return sortedBuckets[i] < sortedBuckets[j] })
+
+	// Compute deltas per bucket
+	actualCutoff := time.Now().Unix() - 24*3600
+	bucketFlow := make(map[int64]int64) // bucket → total delta flow
+	for fwId := range fwIds {
+		var prev int64
+		firstSeen := false
+		for _, bt := range sortedBuckets {
+			snap, ok := fwBucketSnapshot[fwBucketKey{fwId, bt}]
+			if !ok {
+				continue
+			}
+			if !firstSeen {
+				prev = snap
+				firstSeen = true
+				continue
+			}
+			if bt < actualCutoff {
+				prev = snap
+				continue
+			}
+			delta := snap - prev
+			if delta < 0 {
+				delta = 0
+			}
+			bucketFlow[bt] += delta
+			prev = snap
+		}
+	}
+
+	// Build 24-hour result
+	result := make([]map[string]interface{}, 0, 24)
+	nowTs := time.Now().Unix()
+	for i := 23; i >= 0; i-- {
+		bt := ((nowTs - int64(i)*3600) / bucketSize) * bucketSize
+		t := time.Unix(bt, 0)
+		timeStr := fmt.Sprintf("%02d:00", t.Hour())
+		result = append(result, map[string]interface{}{
+			"time": timeStr,
+			"flow": bucketFlow[bt],
+		})
+	}
+
+	return result
+}
+
+func buildEmptyTrafficHistory() []map[string]interface{} {
 	result := make([]map[string]interface{}, 0, 24)
 	now := time.Now().Hour()
 	for i := 23; i >= 0; i-- {
 		h := (now - i + 24) % 24
-		timeStr := fmt.Sprintf("%02d:00", h)
-		flow := hourMap[timeStr]
 		result = append(result, map[string]interface{}{
-			"time": timeStr,
-			"flow": flow,
+			"time": fmt.Sprintf("%02d:00", h),
+			"flow": int64(0),
 		})
 	}
-
 	return result
 }

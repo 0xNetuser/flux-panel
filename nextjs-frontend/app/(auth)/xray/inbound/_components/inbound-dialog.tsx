@@ -8,9 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 
+import FieldTip from './field-tip';
 import ProtocolSettings, { type ProtocolForm, buildSettingsJson, parseSettingsJson } from './protocol-settings';
 import TransportSettings, { type TransportForm, buildTransportJson, parseTransportJson } from './transport-settings';
 import SecuritySettings, { type SecurityForm, buildSecurityJson, parseSecurityJson } from './security-settings';
@@ -38,7 +39,7 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
   const [transportForm, setTransportForm] = useState<TransportForm>({ network: 'tcp' });
   const [securityForm, setSecurityForm] = useState<SecurityForm>({ security: 'none' });
   const [sniffingForm, setSniffingForm] = useState<SniffingForm>({
-    enabled: true, destOverride: ['http', 'tls'], metadataOnly: false, routeOnly: false,
+    enabled: true, destOverride: ['http', 'tls', 'quic', 'fakedns'], metadataOnly: false, routeOnly: true,
   });
 
   // Advanced mode (raw JSON)
@@ -93,7 +94,7 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
       setProtocolForm({});
       setTransportForm({ network: 'tcp' });
       setSecurityForm({ security: 'none' });
-      setSniffingForm({ enabled: true, destOverride: ['http', 'tls'], metadataOnly: false, routeOnly: false });
+      setSniffingForm({ enabled: true, destOverride: ['http', 'tls', 'quic', 'fakedns'], metadataOnly: false, routeOnly: true });
       setRawSettingsJson('{}');
       setRawStreamSettingsJson('{}');
       setRawSniffingJson('{}');
@@ -197,7 +198,7 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
           {/* Basic Fields */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>节点</Label>
+              <Label className="inline-flex items-center gap-1">节点 <FieldTip content="选择要部署该入站的远程节点" /></Label>
               <Select value={nodeId} onValueChange={setNodeId}>
                 <SelectTrigger><SelectValue placeholder="选择节点" /></SelectTrigger>
                 <SelectContent>
@@ -208,7 +209,7 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>协议</Label>
+              <Label className="inline-flex items-center gap-1">协议 <FieldTip content="代理协议类型，不同协议支持的功能和安全性不同" /></Label>
               <Select value={protocol} onValueChange={v => { setProtocol(v); setProtocolForm({}); }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -223,46 +224,59 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
 
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label>Tag</Label>
+              <Label className="inline-flex items-center gap-1">Tag <FieldTip content="入站的唯一标识符，用于路由规则引用，留空自动生成" /></Label>
               <Input value={tag} onChange={e => setTag(e.target.value)} placeholder="入站标签" />
             </div>
             <div className="space-y-2">
-              <Label>端口</Label>
+              <Label className="inline-flex items-center gap-1">端口 <FieldTip content="入站监听的端口号，确保该端口未被占用" /></Label>
               <Input type="number" value={port} onChange={e => setPort(e.target.value)} placeholder={portPlaceholder} />
             </div>
             <div className="space-y-2">
-              <Label>监听地址</Label>
+              <Label className="inline-flex items-center gap-1">监听地址 <FieldTip content="监听的 IP 地址，0.0.0.0 表示监听所有网络接口" /></Label>
               <Input value={listen} onChange={e => setListen(e.target.value)} placeholder="0.0.0.0" />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label>备注</Label>
+            <Label className="inline-flex items-center gap-1">备注 <FieldTip content="用于标记该入站的说明文字，不影响实际功能" /></Label>
             <Input value={remark} onChange={e => setRemark(e.target.value)} placeholder="入站备注" />
           </div>
 
-          {/* Structured Mode */}
+          {/* Structured Mode — sequential sections (3x-ui style) */}
           {!advancedMode && (
-            <Tabs defaultValue="protocol" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="protocol">协议</TabsTrigger>
-                <TabsTrigger value="transport">传输层</TabsTrigger>
-                <TabsTrigger value="security">安全层</TabsTrigger>
-                <TabsTrigger value="sniffing">嗅探</TabsTrigger>
-              </TabsList>
-              <TabsContent value="protocol" className="mt-4">
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-medium text-muted-foreground whitespace-nowrap">协议设置</h4>
+                  <Separator className="flex-1" />
+                </div>
                 <ProtocolSettings protocol={protocol} value={protocolForm} onChange={setProtocolForm} transportNetwork={transportForm.network} securityType={securityForm.security} />
-              </TabsContent>
-              <TabsContent value="transport" className="mt-4">
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-medium text-muted-foreground whitespace-nowrap">传输层设置</h4>
+                  <Separator className="flex-1" />
+                </div>
                 <TransportSettings value={transportForm} onChange={setTransportForm} />
-              </TabsContent>
-              <TabsContent value="security" className="mt-4">
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-medium text-muted-foreground whitespace-nowrap">安全层设置</h4>
+                  <Separator className="flex-1" />
+                </div>
                 <SecuritySettings value={securityForm} onChange={setSecurityForm} />
-              </TabsContent>
-              <TabsContent value="sniffing" className="mt-4">
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-sm font-medium text-muted-foreground whitespace-nowrap">嗅探设置</h4>
+                  <Separator className="flex-1" />
+                </div>
                 <SniffingSettings value={sniffingForm} onChange={setSniffingForm} />
-              </TabsContent>
-            </Tabs>
+              </div>
+            </div>
           )}
 
           {/* Advanced Mode */}

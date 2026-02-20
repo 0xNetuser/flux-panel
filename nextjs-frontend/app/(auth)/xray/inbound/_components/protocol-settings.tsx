@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2, RefreshCw, Shuffle } from 'lucide-react';
 import { randomShadowsocksPassword } from '@/lib/utils/random';
+import FieldTip from './field-tip';
 
 // ── Types ──
 
@@ -60,7 +61,7 @@ function FallbacksEditor({ fallbacks, onChange }: { fallbacks: FallbackItem[]; o
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <Label className="text-xs font-medium">Fallbacks</Label>
+        <Label className="text-xs font-medium inline-flex items-center gap-1">Fallbacks <FieldTip content="当连接不是有效的代理请求时的回落处理，可将流量转发到其他服务" /></Label>
         <Button type="button" variant="ghost" size="sm" onClick={addFallback}>
           <Plus className="h-3 w-3 mr-1" />添加
         </Button>
@@ -132,7 +133,7 @@ export default function ProtocolSettings({ protocol, value, onChange, transportN
       return (
         <div className="space-y-3">
           <div className="space-y-2">
-            <Label>Decryption</Label>
+            <Label className="inline-flex items-center gap-1">Decryption <FieldTip content="VLESS 的加密方式，目前 Xray 仅支持 none" /></Label>
             <Input
               value={value.decryption ?? 'none'}
               onChange={e => update({ decryption: e.target.value })}
@@ -168,7 +169,7 @@ export default function ProtocolSettings({ protocol, value, onChange, transportN
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>加密方式</Label>
+              <Label className="inline-flex items-center gap-1">加密方式 <FieldTip content="Shadowsocks 使用的加密算法，2022-blake3 系列为最新的 SS2022 协议" /></Label>
               <Select value={value.method ?? 'aes-256-gcm'} onValueChange={v => update({ method: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -184,7 +185,7 @@ export default function ProtocolSettings({ protocol, value, onChange, transportN
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Network</Label>
+              <Label className="inline-flex items-center gap-1">Network <FieldTip content="Shadowsocks 允许的网络协议类型" /></Label>
               <Select value={value.network ?? 'tcp,udp'} onValueChange={v => update({ network: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -199,7 +200,7 @@ export default function ProtocolSettings({ protocol, value, onChange, transportN
           {isSS2022 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>SS2022 密码</Label>
+                <Label className="inline-flex items-center gap-1">SS2022 密码 <FieldTip content="SS2022 协议需要的预共享密钥，必须为 Base64 编码格式" /></Label>
                 <Button type="button" variant="ghost" size="sm" onClick={() => update({ password: randomShadowsocksPassword(value.method) })}>
                   <Shuffle className="h-3 w-3 mr-1" />随机生成
                 </Button>
@@ -214,7 +215,7 @@ export default function ProtocolSettings({ protocol, value, onChange, transportN
           )}
           {/* ivCheck */}
           <div className="flex items-center justify-between">
-            <Label className="text-sm">IV Check</Label>
+            <Label className="text-sm inline-flex items-center gap-1">IV Check <FieldTip content="启用后检查初始化向量，防止重放攻击，建议开启" /></Label>
             <Switch checked={value.ivCheck ?? false} onCheckedChange={v => update({ ivCheck: v })} />
           </div>
         </div>

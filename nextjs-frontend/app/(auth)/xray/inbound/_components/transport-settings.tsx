@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Plus, Trash2 } from 'lucide-react';
+import FieldTip from './field-tip';
 
 // ── Types ──
 
@@ -114,7 +115,7 @@ export default function TransportSettings({ value, onChange }: Props) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label>Network (传输协议)</Label>
+        <Label className="inline-flex items-center gap-1">Network (传输协议) <FieldTip content="底层传输协议，决定数据如何在网络上传输。不同传输方式适用于不同的网络环境" /></Label>
         <Select value={value.network} onValueChange={v => update({ network: v })}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -132,7 +133,7 @@ export default function TransportSettings({ value, onChange }: Props) {
       {value.network === 'tcp' && (
         <div className="space-y-3 pl-2 border-l-2 border-muted">
           <div className="space-y-2">
-            <Label className="text-xs">Header Type</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Header Type <FieldTip content="TCP 数据包伪装类型，http 模式可伪装为 HTTP 流量" /></Label>
             <Select value={value.tcpHeaderType ?? 'none'} onValueChange={v => update({ tcpHeaderType: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -144,17 +145,17 @@ export default function TransportSettings({ value, onChange }: Props) {
           {value.tcpHeaderType === 'http' && (
             <>
               <div className="space-y-2">
-                <Label className="text-xs">HTTP Path</Label>
+                <Label className="text-xs inline-flex items-center gap-1">HTTP Path <FieldTip content="HTTP 伪装的请求路径" /></Label>
                 <Input value={value.tcpHttpPath ?? '/'} onChange={e => update({ tcpHttpPath: e.target.value })} placeholder="/" className="text-sm" />
               </div>
               <div className="space-y-2">
-                <Label className="text-xs">HTTP Host</Label>
+                <Label className="text-xs inline-flex items-center gap-1">HTTP Host <FieldTip content="HTTP 伪装的 Host 头域名" /></Label>
                 <Input value={value.tcpHttpHost ?? ''} onChange={e => update({ tcpHttpHost: e.target.value })} placeholder="example.com" className="text-sm" />
               </div>
             </>
           )}
           <div className="flex items-center justify-between">
-            <Label className="text-xs">Accept Proxy Protocol</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Accept Proxy Protocol <FieldTip content="是否接受 PROXY protocol，用于传递客户端真实 IP，通常配合负载均衡使用" /></Label>
             <Switch checked={value.acceptProxyProtocol ?? false} onCheckedChange={v => update({ acceptProxyProtocol: v })} />
           </div>
         </div>
@@ -164,16 +165,16 @@ export default function TransportSettings({ value, onChange }: Props) {
       {value.network === 'ws' && (
         <div className="space-y-3 pl-2 border-l-2 border-muted">
           <div className="space-y-2">
-            <Label className="text-xs">Path</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Path <FieldTip content="WebSocket 握手的 HTTP 路径，需与客户端一致" /></Label>
             <Input value={value.wsPath ?? '/'} onChange={e => update({ wsPath: e.target.value })} placeholder="/" className="text-sm" />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs">Host</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Host <FieldTip content="WebSocket 握手时使用的 Host 头，通常为域名" /></Label>
             <Input value={value.wsHost ?? ''} onChange={e => update({ wsHost: e.target.value })} placeholder="example.com" className="text-sm" />
           </div>
           <HeadersEditor headers={value.wsHeaders ?? {}} onChange={h => update({ wsHeaders: h })} />
           <div className="space-y-2">
-            <Label className="text-xs">Heartbeat Period (秒)</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Heartbeat Period (秒) <FieldTip content="WebSocket 心跳间隔，0 表示禁用。可用于保持长连接不被中间设备断开" /></Label>
             <Input
               type="number"
               value={value.wsHeartbeatPeriod ?? 0}
@@ -183,7 +184,7 @@ export default function TransportSettings({ value, onChange }: Props) {
             />
           </div>
           <div className="flex items-center justify-between">
-            <Label className="text-xs">Accept Proxy Protocol</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Accept Proxy Protocol <FieldTip content="是否接受 PROXY protocol，用于传递客户端真实 IP" /></Label>
             <Switch checked={value.acceptProxyProtocol ?? false} onCheckedChange={v => update({ acceptProxyProtocol: v })} />
           </div>
         </div>
@@ -193,15 +194,15 @@ export default function TransportSettings({ value, onChange }: Props) {
       {value.network === 'grpc' && (
         <div className="space-y-3 pl-2 border-l-2 border-muted">
           <div className="space-y-2">
-            <Label className="text-xs">Service Name</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Service Name <FieldTip content="gRPC 服务名称，等效于 HTTP/2 中的 Path，需与客户端一致" /></Label>
             <Input value={value.grpcServiceName ?? ''} onChange={e => update({ grpcServiceName: e.target.value })} placeholder="GunService" className="text-sm" />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs">Authority</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Authority <FieldTip content="gRPC 的 authority 字段，通常留空即可" /></Label>
             <Input value={value.grpcAuthority ?? ''} onChange={e => update({ grpcAuthority: e.target.value })} placeholder="" className="text-sm" />
           </div>
           <div className="flex items-center justify-between">
-            <Label className="text-xs">Multi Mode</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Multi Mode <FieldTip content="启用 gRPC multi 模式，可提高传输性能" /></Label>
             <Switch checked={value.grpcMultiMode ?? false} onCheckedChange={v => update({ grpcMultiMode: v })} />
           </div>
         </div>
@@ -211,16 +212,16 @@ export default function TransportSettings({ value, onChange }: Props) {
       {value.network === 'httpupgrade' && (
         <div className="space-y-3 pl-2 border-l-2 border-muted">
           <div className="space-y-2">
-            <Label className="text-xs">Path</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Path <FieldTip content="HTTPUpgrade 的请求路径，需与客户端一致" /></Label>
             <Input value={value.httpupgradePath ?? '/'} onChange={e => update({ httpupgradePath: e.target.value })} placeholder="/" className="text-sm" />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs">Host</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Host <FieldTip content="HTTPUpgrade 请求使用的 Host 头" /></Label>
             <Input value={value.httpupgradeHost ?? ''} onChange={e => update({ httpupgradeHost: e.target.value })} placeholder="example.com" className="text-sm" />
           </div>
           <HeadersEditor headers={value.httpupgradeHeaders ?? {}} onChange={h => update({ httpupgradeHeaders: h })} />
           <div className="flex items-center justify-between">
-            <Label className="text-xs">Accept Proxy Protocol</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Accept Proxy Protocol <FieldTip content="是否接受 PROXY protocol，用于传递客户端真实 IP" /></Label>
             <Switch checked={value.acceptProxyProtocol ?? false} onCheckedChange={v => update({ acceptProxyProtocol: v })} />
           </div>
         </div>
@@ -230,16 +231,16 @@ export default function TransportSettings({ value, onChange }: Props) {
       {value.network === 'xhttp' && (
         <div className="space-y-3 pl-2 border-l-2 border-muted">
           <div className="space-y-2">
-            <Label className="text-xs">Path</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Path <FieldTip content="xHTTP 的请求路径，需与客户端一致" /></Label>
             <Input value={value.xhttpPath ?? '/'} onChange={e => update({ xhttpPath: e.target.value })} placeholder="/" className="text-sm" />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs">Host</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Host <FieldTip content="xHTTP 请求使用的 Host 头" /></Label>
             <Input value={value.xhttpHost ?? ''} onChange={e => update({ xhttpHost: e.target.value })} placeholder="example.com" className="text-sm" />
           </div>
           <HeadersEditor headers={value.xhttpHeaders ?? {}} onChange={h => update({ xhttpHeaders: h })} />
           <div className="space-y-2">
-            <Label className="text-xs">Mode</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Mode <FieldTip content="xHTTP 传输模式。auto 自动选择，packet-up 使用多个短请求上传，stream-up 使用单个流式请求上传" /></Label>
             <Select value={value.xhttpMode ?? 'auto'} onValueChange={v => update({ xhttpMode: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -251,7 +252,7 @@ export default function TransportSettings({ value, onChange }: Props) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label className="text-xs">Extra (高级 JSON)</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Extra (高级 JSON) <FieldTip content="xHTTP 的高级配置，如 scMaxBufferedPosts、scMaxEachPostBytes、xPaddingBytes 等" /></Label>
             <textarea
               className="w-full rounded-md border bg-background px-3 py-2 text-xs font-mono min-h-[80px] resize-y"
               value={value.xhttpExtra ?? '{}'}
@@ -270,36 +271,36 @@ export default function TransportSettings({ value, onChange }: Props) {
         <div className="space-y-3 pl-2 border-l-2 border-muted">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label className="text-xs">MTU</Label>
+              <Label className="text-xs inline-flex items-center gap-1">MTU <FieldTip content="最大传输单元，建议值 576 ~ 1460，默认 1350" /></Label>
               <Input type="number" value={value.kcpMtu ?? 1350} onChange={e => update({ kcpMtu: parseInt(e.target.value) || 1350 })} className="text-sm" />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs">TTI</Label>
+              <Label className="text-xs inline-flex items-center gap-1">TTI <FieldTip content="传输时间间隔(毫秒)，mKCP 将以此频率发送数据，值越小延迟越低但越耗带宽，建议 10 ~ 100" /></Label>
               <Input type="number" value={value.kcpTti ?? 50} onChange={e => update({ kcpTti: parseInt(e.target.value) || 50 })} className="text-sm" />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs">Uplink Capacity</Label>
+              <Label className="text-xs inline-flex items-center gap-1">Uplink Capacity <FieldTip content="上行链路带宽容量 (MB/s)，用于限制上传速度" /></Label>
               <Input type="number" value={value.kcpUplinkCapacity ?? 5} onChange={e => update({ kcpUplinkCapacity: parseInt(e.target.value) || 5 })} className="text-sm" />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs">Downlink Capacity</Label>
+              <Label className="text-xs inline-flex items-center gap-1">Downlink Capacity <FieldTip content="下行链路带宽容量 (MB/s)，用于限制下载速度" /></Label>
               <Input type="number" value={value.kcpDownlinkCapacity ?? 20} onChange={e => update({ kcpDownlinkCapacity: parseInt(e.target.value) || 20 })} className="text-sm" />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs">Read Buffer Size</Label>
+              <Label className="text-xs inline-flex items-center gap-1">Read Buffer Size <FieldTip content="单个连接的读取缓冲区大小 (MB)" /></Label>
               <Input type="number" value={value.kcpReadBufferSize ?? 2} onChange={e => update({ kcpReadBufferSize: parseInt(e.target.value) || 2 })} className="text-sm" />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs">Write Buffer Size</Label>
+              <Label className="text-xs inline-flex items-center gap-1">Write Buffer Size <FieldTip content="单个连接的写入缓冲区大小 (MB)" /></Label>
               <Input type="number" value={value.kcpWriteBufferSize ?? 2} onChange={e => update({ kcpWriteBufferSize: parseInt(e.target.value) || 2 })} className="text-sm" />
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="text-xs">Seed (混淆密码)</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Seed (混淆密码) <FieldTip content="mKCP 混淆密码，可抵抗部分流量特征检测，留空不使用" /></Label>
             <Input value={value.kcpSeed ?? ''} onChange={e => update({ kcpSeed: e.target.value })} placeholder="可选" className="text-sm" />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs">Header Type (伪装)</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Header Type (伪装) <FieldTip content="mKCP 数据包头部伪装类型，可模拟不同协议的流量特征" /></Label>
             <Select value={value.kcpHeaderType ?? 'none'} onValueChange={v => update({ kcpHeaderType: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -314,7 +315,7 @@ export default function TransportSettings({ value, onChange }: Props) {
             </Select>
           </div>
           <div className="flex items-center justify-between">
-            <Label className="text-xs">Congestion</Label>
+            <Label className="text-xs inline-flex items-center gap-1">Congestion <FieldTip content="启用拥塞控制，当网络拥堵时自动降速" /></Label>
             <Switch checked={value.kcpCongestion ?? false} onCheckedChange={v => update({ kcpCongestion: v })} />
           </div>
         </div>

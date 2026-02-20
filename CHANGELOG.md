@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.8.4 — 入站表单 UI 优化
+
+### Features
+
+- **3x-ui 风格表单**：入站配置表单从 Tab 切换改为单页顺序排列，所有设置区域从上到下依次排列，无需切换标签页
+- **配置项提示**：每个配置字段旁增加 Tip 图标，鼠标悬浮显示该配置的中文说明
+- **嗅探默认值对齐 3x-ui**：destOverride 默认包含 http/tls/quic/fakedns，routeOnly 默认开启
+
 ## v1.8.3 — 前端修复
 
 ### Fixes

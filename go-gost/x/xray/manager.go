@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -139,7 +140,7 @@ func (m *XrayManager) IsRunning() bool {
 	return m.running
 }
 
-// GetVersion returns the Xray version
+// GetVersion returns the Xray version number (e.g. "25.1.30")
 func (m *XrayManager) GetVersion() string {
 	if m.version != "" {
 		return m.version
@@ -151,7 +152,15 @@ func (m *XrayManager) GetVersion() string {
 		return "unknown"
 	}
 
-	m.version = string(output)
+	// Parse version from output like "Xray 25.1.30 (Xray, ...) ..."
+	// Extract just the version number from the first line
+	firstLine := strings.SplitN(string(output), "\n", 2)[0]
+	fields := strings.Fields(firstLine)
+	if len(fields) >= 2 {
+		m.version = fields[1]
+	} else {
+		m.version = strings.TrimSpace(firstLine)
+	}
 	return m.version
 }
 

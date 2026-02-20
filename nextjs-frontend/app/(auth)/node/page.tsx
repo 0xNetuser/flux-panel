@@ -137,7 +137,7 @@ export default function NodePage() {
 
   const handleXrayVersionSwitch = (node: any) => {
     setXrayVersionNode(node);
-    setXrayTargetVersion('');
+    setXrayTargetVersion(node.xrayVersion && node.xrayVersion !== 'unknown' ? node.xrayVersion : '');
     setXrayVersionDialog(true);
   };
 
@@ -358,7 +358,7 @@ export default function NodePage() {
               <Input
                 value={xrayTargetVersion}
                 onChange={e => setXrayTargetVersion(e.target.value)}
-                placeholder="例如: 24.12.18"
+                placeholder="例如: 25.1.30"
               />
               <p className="text-xs text-muted-foreground">输入 Xray-core GitHub Release 版本号（不带 v 前缀）</p>
             </div>

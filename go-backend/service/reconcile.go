@@ -6,6 +6,7 @@ import (
 	"flux-panel/go-backend/model"
 	"flux-panel/go-backend/pkg"
 	"log"
+	"strings"
 	"sync"
 	"time"
 )
@@ -118,6 +119,13 @@ func reconcileForwards(nodeId int64, result *ReconcileResult) {
 		}
 
 		for _, fwd := range forwards {
+			// Override tunnel listen address if forward has custom listenIp
+			fwdTunnel := tunnel
+			if fwd.ListenIp != "" {
+				fwdTunnel.TcpListenAddr = fwd.ListenIp
+				fwdTunnel.UdpListenAddr = fwd.ListenIp
+			}
+
 			userTunnel := getUserTunnel(fwd.UserId, fwd.TunnelId)
 			serviceName := buildServiceName(fwd.ID, fwd.UserId, userTunnel)
 
@@ -128,7 +136,7 @@ func reconcileForwards(nodeId int64, result *ReconcileResult) {
 				limiter = &v
 			}
 
-			errStr := updateGostServices(&fwd, &tunnel, limiter, inNode, outNode, serviceName)
+			errStr := updateGostServices(&fwd, &fwdTunnel, limiter, inNode, outNode, serviceName)
 			if errStr != "" {
 				result.Errors = append(result.Errors, fmt.Sprintf("转发 %d: %s", fwd.ID, errStr))
 			}
@@ -137,7 +145,11 @@ func reconcileForwards(nodeId int64, result *ReconcileResult) {
 			// If forward is paused, ensure it stays paused on this node
 			if fwd.Status == forwardStatusPaused {
 				if tunnel.InNodeId == nodeId {
-					pkg.PauseService(nodeId, serviceName)
+					if fwd.ListenIp != "" && strings.Contains(fwd.ListenIp, ",") {
+						pkg.PauseServiceMultiIP(nodeId, serviceName, fwd.ListenIp)
+					} else {
+						pkg.PauseService(nodeId, serviceName)
+					}
 				}
 				if tunnel.Type == tunnelTypeTunnelForward && tunnel.OutNodeId == nodeId && outNode != nil {
 					pkg.PauseRemoteService(nodeId, serviceName)

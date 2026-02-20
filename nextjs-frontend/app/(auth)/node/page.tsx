@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Plus, Trash2, Edit2, Terminal, Container, Copy, Eye, EyeOff, RefreshCw, ArrowUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { getNodeList, createNode, updateNode, deleteNode, getNodeInstallCommand, getNodeDockerCommand, reconcileNode } from '@/lib/api/node';
@@ -33,7 +34,7 @@ export default function NodePage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingNode, setEditingNode] = useState<any>(null);
-  const [form, setForm] = useState({ name: '', ip: '', serverIp: '', portSta: '', portEnd: '', secret: '' });
+  const [form, setForm] = useState({ name: '', entryIps: '', serverIp: '', portSta: '', portEnd: '', secret: '' });
   const [commandDialog, setCommandDialog] = useState(false);
   const [commandContent, setCommandContent] = useState('');
   const [commandTitle, setCommandTitle] = useState('');
@@ -61,7 +62,7 @@ export default function NodePage() {
 
   const handleCreate = () => {
     setEditingNode(null);
-    setForm({ name: '', ip: '', serverIp: '', portSta: '', portEnd: '', secret: '' });
+    setForm({ name: '', entryIps: '', serverIp: '', portSta: '', portEnd: '', secret: '' });
     setShowSecret(false);
     setDialogOpen(true);
   };
@@ -70,7 +71,7 @@ export default function NodePage() {
     setEditingNode(node);
     setForm({
       name: node.name || '',
-      ip: node.ip || '',
+      entryIps: node.entryIps || '',
       serverIp: node.serverIp || '',
       portSta: node.portSta?.toString() || '',
       portEnd: node.portEnd?.toString() || '',
@@ -87,7 +88,7 @@ export default function NodePage() {
     }
     const data: any = {
       name: form.name,
-      ip: form.ip || undefined,
+      entryIps: form.entryIps || '',
       serverIp: form.serverIp,
       secret: form.secret || undefined,
     };
@@ -260,7 +261,7 @@ export default function NodePage() {
                 nodes.map((n) => (
                   <TableRow key={n.id}>
                     <TableCell className="font-medium">{n.name}</TableCell>
-                    <TableCell className="text-sm">{n.ip || '-'}</TableCell>
+                    <TableCell className="text-sm">{n.entryIps ? n.entryIps.split(',').join(' / ') : (n.ip || '-')}</TableCell>
                     <TableCell className="text-sm">{n.serverIp}</TableCell>
                     <TableCell>{n.portSta} - {n.portEnd}</TableCell>
                     <TableCell>
@@ -319,15 +320,20 @@ export default function NodePage() {
               <Label>名称</Label>
               <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="节点名称" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>入口IP</Label>
-                <Input value={form.ip} onChange={e => setForm(p => ({ ...p, ip: e.target.value }))} placeholder="用户连接的IP" />
-              </div>
-              <div className="space-y-2">
-                <Label>服务器IP</Label>
-                <Input value={form.serverIp} onChange={e => setForm(p => ({ ...p, serverIp: e.target.value }))} placeholder="节点通信IP" />
-              </div>
+            <div className="space-y-2">
+              <Label>入口IP列表</Label>
+              <Textarea
+                value={form.entryIps}
+                onChange={e => setForm(p => ({ ...p, entryIps: e.target.value }))}
+                placeholder={"多个IP用逗号分隔，例如:\n1.2.3.4,5.6.7.8,2001:db8::1"}
+                rows={2}
+                className="font-mono text-sm"
+              />
+              <p className="text-xs text-muted-foreground">面向用户展示的入口IP，用逗号分隔</p>
+            </div>
+            <div className="space-y-2">
+              <Label>服务器IP</Label>
+              <Input value={form.serverIp} onChange={e => setForm(p => ({ ...p, serverIp: e.target.value }))} placeholder="面板与节点通信的IP" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

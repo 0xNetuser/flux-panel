@@ -235,7 +235,41 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
             </div>
             <div className="space-y-2">
               <Label className="inline-flex items-center gap-1">监听地址 <FieldTip content="监听的 IP 地址，:: 表示同时监听 IPv4 和 IPv6，0.0.0.0 仅监听 IPv4" /></Label>
-              <Input value={listen} onChange={e => setListen(e.target.value)} placeholder="::" />
+              {(() => {
+                const selectedNode = nodes.find((n: any) => n.id?.toString() === nodeId);
+                const ifaces: { name: string; ips: string[] }[] = selectedNode?.interfaces || [];
+                const allIps = ifaces.flatMap((iface: any) => iface.ips || []);
+                const knownValues = ['::', '0.0.0.0', ...allIps];
+                const isCustom = listen && !knownValues.includes(listen);
+                return (
+                  <>
+                    <Select value={isCustom ? '__custom__' : listen} onValueChange={v => {
+                      if (v === '__custom__') {
+                        setListen(listen || '');
+                      } else {
+                        setListen(v);
+                      }
+                    }}>
+                      <SelectTrigger><SelectValue placeholder="选择监听地址" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="::">全部接口 (::)</SelectItem>
+                        <SelectItem value="0.0.0.0">仅IPv4 (0.0.0.0)</SelectItem>
+                        {ifaces.map((iface: any) =>
+                          (iface.ips || []).map((ip: string) => (
+                            <SelectItem key={`${iface.name}-${ip}`} value={ip}>
+                              {iface.name} — {ip}
+                            </SelectItem>
+                          ))
+                        )}
+                        <SelectItem value="__custom__">自定义...</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {isCustom && (
+                      <Input value={listen} onChange={e => setListen(e.target.value)} placeholder="自定义监听地址" className="mt-1" />
+                    )}
+                  </>
+                );
+              })()}
             </div>
           </div>
 

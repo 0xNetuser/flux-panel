@@ -25,15 +25,22 @@ import (
 	"os"
 )
 
+// NetInterface 网卡信息
+type NetInterface struct {
+	Name string   `json:"name"` // 网卡名称，如 eth0
+	IPs  []string `json:"ips"`  // 绑定的IP地址列表
+}
+
 // SystemInfo 系统信息结构体
 type SystemInfo struct {
-	Uptime           uint64  `json:"uptime"`            // 开机时间	（秒）
-	BytesReceived    uint64  `json:"bytes_received"`    // 接收字节数
-	BytesTransmitted uint64  `json:"bytes_transmitted"` // 发送字节数
-	CPUUsage         float64 `json:"cpu_usage"`         // CPU使用率（百分比）
-	MemoryUsage      float64 `json:"memory_usage"`      // 内存使用率（百分比）
-	XrayRunning      bool    `json:"xray_running"`      // Xray 是否运行
-	XrayVersion      string  `json:"xray_version"`      // Xray 版本号
+	Uptime           uint64         `json:"uptime"`            // 开机时间	（秒）
+	BytesReceived    uint64         `json:"bytes_received"`    // 接收字节数
+	BytesTransmitted uint64         `json:"bytes_transmitted"` // 发送字节数
+	CPUUsage         float64        `json:"cpu_usage"`         // CPU使用率（百分比）
+	MemoryUsage      float64        `json:"memory_usage"`      // 内存使用率（百分比）
+	XrayRunning      bool           `json:"xray_running"`      // Xray 是否运行
+	XrayVersion      string         `json:"xray_version"`      // Xray 版本号
+	Interfaces       []NetInterface `json:"interfaces"`        // 网卡列表
 }
 
 // NetworkStats 网络统计信息
@@ -316,6 +323,7 @@ func (w *WebSocketReporter) collectSystemInfo() SystemInfo {
 		BytesTransmitted: networkStats.BytesTransmitted,
 		CPUUsage:         cpuInfo.Usage,
 		MemoryUsage:      memoryInfo.Usage,
+		Interfaces:       getInterfaces(),
 	}
 
 	// Attach Xray status if manager is available
@@ -1304,6 +1312,64 @@ func getCPUInfo() CPUInfo {
 	}
 
 	return cpuInfo
+}
+
+// isVirtualInterface 检查是否为 Docker/K8s 等虚拟网卡
+func isVirtualInterface(name string) bool {
+	// Docker
+	if name == "docker0" || strings.HasPrefix(name, "veth") || strings.HasPrefix(name, "br-") {
+		return true
+	}
+	// Kubernetes / CNI
+	if strings.HasPrefix(name, "cni") || strings.HasPrefix(name, "flannel") ||
+		strings.HasPrefix(name, "kube-") || strings.HasPrefix(name, "cali") {
+		return true
+	}
+	// Libvirt
+	if strings.HasPrefix(name, "virbr") {
+		return true
+	}
+	return false
+}
+
+// getInterfaces 获取网卡列表（排除回环、虚拟网卡和无IP的接口）
+func getInterfaces() []NetInterface {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil
+	}
+	var result []NetInterface
+	for _, iface := range ifaces {
+		// 跳过回环接口和未启用的接口
+		if iface.Flags&net.FlagLoopback != 0 || iface.Flags&net.FlagUp == 0 {
+			continue
+		}
+		// 跳过 Docker/K8s 等虚拟网卡
+		if isVirtualInterface(iface.Name) {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil || len(addrs) == 0 {
+			continue
+		}
+		var ips []string
+		for _, addr := range addrs {
+			// addr is like "192.168.1.1/24" or "fe80::1/64"
+			ip, _, err := net.ParseCIDR(addr.String())
+			if err != nil {
+				continue
+			}
+			// 跳过链路本地地址
+			if ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+				continue
+			}
+			ips = append(ips, ip.String())
+		}
+		if len(ips) > 0 {
+			result = append(result, NetInterface{Name: iface.Name, IPs: ips})
+		}
+	}
+	return result
 }
 
 // getMemoryInfo 获取内存信息

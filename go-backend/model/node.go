@@ -5,6 +5,7 @@ type Node struct {
 	Name        string `gorm:"column:name" json:"name"`
 	Secret      string `gorm:"column:secret" json:"secret"`
 	Ip          string `gorm:"column:ip" json:"ip"`
+	EntryIps    string `gorm:"column:entry_ips" json:"entryIps"`
 	ServerIp    string `gorm:"column:server_ip" json:"serverIp"`
 	PortSta     int    `gorm:"column:port_sta" json:"portSta"`
 	PortEnd     int    `gorm:"column:port_end" json:"portEnd"`

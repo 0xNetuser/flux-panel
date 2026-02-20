@@ -17,6 +17,7 @@ func CreateNode(d dto.NodeDto) dto.R {
 	node := model.Node{
 		Name:        d.Name,
 		Ip:          d.Ip,
+		EntryIps:    d.EntryIps,
 		ServerIp:    d.ServerIp,
 		PortSta:     d.PortSta,
 		PortEnd:     d.PortEnd,
@@ -47,6 +48,7 @@ func GetAllNodes() dto.R {
 			"id":          n.ID,
 			"name":        n.Name,
 			"ip":          n.Ip,
+			"entryIps":    n.EntryIps,
 			"serverIp":    n.ServerIp,
 			"portSta":     n.PortSta,
 			"portEnd":     n.PortEnd,
@@ -71,6 +73,7 @@ func GetAllNodes() dto.R {
 				item["uptime"] = info.Uptime
 				item["bytesReceived"] = info.BytesReceived
 				item["bytesTransmitted"] = info.BytesTransmitted
+				item["interfaces"] = info.Interfaces
 				if info.XrayVersion != "" {
 					item["xrayVersion"] = info.XrayVersion
 				}
@@ -99,6 +102,8 @@ func UpdateNode(d dto.NodeUpdateDto) dto.R {
 	if d.Ip != "" {
 		updates["ip"] = d.Ip
 	}
+	// EntryIps can be set to empty string to clear, so always update if present in request
+	updates["entry_ips"] = d.EntryIps
 	if d.ServerIp != "" {
 		oldServerIp := node.ServerIp
 		updates["server_ip"] = d.ServerIp
@@ -163,11 +168,18 @@ func GetUserAccessibleNodes(userId int64, roleId int) dto.R {
 		if pkg.WS != nil && pkg.WS.IsNodeOnline(n.ID) {
 			status = 1
 		}
-		result = append(result, map[string]interface{}{
-			"id":     n.ID,
-			"name":   n.Name,
-			"status": status,
-		})
+		item := map[string]interface{}{
+			"id":       n.ID,
+			"name":     n.Name,
+			"entryIps": n.EntryIps,
+			"status":   status,
+		}
+		if pkg.WS != nil {
+			if info := pkg.WS.GetNodeSystemInfo(n.ID); info != nil {
+				item["interfaces"] = info.Interfaces
+			}
+		}
+		result = append(result, item)
 	}
 	return dto.Ok(result)
 }

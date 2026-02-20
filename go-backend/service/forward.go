@@ -314,18 +314,24 @@ func UpdateForward(d dto.ForwardUpdateDto, userId int64, roleId int) dto.R {
 		limiterInt = &v
 	}
 
-	if tunnelChanged {
-		// Tunnel changed: delete old config, create new
+	listenIpChanged := existForward.ListenIp != updatedForward.ListenIp
+
+	if tunnelChanged || listenIpChanged {
+		// Tunnel or listenIp changed: delete old config, create new
 		var oldTunnel model.Tunnel
-		if err := DB.First(&oldTunnel, existForward.TunnelId).Error; err != nil {
-			return dto.Err("原隧道不存在，无法删除旧配置")
+		if tunnelChanged {
+			if err := DB.First(&oldTunnel, existForward.TunnelId).Error; err != nil {
+				return dto.Err("原隧道不存在，无法删除旧配置")
+			}
+		} else {
+			oldTunnel = tunnel
 		}
 		deleteOldGostServices(existForward, &oldTunnel)
 
 		gostErr := createGostServices(&updatedForward, &tunnel, limiter, inNode, outNode, serviceName)
 		if gostErr != "" {
 			updateForwardStatusToError(updatedForward.ID)
-			return dto.Err("创建新隧道配置失败: " + gostErr)
+			return dto.Err("创建新配置失败: " + gostErr)
 		}
 	} else {
 		// Tunnel unchanged: direct update
@@ -387,7 +393,7 @@ func DeleteForward(id int64, userId int64, roleId int) dto.R {
 
 	// 5. Delete GOST services
 	serviceName := buildServiceName(forward.ID, forward.UserId, userTunnel)
-	gostErr := deleteGostServices(&tunnel, inNode, outNode, serviceName)
+	gostErr := deleteGostServicesWithIP(&tunnel, inNode, outNode, serviceName, forward.ListenIp)
 	if gostErr != "" {
 		return dto.Err(gostErr)
 	}
@@ -443,7 +449,12 @@ func PauseForward(id int64, userId int64, roleId int) dto.R {
 
 	// 6. Pause GOST services
 	serviceName := buildServiceName(forward.ID, forward.UserId, userTunnel)
-	result := pkg.PauseService(inNode.ID, serviceName)
+	var result *dto.GostResponse
+	if forward.ListenIp != "" && strings.Contains(forward.ListenIp, ",") {
+		result = pkg.PauseServiceMultiIP(inNode.ID, serviceName, forward.ListenIp)
+	} else {
+		result = pkg.PauseService(inNode.ID, serviceName)
+	}
 	if !isGostSuccess(result) {
 		return dto.Err("暂停服务失败：" + result.Msg)
 	}
@@ -520,7 +531,12 @@ func ResumeForward(id int64, userId int64, roleId int) dto.R {
 
 	// 6. Resume GOST services
 	serviceName := buildServiceName(forward.ID, forward.UserId, userTunnel)
-	result := pkg.ResumeService(inNode.ID, serviceName)
+	var result *dto.GostResponse
+	if forward.ListenIp != "" && strings.Contains(forward.ListenIp, ",") {
+		result = pkg.ResumeServiceMultiIP(inNode.ID, serviceName, forward.ListenIp)
+	} else {
+		result = pkg.ResumeService(inNode.ID, serviceName)
+	}
 	if !isGostSuccess(result) {
 		return dto.Err("恢复服务失败：" + result.Msg)
 	}
@@ -1024,8 +1040,17 @@ func updateGostServices(forward *model.Forward, tunnel *model.Tunnel, limiter *i
 }
 
 func deleteGostServices(tunnel *model.Tunnel, inNode *model.Node, outNode *model.Node, serviceName string) string {
+	return deleteGostServicesWithIP(tunnel, inNode, outNode, serviceName, "")
+}
+
+func deleteGostServicesWithIP(tunnel *model.Tunnel, inNode *model.Node, outNode *model.Node, serviceName string, listenIp string) string {
 	// Delete main service (ignore "not found" — already gone)
-	serviceResult := pkg.DeleteService(inNode.ID, serviceName)
+	var serviceResult *dto.GostResponse
+	if listenIp != "" && strings.Contains(listenIp, ",") {
+		serviceResult = pkg.DeleteServiceMultiIP(inNode.ID, serviceName, listenIp)
+	} else {
+		serviceResult = pkg.DeleteService(inNode.ID, serviceName)
+	}
 	if !isGostSuccess(serviceResult) && !strings.Contains(serviceResult.Msg, gostNotFoundMsg) {
 		return serviceResult.Msg
 	}
@@ -1055,7 +1080,12 @@ func deleteOldGostServices(forward *model.Forward, oldTunnel *model.Tunnel) {
 
 	// Delete main service
 	if nodeErr == "" && oldInNode != nil {
-		result := pkg.DeleteService(oldInNode.ID, serviceName)
+		var result *dto.GostResponse
+		if forward.ListenIp != "" && strings.Contains(forward.ListenIp, ",") {
+			result = pkg.DeleteServiceMultiIP(oldInNode.ID, serviceName, forward.ListenIp)
+		} else {
+			result = pkg.DeleteService(oldInNode.ID, serviceName)
+		}
 		if !isGostSuccess(result) {
 			log.Printf("删除主服务失败: %s", result.Msg)
 		}

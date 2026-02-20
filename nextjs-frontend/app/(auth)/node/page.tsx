@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, Edit2, Terminal, Container, Copy, Eye, EyeOff, RefreshCw, ArrowUpDown } from 'lucide-react';
+import { Plus, Trash2, Edit2, Terminal, Container, Copy, Eye, EyeOff, RefreshCw, ArrowUpDown, Network } from 'lucide-react';
 import { toast } from 'sonner';
 import { getNodeList, createNode, updateNode, deleteNode, getNodeInstallCommand, getNodeDockerCommand, reconcileNode } from '@/lib/api/node';
 import { switchXrayVersion, getXrayVersions } from '@/lib/api/xray-node';
@@ -140,6 +140,7 @@ export default function NodePage() {
     }
   };
 
+  const [ifaceNode, setIfaceNode] = useState<any>(null);
   const [reconcilingId, setReconcilingId] = useState<number | null>(null);
   const [xrayVersionDialog, setXrayVersionDialog] = useState(false);
   const [xrayVersionNode, setXrayVersionNode] = useState<any>(null);
@@ -284,6 +285,9 @@ export default function NodePage() {
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(n)} title="编辑">
                           <Edit2 className="h-4 w-4" />
                         </Button>
+                        <Button variant="ghost" size="icon" onClick={() => setIfaceNode(n)} title="网卡信息" disabled={!n.interfaces?.length}>
+                          <Network className="h-4 w-4" />
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleXrayVersionSwitch(n)} title="Xray 版本切换">
                           <ArrowUpDown className="h-4 w-4" />
                         </Button>
@@ -423,6 +427,34 @@ export default function NodePage() {
             <Button onClick={handleXrayVersionSubmit} disabled={xraySwitching}>
               {xraySwitching ? '切换中...' : '切换'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* NIC Info Dialog */}
+      <Dialog open={!!ifaceNode} onOpenChange={() => setIfaceNode(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>网卡信息 — {ifaceNode?.name}</DialogTitle>
+          </DialogHeader>
+          {ifaceNode?.interfaces?.length ? (
+            <div className="space-y-3">
+              {ifaceNode.interfaces.map((iface: any) => (
+                <div key={iface.name} className="rounded border p-3">
+                  <div className="text-sm font-medium">{iface.name}</div>
+                  <div className="mt-1 space-y-0.5">
+                    {(iface.ips || []).map((ip: string) => (
+                      <div key={ip} className="text-sm text-muted-foreground font-mono">{ip}</div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">节点离线或无网卡数据</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIfaceNode(null)}>关闭</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

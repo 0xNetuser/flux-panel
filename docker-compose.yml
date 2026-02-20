@@ -25,14 +25,14 @@ services:
       retries: 10
 
   gost-binary-init:
-    image: 0xnetuser/gost-binary:1.6.6
+    image: 0xnetuser/gost-binary:1.7.0
     container_name: gost-binary-init
     volumes:
       - node_binary:/data/node
     restart: "no"
 
   backend:
-    image: 0xnetuser/go-backend:1.6.6
+    image: 0xnetuser/go-backend:1.7.0
     container_name: go-backend
     restart: unless-stopped
     environment:
@@ -63,7 +63,7 @@ services:
       start_period: 10s
 
   frontend:
-    image: 0xnetuser/nextjs-frontend:1.6.6
+    image: 0xnetuser/nextjs-frontend:1.7.0
     container_name: nextjs-frontend
     restart: unless-stopped
     ports:

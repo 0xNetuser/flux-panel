@@ -37,6 +37,8 @@ export default function XrayInboundPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingInbound, setEditingInbound] = useState<any>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [operatingIds, setOperatingIds] = useState<Set<number>>(new Set());
 
   // Client inline management
   const [expandedInbound, setExpandedInbound] = useState<number | null>(null);
@@ -150,51 +152,60 @@ export default function XrayInboundPage() {
   };
 
   const handleSubmit = async (data: any) => {
-    let res;
-    if (data.id) {
-      res = await updateXrayInbound(data);
-    } else {
-      res = await createXrayInbound(data);
-    }
-
-    if (res.code === 0) {
-      toast.success(data.id ? '更新成功' : '创建成功');
-      if (res.msg && res.msg !== '操作成功') {
-        toast.warning(res.msg);
+    setSubmitting(true);
+    try {
+      let res;
+      if (data.id) {
+        res = await updateXrayInbound(data);
+      } else {
+        res = await createXrayInbound(data);
       }
-      setDialogOpen(false);
-      loadData();
-    } else {
-      toast.error(res.msg);
+
+      if (res.code === 0) {
+        toast.success(data.id ? '更新成功' : '创建成功');
+        if (res.msg && res.msg !== '操作成功') {
+          toast.warning(res.msg);
+        }
+        setDialogOpen(false);
+        loadData();
+      } else {
+        toast.error(res.msg);
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm('确定删除此入站? 相关客户端也将被删除。')) return;
-    const res = await deleteXrayInbound(id);
-    if (res.code === 0) {
-      toast.success('删除成功');
-      if (res.msg && res.msg !== '操作成功') {
-        toast.warning(res.msg);
+    setOperatingIds(prev => new Set(prev).add(id));
+    try {
+      const res = await deleteXrayInbound(id);
+      if (res.code === 0) {
+        toast.success('删除成功');
+        loadData();
+      } else {
+        toast.error(res.msg);
       }
-      loadData();
-    } else {
-      toast.error(res.msg);
+    } finally {
+      setOperatingIds(prev => { const s = new Set(prev); s.delete(id); return s; });
     }
   };
 
   const handleToggleEnable = async (inbound: any) => {
-    const res = inbound.enable
-      ? await disableXrayInbound(inbound.id)
-      : await enableXrayInbound(inbound.id);
-    if (res.code === 0) {
-      toast.success(inbound.enable ? '已禁用' : '已启用');
-      if (res.msg && res.msg !== '操作成功') {
-        toast.warning(res.msg);
+    setOperatingIds(prev => new Set(prev).add(inbound.id));
+    try {
+      const res = inbound.enable
+        ? await disableXrayInbound(inbound.id)
+        : await enableXrayInbound(inbound.id);
+      if (res.code === 0) {
+        toast.success(inbound.enable ? '已禁用' : '已启用');
+        loadData();
+      } else {
+        toast.error(res.msg);
       }
-      loadData();
-    } else {
-      toast.error(res.msg);
+    } finally {
+      setOperatingIds(prev => { const s = new Set(prev); s.delete(inbound.id); return s; });
     }
   };
 
@@ -403,14 +414,14 @@ export default function XrayInboundPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" onClick={() => handleEdit(ib)} title="编辑">
+                          <Button variant="ghost" size="icon" onClick={() => handleEdit(ib)} title="编辑" disabled={operatingIds.has(ib.id)}>
                             <Edit2 className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleToggleEnable(ib)} title={ib.enable ? '禁用' : '启用'}>
-                            {ib.enable ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          <Button variant="ghost" size="icon" onClick={() => handleToggleEnable(ib)} title={ib.enable ? '禁用' : '启用'} disabled={operatingIds.has(ib.id)}>
+                            {operatingIds.has(ib.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : ib.enable ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(ib.id)} className="text-destructive" title="删除">
-                            <Trash2 className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(ib.id)} className="text-destructive" title="删除" disabled={operatingIds.has(ib.id)}>
+                            {operatingIds.has(ib.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                           </Button>
                         </div>
                       </TableCell>
@@ -532,6 +543,7 @@ export default function XrayInboundPage() {
         editingInbound={editingInbound}
         nodes={nodes}
         onSubmit={handleSubmit}
+        submitting={submitting}
       />
 
       {/* QR Code Dialog */}

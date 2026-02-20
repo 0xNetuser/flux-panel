@@ -941,14 +941,12 @@ func (w *WebSocketReporter) InitXray(binaryPath, configPath, grpcAddr string) {
 
 // StartXrayTrafficReporter starts the Xray traffic reporter
 func (w *WebSocketReporter) StartXrayTrafficReporter(panelAddr string) {
-	if w.xrayManager == nil {
-		return
-	}
+	mgr := w.getOrInitXrayManager()
 	w.xrayTraffic = xray.NewTrafficReporter(
-		w.xrayManager.GetGrpcAddr(),
+		mgr.GetGrpcAddr(),
 		panelAddr,
 		w.secret,
-		w.xrayManager.GetBinaryPath(),
+		mgr.GetBinaryPath(),
 		w.useTLS,
 	)
 	w.xrayTraffic.Start()

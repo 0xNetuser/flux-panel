@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 const bytesToGB = 1024 * 1024 * 1024
@@ -45,6 +47,7 @@ func ProcessFlowUpload(rawData, secret string) string {
 	var nodeCount int64
 	DB.Model(&model.Node{}).Where("secret = ?", secret).Count(&nodeCount)
 	if nodeCount == 0 {
+		log.Printf("[GOST流量] 无效的节点密钥: %s", secret)
 		return "ok"
 	}
 
@@ -53,6 +56,7 @@ func ProcessFlowUpload(rawData, secret string) string {
 
 	var flowData dto.FlowDto
 	if err := json.Unmarshal([]byte(decrypted), &flowData); err != nil {
+		log.Printf("[GOST流量] JSON解析失败: %v, raw=%s", err, decrypted)
 		return "ok"
 	}
 
@@ -60,7 +64,7 @@ func ProcessFlowUpload(rawData, secret string) string {
 		return "ok"
 	}
 
-	log.Printf("节点上报流量数据 %+v", flowData)
+	log.Printf("[GOST流量] 上报: %+v", flowData)
 	return processFlowData(flowData)
 }
 
@@ -86,6 +90,7 @@ func ProcessXrayFlowUpload(rawData, secret string) string {
 	var nodeCount int64
 	DB.Model(&model.Node{}).Where("secret = ?", secret).Count(&nodeCount)
 	if nodeCount == 0 {
+		log.Printf("[Xray流量] 无效的节点密钥: %s", secret)
 		return "ok"
 	}
 
@@ -99,8 +104,11 @@ func ProcessXrayFlowUpload(rawData, secret string) string {
 		} `json:"clients"`
 	}
 	if err := json.Unmarshal([]byte(decrypted), &data); err != nil {
+		log.Printf("[Xray流量] JSON解析失败: %v, raw=%s", err, decrypted)
 		return "ok"
 	}
+
+	log.Printf("[Xray流量] 上报: %d 个客户端", len(data.Clients))
 
 	for _, client := range data.Clients {
 		if client.Email == "" || (client.U == 0 && client.D == 0) {
@@ -109,14 +117,15 @@ func ProcessXrayFlowUpload(rawData, secret string) string {
 
 		var xrayClient model.XrayClient
 		if err := DB.Where("email = ?", client.Email).First(&xrayClient).Error; err != nil {
+			log.Printf("[Xray流量] 客户端 %s 未找到: %v", client.Email, err)
 			continue
 		}
 
 		// Atomic update xray_client traffic
 		DB.Model(&model.XrayClient{}).Where("id = ?", xrayClient.ID).
 			UpdateColumns(map[string]interface{}{
-				"up_traffic":   DB.Raw("up_traffic + ?", client.U),
-				"down_traffic": DB.Raw("down_traffic + ?", client.D),
+				"up_traffic":   gorm.Expr("up_traffic + ?", client.U),
+				"down_traffic": gorm.Expr("down_traffic + ?", client.D),
 			})
 
 		// Update user flow
@@ -124,8 +133,8 @@ func ProcessXrayFlowUpload(rawData, secret string) string {
 		lock.Lock()
 		DB.Model(&model.User{}).Where("id = ?", xrayClient.UserId).
 			UpdateColumns(map[string]interface{}{
-				"in_flow":  DB.Raw("in_flow + ?", client.D),
-				"out_flow": DB.Raw("out_flow + ?", client.U),
+				"in_flow":  gorm.Expr("in_flow + ?", client.D),
+				"out_flow": gorm.Expr("out_flow + ?", client.U),
 			})
 		lock.Unlock()
 
@@ -175,8 +184,8 @@ func processFlowData(flowData dto.FlowDto) string {
 	fwdLock.Lock()
 	DB.Model(&model.Forward{}).Where("id = ?", forwardId).
 		UpdateColumns(map[string]interface{}{
-			"in_flow":  DB.Raw("in_flow + ?", d),
-			"out_flow": DB.Raw("out_flow + ?", u),
+			"in_flow":  gorm.Expr("in_flow + ?", d),
+			"out_flow": gorm.Expr("out_flow + ?", u),
 		})
 	fwdLock.Unlock()
 
@@ -185,8 +194,8 @@ func processFlowData(flowData dto.FlowDto) string {
 	uLock.Lock()
 	DB.Model(&model.User{}).Where("id = ?", userId).
 		UpdateColumns(map[string]interface{}{
-			"in_flow":  DB.Raw("in_flow + ?", d),
-			"out_flow": DB.Raw("out_flow + ?", u),
+			"in_flow":  gorm.Expr("in_flow + ?", d),
+			"out_flow": gorm.Expr("out_flow + ?", u),
 		})
 	uLock.Unlock()
 
@@ -196,8 +205,8 @@ func processFlowData(flowData dto.FlowDto) string {
 		tLock.Lock()
 		DB.Model(&model.UserTunnel{}).Where("id = ?", userTunnelId).
 			UpdateColumns(map[string]interface{}{
-				"in_flow":  DB.Raw("in_flow + ?", d),
-				"out_flow": DB.Raw("out_flow + ?", u),
+				"in_flow":  gorm.Expr("in_flow + ?", d),
+				"out_flow": gorm.Expr("out_flow + ?", u),
 			})
 		tLock.Unlock()
 	}

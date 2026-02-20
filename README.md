@@ -54,7 +54,7 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 
 ```bash
 # 下载 docker-compose 配置文件
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.8.7/docker-compose.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.8.8/docker-compose.yml -o docker-compose.yml
 ```
 
 **2. 创建环境变量文件**
@@ -121,7 +121,7 @@ docker compose up -d
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.8.7
+  0xnetuser/gost-node:1.8.8
 ```
 
 也可以使用 docker-compose，参考项目中的 `docker-compose-node.yml`：
@@ -129,7 +129,7 @@ docker run -d --network=host --restart=unless-stopped --name gost-node \
 ```yaml
 services:
   gost-node:
-    image: 0xnetuser/gost-node:1.8.7
+    image: 0xnetuser/gost-node:1.8.8
     container_name: gost-node
     network_mode: host
     restart: unless-stopped
@@ -178,7 +178,7 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 
 ```bash
 # 下载最新 docker-compose 配置（覆盖旧文件）
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.8.7/docker-compose.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.8.8/docker-compose.yml -o docker-compose.yml
 
 # 拉取最新镜像并重启
 docker compose pull && docker compose up -d
@@ -200,7 +200,7 @@ docker stop gost-node && docker rm gost-node
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.8.7
+  0xnetuser/gost-node:1.8.8
 ```
 
 如果使用 docker-compose 部署，更新 `docker-compose-node.yml` 中的镜像版本后：
@@ -222,6 +222,14 @@ curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && c
 ---
 
 ## 更新日志
+
+### v1.8.8
+
+- **GOST 流量统计修复**：`observeStats` 在 observer 未注册时直接 return，导致流量上报完全不执行。解耦流量上报与 observer
+- **Xray 流量统计修复**：`StartXrayTrafficReporter` 因 xrayManager 未初始化而跳过启动，改用懒初始化确保上报器启动
+- **流量写入 DB 修复**：`DB.Raw()` 在 GORM v2 下无法作为 SQL 表达式用于 UpdateColumns，全部替换为 `gorm.Expr()`
+- **Xray 同步失败 DB 回退**：创建/更新/删除/启用/禁用入站及客户端操作，同步失败时自动回退 DB 变更
+- **操作加载状态**：入站创建/编辑显示"同步中..."，删除/启用/禁用按钮显示加载动画并禁止重复操作
 
 ### v1.8.7
 

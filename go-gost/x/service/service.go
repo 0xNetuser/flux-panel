@@ -353,10 +353,6 @@ func (s *defaultService) setState(state State) {
 }
 
 func (s *defaultService) observeStats(ctx context.Context) {
-	if s.options.observer == nil {
-		return
-	}
-
 	d := s.options.observerPeriod
 	if d == 0 {
 		d = 5 * time.Second
@@ -374,8 +370,8 @@ func (s *defaultService) observeStats(ctx context.Context) {
 		select {
 		case <-ticker.C:
 
-			// First, try to send any pending events
-			if len(events) > 0 {
+			// First, try to send any pending observer events
+			if s.options.observer != nil && len(events) > 0 {
 				if err := s.options.observer.Observe(ctx, events); err == nil {
 					events = nil
 				}
@@ -408,21 +404,24 @@ func (s *defaultService) observeStats(ctx context.Context) {
 					}
 				}
 
-				evs := []observer.Event{
-					xstats.StatsEvent{
-						Kind:         "service",
-						Service:      s.name,
-						TotalConns:   st.Get(stats.KindTotalConns),
-						CurrentConns: st.Get(stats.KindCurrentConns),
-						InputBytes:   inputBytes,
-						OutputBytes:  outputBytes,
-						TotalErrs:    st.Get(stats.KindTotalErrs),
-					},
-				}
+				// Send observer events (only if observer is configured)
+				if s.options.observer != nil {
+					evs := []observer.Event{
+						xstats.StatsEvent{
+							Kind:         "service",
+							Service:      s.name,
+							TotalConns:   st.Get(stats.KindTotalConns),
+							CurrentConns: st.Get(stats.KindCurrentConns),
+							InputBytes:   inputBytes,
+							OutputBytes:  outputBytes,
+							TotalErrs:    st.Get(stats.KindTotalErrs),
+						},
+					}
 
-				if err := s.options.observer.Observe(ctx, evs); err != nil {
-					fmt.Printf("发送观察器事件失败: %v", err)
-					events = evs
+					if err := s.options.observer.Observe(ctx, evs); err != nil {
+						fmt.Printf("发送观察器事件失败: %v", err)
+						events = evs
+					}
 				}
 			}
 

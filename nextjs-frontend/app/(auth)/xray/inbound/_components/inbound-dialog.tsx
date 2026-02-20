@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 
+import { Loader2 } from 'lucide-react';
 import FieldTip from './field-tip';
 import ProtocolSettings, { type ProtocolForm, buildSettingsJson, parseSettingsJson } from './protocol-settings';
 import TransportSettings, { type TransportForm, buildTransportJson, parseTransportJson } from './transport-settings';
@@ -22,10 +23,11 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   editingInbound: any;
   nodes: any[];
-  onSubmit: (data: any) => void;
+  onSubmit: (data: any) => Promise<void>;
+  submitting?: boolean;
 }
 
-export default function InboundDialog({ open, onOpenChange, editingInbound, nodes, onSubmit }: Props) {
+export default function InboundDialog({ open, onOpenChange, editingInbound, nodes, onSubmit, submitting = false }: Props) {
   // Basic fields
   const [nodeId, setNodeId] = useState('');
   const [protocol, setProtocol] = useState('vmess');
@@ -317,8 +319,11 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
-          <Button onClick={handleSubmit}>{editingInbound ? '更新' : '创建'}</Button>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>取消</Button>
+          <Button onClick={handleSubmit} disabled={submitting}>
+            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {submitting ? '同步中...' : (editingInbound ? '更新' : '创建')}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

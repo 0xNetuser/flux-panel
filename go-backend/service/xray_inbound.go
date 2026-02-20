@@ -140,7 +140,9 @@ func CreateXrayInbound(d dto.XrayInboundDto, userId int64, roleId int) dto.R {
 
 	syncErr := syncXrayNodeConfig(node.ID)
 	if syncErr != "" {
-		return dto.R{Code: 0, Msg: "Xray 同步失败: " + syncErr, Ts: time.Now().UnixMilli(), Data: inbound}
+		// Sync failed — delete the inbound from DB so it stays consistent with node
+		DB.Delete(&inbound)
+		return dto.Err("Xray 同步失败，入站未创建: " + syncErr)
 	}
 
 	return dto.Ok(inbound)
@@ -224,6 +226,9 @@ func UpdateXrayInbound(d dto.XrayInboundUpdateDto, userId int64, roleId int) dto
 		}
 	}
 
+	// Save old state before updating (for rollback on sync failure)
+	oldInbound := existing
+
 	updates := map[string]interface{}{"updated_time": time.Now().UnixMilli()}
 	if d.Tag != "" {
 		updates["tag"] = d.Tag
@@ -255,7 +260,9 @@ func UpdateXrayInbound(d dto.XrayInboundUpdateDto, userId int64, roleId int) dto
 	// Sync config to node
 	syncErr := syncXrayNodeConfig(existing.NodeId)
 	if syncErr != "" {
-		return dto.R{Code: 0, Msg: "Xray 同步失败: " + syncErr, Ts: time.Now().UnixMilli(), Data: "更新成功"}
+		// Revert DB to old state
+		DB.Save(&oldInbound)
+		return dto.Err("Xray 同步失败，已回退更新: " + syncErr)
 	}
 
 	return dto.Ok("更新成功")
@@ -275,6 +282,10 @@ func DeleteXrayInbound(id int64, userId int64, roleId int) dto.R {
 		return *r
 	}
 
+	// Save clients for potential restore
+	var savedClients []model.XrayClient
+	DB.Where("inbound_id = ?", id).Find(&savedClients)
+
 	// Delete associated clients
 	DB.Where("inbound_id = ?", id).Delete(&model.XrayClient{})
 
@@ -283,7 +294,12 @@ func DeleteXrayInbound(id int64, userId int64, roleId int) dto.R {
 	// Use full sync instead of single remove — XrayRemoveInbound is a no-op on node side
 	syncErr := syncXrayNodeConfig(inbound.NodeId)
 	if syncErr != "" {
-		return dto.R{Code: 0, Msg: "Xray 同步失败: " + syncErr, Ts: time.Now().UnixMilli(), Data: "删除成功"}
+		// Restore inbound and clients
+		DB.Create(&inbound)
+		for i := range savedClients {
+			DB.Create(&savedClients[i])
+		}
+		return dto.Err("Xray 同步失败，删除已回退: " + syncErr)
 	}
 
 	return dto.Ok("删除成功")
@@ -309,7 +325,12 @@ func EnableXrayInbound(id int64, userId int64, roleId int) dto.R {
 	})
 	syncErr := syncXrayNodeConfig(inbound.NodeId)
 	if syncErr != "" {
-		return dto.R{Code: 0, Msg: "Xray 同步失败: " + syncErr, Ts: time.Now().UnixMilli(), Data: "已启用"}
+		// Revert
+		DB.Model(&inbound).Updates(map[string]interface{}{
+			"enable":       0,
+			"updated_time": time.Now().UnixMilli(),
+		})
+		return dto.Err("Xray 同步失败，启用已回退: " + syncErr)
 	}
 	return dto.Ok("已启用")
 }
@@ -334,7 +355,12 @@ func DisableXrayInbound(id int64, userId int64, roleId int) dto.R {
 	})
 	syncErr := syncXrayNodeConfig(inbound.NodeId)
 	if syncErr != "" {
-		return dto.R{Code: 0, Msg: "Xray 同步失败: " + syncErr, Ts: time.Now().UnixMilli(), Data: "已禁用"}
+		// Revert
+		DB.Model(&inbound).Updates(map[string]interface{}{
+			"enable":       1,
+			"updated_time": time.Now().UnixMilli(),
+		})
+		return dto.Err("Xray 同步失败，禁用已回退: " + syncErr)
 	}
 	return dto.Ok("已禁用")
 }

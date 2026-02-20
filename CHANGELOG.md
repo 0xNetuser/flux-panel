@@ -1,5 +1,36 @@
 # Changelog
 
+## v1.8.8 — 流量统计全面修复 + 同步回退 + 操作加载态
+
+### Bug Fixes
+
+- **GOST 流量上报不执行**：`observeStats()` 在 `observer == nil` 时直接 return，而 "console" observer 从未注册到 registry，导致所有 GOST 服务的流量上报完全不执行。去掉 nil 判断提前返回，流量上报与 observer 解耦
+- **Xray 流量上报不启动**：`StartXrayTrafficReporter()` 检查 `xrayManager == nil` 后返回，但 `InitXray()` 从未被调用。改用 `getOrInitXrayManager()` 懒初始化
+- **流量数据无法写入数据库**：`flow.go` 中所有原子递增使用 `DB.Raw("col + ?", val)`，GORM v2 下 `DB.Raw()` 返回 `*gorm.DB` 对象而非 SQL 表达式，导致 UpdateColumns 静默失败。全部替换为 `gorm.Expr()`
+- **Xray 同步失败 DB 不回退**：Create/Update/Delete/Enable/Disable 入站及客户端操作，同步节点失败时 DB 变更未撤销。新增完整回退逻辑
+
+### Features
+
+- **操作加载状态**：入站创建/编辑对话框显示"同步中..."并禁止操作；删除/启用/禁用按钮显示 Loader2 动画并禁止重复点击
+- **流量处理日志**：`ProcessFlowUpload` 和 `ProcessXrayFlowUpload` 新增详细日志，便于排查上报问题
+
+### Changed Files
+
+**节点端：**
+- `go-gost/x/service/service.go` — `observeStats` 去掉 observer nil 提前返回，observer 事件单独守卫
+- `go-gost/x/socket/websocket_reporter.go` — `StartXrayTrafficReporter` 使用 `getOrInitXrayManager()`
+
+**后端：**
+- `go-backend/service/flow.go` — `DB.Raw` → `gorm.Expr`，新增日志
+- `go-backend/service/xray_inbound.go` — Create/Update/Delete/Enable/Disable 同步失败时 DB 回退
+- `go-backend/service/xray_client.go` — Create/Update/Delete 同步失败时 DB 回退
+
+**前端：**
+- `nextjs-frontend/app/(auth)/xray/inbound/page.tsx` — submitting + operatingIds 加载态
+- `nextjs-frontend/app/(auth)/xray/inbound/_components/inbound-dialog.tsx` — submitting prop + 按钮禁用
+
+---
+
 ## v1.8.7 — Xray 配置同步回退 + 流量统计修复 + 限速绑定隧道
 
 ### Features

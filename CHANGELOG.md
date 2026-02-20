@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.8.3 — 前端修复
+
+### Fixes
+
+- **React Fragment key**：修复入站列表 `.map()` 中 `<>` 未设置 key 导致的 React 协调问题
+- **SelectItem 空值崩溃**：修复 Flow 选择器 `value=""` 导致 Radix UI 运行时崩溃（Application error）
+
 ## v1.8.2 — 入站客户端合并 + 修复
 
 ### Features

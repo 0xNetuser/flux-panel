@@ -3,6 +3,8 @@ package service
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
+	"fmt"
 	"flux-panel/go-backend/dto"
 	"flux-panel/go-backend/model"
 	"flux-panel/go-backend/pkg"
@@ -130,10 +132,13 @@ func CreateXrayInbound(d dto.XrayInboundDto, userId int64, roleId int) dto.R {
 		return dto.Err("创建入站失败")
 	}
 
-	result := pkg.XrayAddInbound(node.ID, &inbound)
-	if result != nil && result.Msg != "OK" {
-		log.Printf("下发 XrayAddInbound 到节点 %d 失败: %s", node.ID, result.Msg)
+	// Auto-generate tag if empty
+	if inbound.Tag == "" {
+		inbound.Tag = fmt.Sprintf("inbound-%d", inbound.ID)
+		DB.Model(&inbound).Update("tag", inbound.Tag)
 	}
+
+	syncXrayNodeConfig(node.ID)
 
 	return dto.Ok(inbound)
 }
@@ -319,9 +324,46 @@ func DisableXrayInbound(id int64, userId int64, roleId int) dto.R {
 	return dto.Ok("已禁用")
 }
 
+func mergeClientsIntoSettings(inbound *model.XrayInbound) string {
+	var settings map[string]interface{}
+	if err := json.Unmarshal([]byte(inbound.SettingsJson), &settings); err != nil {
+		settings = map[string]interface{}{}
+	}
+
+	var clients []model.XrayClient
+	DB.Where("inbound_id = ? AND enable = 1", inbound.ID).Find(&clients)
+
+	clientArr := []map[string]interface{}{}
+	for _, c := range clients {
+		obj := map[string]interface{}{"email": c.Email, "level": 0}
+		switch inbound.Protocol {
+		case "vmess":
+			obj["id"] = c.UuidOrPassword
+			obj["alterId"] = c.AlterId
+		case "vless":
+			obj["id"] = c.UuidOrPassword
+			obj["flow"] = c.Flow
+			obj["encryption"] = "none"
+		case "trojan":
+			obj["password"] = c.UuidOrPassword
+		case "shadowsocks":
+			obj["password"] = c.UuidOrPassword
+		}
+		clientArr = append(clientArr, obj)
+	}
+	settings["clients"] = clientArr
+
+	result, _ := json.Marshal(settings)
+	return string(result)
+}
+
 func syncXrayNodeConfig(nodeId int64) {
 	var inbounds []model.XrayInbound
 	DB.Where("node_id = ? AND enable = 1", nodeId).Find(&inbounds)
+	// Merge clients into settingsJson before sending to node
+	for i := range inbounds {
+		inbounds[i].SettingsJson = mergeClientsIntoSettings(&inbounds[i])
+	}
 	result := pkg.XrayApplyConfig(nodeId, inbounds)
 	if result != nil && result.Msg != "OK" {
 		log.Printf("全量同步 Xray 配置到节点 %d 失败: %s", nodeId, result.Msg)

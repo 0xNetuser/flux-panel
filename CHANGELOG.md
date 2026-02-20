@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.8.5 — 修复 VLESS 客户端注入
+
+### Fixes
+
+- **修复 VLESS "invalid request user id"**：客户端 UUID 未注入到 Xray 配置导致连接失败
+- **自动生成 inbound tag**：创建入站时 tag 为空自动生成 `inbound-{id}`，避免空 tag 导致同步异常
+- **客户端合并到全量同步**：`syncXrayNodeConfig` 从 `xray_client` 表查询启用客户端并合并到 `settingsJson`，替代无效的 gRPC addUser
+- **统一使用全量同步**：创建/删除/启禁客户端均改为 `syncXrayNodeConfig`，不再依赖空操作的 gRPC 调用
+
 ## v1.8.4 — 入站表单 UI 优化
 
 ### Features

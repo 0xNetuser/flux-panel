@@ -7,7 +7,6 @@ import (
 	"flux-panel/go-backend/dto"
 	"flux-panel/go-backend/model"
 	"flux-panel/go-backend/pkg"
-	"log"
 	"net/url"
 	"strings"
 	"time"
@@ -179,14 +178,8 @@ func CreateXrayClient(d dto.XrayClientDto, userId int64, roleId int) dto.R {
 		return dto.Err("创建客户端失败")
 	}
 
-	// Add client via gRPC
-	node := GetNodeById(inbound.NodeId)
-	if node != nil {
-		result := pkg.XrayAddClient(node.ID, inbound.Tag, client.Email, client.UuidOrPassword, client.Flow, client.AlterId, inbound.Protocol)
-		if result != nil && result.Msg != "OK" {
-			log.Printf("下发 XrayAddClient 到节点 %d 失败: %s", node.ID, result.Msg)
-		}
-	}
+	// Full sync to inject client into Xray config
+	syncXrayNodeConfig(inbound.NodeId)
 
 	return dto.Ok(client)
 }
@@ -282,19 +275,8 @@ func UpdateXrayClient(d dto.XrayClientUpdateDto, userId int64, roleId int) dto.R
 
 	DB.Model(&existing).Updates(updates)
 
-	// Handle enable/disable via gRPC
-	if d.Enable != nil {
-		if err := DB.First(&inbound, existing.InboundId).Error; err == nil {
-			node := GetNodeById(inbound.NodeId)
-			if node != nil {
-				if *d.Enable == 0 {
-					pkg.XrayRemoveClient(node.ID, inbound.Tag, existing.Email)
-				} else {
-					pkg.XrayAddClient(node.ID, inbound.Tag, existing.Email, existing.UuidOrPassword, existing.Flow, existing.AlterId, inbound.Protocol)
-				}
-			}
-		}
-	}
+	// Full sync on any update (especially enable/disable)
+	syncXrayNodeConfig(inbound.NodeId)
 
 	return dto.Ok("更新成功")
 }
@@ -327,13 +309,7 @@ func DeleteXrayClient(id int64, userId int64, roleId int) dto.R {
 	DB.Delete(&client)
 
 	if inbound.ID > 0 {
-		node := GetNodeById(inbound.NodeId)
-		if node != nil {
-			result := pkg.XrayRemoveClient(node.ID, inbound.Tag, client.Email)
-			if result != nil && result.Msg != "OK" {
-				log.Printf("下发 XrayRemoveClient 到节点 %d 失败: %s", node.ID, result.Msg)
-			}
-		}
+		syncXrayNodeConfig(inbound.NodeId)
 	}
 
 	return dto.Ok("删除成功")

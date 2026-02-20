@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Server, Cpu, HardDrive, RefreshCw, Filter, Info } from 'lucide-react';
+import { Server, Cpu, HardDrive, Network, RefreshCw, Filter, Info } from 'lucide-react';
 import { Tooltip as UiTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { getNodeHealth, getLatencyHistory, getTrafficOverview } from '@/lib/api/monitor';
@@ -49,6 +49,7 @@ interface NodeHealth {
   uptime?: number;
   xrayRunning?: boolean;
   xrayVersion?: string;
+  interfaces?: { name: string; ips: string[] }[];
 }
 
 interface ForwardItem {
@@ -280,6 +281,22 @@ export default function MonitorPage() {
                         <Badge variant="secondary" className="text-xs">未运行</Badge>
                       )}
                     </div>
+                    {node.interfaces && node.interfaces.length > 0 && (
+                      <div className="pt-1 border-t">
+                        <div className="flex items-center gap-1 text-muted-foreground mb-1">
+                          <Network className="h-3 w-3" />
+                          <span className="text-xs">网卡</span>
+                        </div>
+                        <div className="space-y-0.5">
+                          {node.interfaces.map((iface) => (
+                            <div key={iface.name} className="text-xs font-mono">
+                              <span className="text-foreground">{iface.name}</span>
+                              <span className="text-muted-foreground ml-1">{iface.ips.join(', ')}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
                 {node.version && (

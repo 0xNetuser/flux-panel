@@ -8,7 +8,7 @@ export LC_ALL=C
 
 
 # 全局下载地址配置
-DOCKER_COMPOSE_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.8.13/docker-compose.yml"
+DOCKER_COMPOSE_URL="https://github.com/0xNetuser/flux-panel/releases/download/1.8.14/docker-compose.yml"
 
 COUNTRY=$(curl -s https://ipinfo.io/country)
 if [ "$COUNTRY" = "CN" ]; then

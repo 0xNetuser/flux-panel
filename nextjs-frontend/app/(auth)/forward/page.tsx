@@ -211,7 +211,7 @@ export default function ForwardPage() {
                     <TableCell className="font-medium">{f.name}</TableCell>
                     <TableCell>{f.tunnelName}</TableCell>
                     <TableCell>{f.inIp}:{f.inPort}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{f.remoteAddr}</TableCell>
+                    <TableCell className="max-w-[200px] text-sm whitespace-pre-line">{f.remoteAddr?.includes(',') ? f.remoteAddr.split(',').join('\n') : f.remoteAddr}</TableCell>
                     <TableCell className="text-xs">{formatBytes(f.inFlow)} / {formatBytes(f.outFlow)}</TableCell>
                     <TableCell className="text-xs">
                       {f.status === 1 && latencyMap[f.id] ? (
@@ -320,7 +320,13 @@ export default function ForwardPage() {
             </div>
             <div className="space-y-2">
               <Label>目标地址</Label>
-              <Input value={form.remoteAddr} onChange={e => setForm(p => ({ ...p, remoteAddr: e.target.value }))} placeholder="ip:port" />
+              <textarea
+                className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 font-mono"
+                value={form.remoteAddr.split(',').filter(Boolean).join('\n')}
+                onChange={e => setForm(p => ({ ...p, remoteAddr: e.target.value.split('\n').map(s => s.trim()).filter(Boolean).join(',') }))}
+                placeholder={"每行一个目标地址，例如:\n1.2.3.4:8080\n5.6.7.8:8080"}
+                rows={3}
+              />
             </div>
             {(() => {
               const selectedTunnel = tunnels.find((t: any) => t.id?.toString() === form.tunnelId);
@@ -331,15 +337,16 @@ export default function ForwardPage() {
               // Build listenIp options: check if current value is a known IP or NIC-derived
               const knownValues = ['', '::', '0.0.0.0', ...allIps];
               const isCustomListenIp = form.listenIp && !knownValues.includes(form.listenIp);
-              // Build interfaceName options: check if current value is a known NIC
+              // Build interfaceName options: check if current value is a known NIC or IP
               const nicNames = ifaces.map((iface: any) => iface.name);
-              const isCustomInterface = form.interfaceName && !nicNames.includes(form.interfaceName);
+              const knownIfaceValues = [...nicNames, ...allIps];
+              const isCustomInterface = form.interfaceName && !knownIfaceValues.includes(form.interfaceName);
 
               return (
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>入口网卡 (可选)</Label>
+                      <Label>监听地址 (可选)</Label>
                       <Select value={isCustomListenIp ? '__custom__' : (form.listenIp || '::')} onValueChange={v => {
                         if (v === '__custom__') {
                           setForm(p => ({ ...p, listenIp: p.listenIp || '' }));
@@ -371,7 +378,7 @@ export default function ForwardPage() {
                       )}
                     </div>
                     <div className="space-y-2">
-                      <Label>出口网卡 (可选)</Label>
+                      <Label>出口地址 (可选)</Label>
                       <Select value={isCustomInterface ? '__custom__' : (form.interfaceName || '__none__')} onValueChange={v => {
                         if (v === '__custom__') {
                           setForm(p => ({ ...p, interfaceName: p.interfaceName || '' }));
@@ -385,10 +392,17 @@ export default function ForwardPage() {
                         <SelectContent>
                           <SelectItem value="__none__">默认路由</SelectItem>
                           {ifaces.map((iface: any) => (
-                            <SelectItem key={iface.name} value={iface.name}>
-                              {iface.name}{iface.ips?.length ? ` (${iface.ips.join(', ')})` : ''}
+                            <SelectItem key={`nic-${iface.name}`} value={iface.name}>
+                              {iface.name} — 全部IP
                             </SelectItem>
                           ))}
+                          {ifaces.flatMap((iface: any) =>
+                            (iface.ips || []).map((ip: string) => (
+                              <SelectItem key={`ip-${iface.name}-${ip}`} value={ip}>
+                                {iface.name} — {ip}
+                              </SelectItem>
+                            ))
+                          )}
                           <SelectItem value="__custom__">自定义...</SelectItem>
                         </SelectContent>
                       </Select>
@@ -396,7 +410,7 @@ export default function ForwardPage() {
                         <Input
                           value={form.interfaceName}
                           onChange={e => setForm(p => ({ ...p, interfaceName: e.target.value }))}
-                          placeholder="网卡名称，如 eth0"
+                          placeholder="网卡名或IP地址，如 eth0 或 1.2.3.4"
                           className="mt-1"
                         />
                       )}

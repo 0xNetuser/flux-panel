@@ -948,6 +948,7 @@ func (w *WebSocketReporter) StartXrayTrafficReporter(panelAddr string) {
 		w.xrayManager.GetGrpcAddr(),
 		panelAddr,
 		w.secret,
+		w.xrayManager.GetBinaryPath(),
 		w.useTLS,
 	)
 	w.xrayTraffic.Start()

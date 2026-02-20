@@ -7,23 +7,30 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, Edit2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getSpeedLimitList, createSpeedLimit, updateSpeedLimit, deleteSpeedLimit } from '@/lib/api/config';
+import { getTunnelList } from '@/lib/api/tunnel';
 import { useAuth } from '@/lib/hooks/use-auth';
 
 export default function LimitPage() {
   const { isAdmin } = useAuth();
   const [limits, setLimits] = useState<any[]>([]);
+  const [tunnels, setTunnels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingLimit, setEditingLimit] = useState<any>(null);
-  const [form, setForm] = useState({ name: '', speed: '' });
+  const [form, setForm] = useState({ name: '', speed: '', tunnelId: '' });
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const res = await getSpeedLimitList();
-    if (res.code === 0) setLimits(res.data || []);
+    const [limitsRes, tunnelsRes] = await Promise.all([
+      getSpeedLimitList(),
+      getTunnelList(),
+    ]);
+    if (limitsRes.code === 0) setLimits(limitsRes.data || []);
+    if (tunnelsRes.code === 0) setTunnels(tunnelsRes.data || []);
     setLoading(false);
   }, []);
 
@@ -31,7 +38,7 @@ export default function LimitPage() {
 
   const handleCreate = () => {
     setEditingLimit(null);
-    setForm({ name: '', speed: '' });
+    setForm({ name: '', speed: '', tunnelId: '' });
     setDialogOpen(true);
   };
 
@@ -40,6 +47,7 @@ export default function LimitPage() {
     setForm({
       name: limit.name || '',
       speed: limit.speed?.toString() || '',
+      tunnelId: limit.tunnelId?.toString() || '',
     });
     setDialogOpen(true);
   };
@@ -49,10 +57,17 @@ export default function LimitPage() {
       toast.error('请填写名称和限速值');
       return;
     }
+    if (!editingLimit && !form.tunnelId) {
+      toast.error('请选择隧道');
+      return;
+    }
     const data: any = {
       name: form.name,
       speed: parseInt(form.speed),
     };
+    if (form.tunnelId) {
+      data.tunnelId = parseInt(form.tunnelId);
+    }
 
     let res;
     if (editingLimit) {
@@ -99,19 +114,21 @@ export default function LimitPage() {
               <TableRow>
                 <TableHead>名称</TableHead>
                 <TableHead>速度 (Mbps)</TableHead>
+                <TableHead>隧道</TableHead>
                 <TableHead>操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={3} className="text-center py-8">加载中...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center py-8">加载中...</TableCell></TableRow>
               ) : limits.length === 0 ? (
-                <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
               ) : (
                 limits.map((l) => (
                   <TableRow key={l.id}>
                     <TableCell className="font-medium">{l.name}</TableCell>
                     <TableCell>{l.speed} Mbps</TableCell>
+                    <TableCell>{l.tunnelName || '-'}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(l)} title="编辑">
@@ -137,6 +154,19 @@ export default function LimitPage() {
             <DialogTitle>{editingLimit ? '编辑限速规则' : '创建限速规则'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
+            {!editingLimit && (
+              <div className="space-y-2">
+                <Label>隧道</Label>
+                <Select value={form.tunnelId} onValueChange={v => setForm(p => ({ ...p, tunnelId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="选择隧道" /></SelectTrigger>
+                  <SelectContent>
+                    {tunnels.map((t: any) => (
+                      <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>规则名称</Label>
               <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="例: 50M限速" />

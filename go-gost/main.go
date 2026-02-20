@@ -127,6 +127,9 @@ func main() {
 	defer wsReporter.Stop()
 	service.SetHTTPReportURL(config.Addr, config.Secret, config.UseTLS)
 
+	// Start Xray traffic reporter (collects stats every 30s and uploads to panel)
+	wsReporter.StartXrayTrafficReporter(config.Addr)
+
 	p := &program{}
 	if err := svc.Run(p); err != nil {
 		logger.Default().Fatal(err)

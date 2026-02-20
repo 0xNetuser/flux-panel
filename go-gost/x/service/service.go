@@ -379,7 +379,6 @@ func (s *defaultService) observeStats(ctx context.Context) {
 				if err := s.options.observer.Observe(ctx, events); err == nil {
 					events = nil
 				}
-				continue
 			}
 
 			st := s.status.Stats()
@@ -392,17 +391,7 @@ func (s *defaultService) observeStats(ctx context.Context) {
 				inputBytes := st.Get(stats.KindInputBytes)
 				outputBytes := st.Get(stats.KindOutputBytes)
 
-				evs := []observer.Event{
-					xstats.StatsEvent{
-						Kind:         "service",
-						Service:      s.name,
-						TotalConns:   st.Get(stats.KindTotalConns),
-						CurrentConns: st.Get(stats.KindCurrentConns),
-						InputBytes:   inputBytes,
-						OutputBytes:  outputBytes,
-						TotalErrs:    st.Get(stats.KindTotalErrs),
-					},
-				}
+				// Report traffic to panel (independent of observer)
 				if outputBytes > 0 || inputBytes > 0 {
 					reportItems := TrafficReportItem{
 						N: s.name,
@@ -417,6 +406,18 @@ func (s *defaultService) observeStats(ctx context.Context) {
 							xstats.ResetTraffic(st.Get(stats.KindInputBytes)-inputBytes, st.Get(stats.KindOutputBytes)-outputBytes)
 						}
 					}
+				}
+
+				evs := []observer.Event{
+					xstats.StatsEvent{
+						Kind:         "service",
+						Service:      s.name,
+						TotalConns:   st.Get(stats.KindTotalConns),
+						CurrentConns: st.Get(stats.KindCurrentConns),
+						InputBytes:   inputBytes,
+						OutputBytes:  outputBytes,
+						TotalErrs:    st.Get(stats.KindTotalErrs),
+					},
 				}
 
 				if err := s.options.observer.Observe(ctx, evs); err != nil {

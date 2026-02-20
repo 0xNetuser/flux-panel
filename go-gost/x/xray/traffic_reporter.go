@@ -30,7 +30,7 @@ type TrafficUploadPayload struct {
 }
 
 // NewTrafficReporter creates a new TrafficReporter
-func NewTrafficReporter(grpcAddr, panelURL, secret string, useTLS bool) *TrafficReporter {
+func NewTrafficReporter(grpcAddr, panelURL, secret, binaryPath string, useTLS bool) *TrafficReporter {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	var aesCrypto *crypto.AESCrypto
@@ -42,8 +42,13 @@ func NewTrafficReporter(grpcAddr, panelURL, secret string, useTLS bool) *Traffic
 		}
 	}
 
+	client := NewXrayGrpcClient(grpcAddr)
+	if binaryPath != "" {
+		client.binaryPath = binaryPath
+	}
+
 	return &TrafficReporter{
-		grpcClient: NewXrayGrpcClient(grpcAddr),
+		grpcClient: client,
 		panelURL:   panelURL,
 		secret:     secret,
 		interval:   30 * time.Second,

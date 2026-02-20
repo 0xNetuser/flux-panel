@@ -169,6 +169,11 @@ func (m *XrayManager) GetGrpcAddr() string {
 	return m.grpcAddr
 }
 
+// GetBinaryPath returns the Xray binary path
+func (m *XrayManager) GetBinaryPath() string {
+	return m.binaryPath
+}
+
 // SwitchVersion downloads and replaces the Xray binary with the specified version.
 // This method is designed to be called in a goroutine (async).
 func (m *XrayManager) SwitchVersion(version string) error {
@@ -440,17 +445,49 @@ func (m *XrayManager) buildBaseConfig(inbounds []InboundConfig) map[string]inter
 	return config
 }
 
-// ApplyConfig builds a full config with inbounds and restarts Xray
+// ApplyConfig builds a full config with inbounds, writes it, and restarts Xray.
+// If Xray fails to start or crashes within 2 seconds, the old config is restored.
 func (m *XrayManager) ApplyConfig(inbounds []InboundConfig) error {
 	config := m.buildBaseConfig(inbounds)
+
+	// 1. Backup old config
+	oldConfig, _ := os.ReadFile(m.configPath)
+
+	// 2. Write new config
 	if err := m.writeConfig(config); err != nil {
 		return fmt.Errorf("failed to write config: %v", err)
 	}
 
-	if m.IsRunning() {
-		return m.Restart()
+	// 3. Start or restart
+	wasRunning := m.IsRunning()
+	var err error
+	if wasRunning {
+		err = m.Restart()
+	} else {
+		err = m.Start()
 	}
-	return m.Start()
+
+	if err != nil {
+		fmt.Printf("❌ Xray 启动失败，回退到旧配置\n")
+		if oldConfig != nil {
+			os.WriteFile(m.configPath, oldConfig, 0644)
+			m.Start()
+		}
+		return fmt.Errorf("Xray 启动失败: %v", err)
+	}
+
+	// 4. Wait 2s and verify process is still alive (catches delayed crashes from bad config)
+	time.Sleep(2 * time.Second)
+	if !m.IsRunning() {
+		fmt.Printf("❌ Xray 启动后崩溃，回退到旧配置\n")
+		if oldConfig != nil {
+			os.WriteFile(m.configPath, oldConfig, 0644)
+			m.Start()
+		}
+		return fmt.Errorf("Xray 配置无效，启动后立即崩溃，已回退到旧配置")
+	}
+
+	return nil
 }
 
 // writeConfig writes the config to the config file

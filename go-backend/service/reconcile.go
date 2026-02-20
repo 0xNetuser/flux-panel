@@ -155,6 +155,11 @@ func reconcileXrayInbounds(nodeId int64, result *ReconcileResult) {
 	var inbounds []model.XrayInbound
 	DB.Where("node_id = ? AND enable = 1", nodeId).Find(&inbounds)
 
+	// Merge clients into settingsJson before sending to node
+	for i := range inbounds {
+		inbounds[i].SettingsJson = mergeClientsIntoSettings(&inbounds[i])
+	}
+
 	r := pkg.XrayApplyConfig(nodeId, inbounds)
 	if r != nil && r.Msg != "OK" {
 		result.Errors = append(result.Errors, fmt.Sprintf("Xray 入站: %s", r.Msg))

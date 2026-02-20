@@ -1,5 +1,47 @@
 # Changelog
 
+## v1.8.7 — Xray 配置同步回退 + 流量统计修复 + 限速绑定隧道
+
+### Features
+
+- **Xray 配置同步自动回退**：节点端 `ApplyConfig` 新增备份→验证→回退机制，写入新配置后等待 2 秒验证 Xray 进程存活，启动失败或崩溃时自动恢复旧配置并重启
+- **同步错误前端上报**：Xray 入站/客户端的 CRUD 操作，同步失败时前端 `toast.warning` 显示警告信息（DB 操作不受影响，Code 仍为 0）
+- **限速规则绑定隧道**：限速创建表单新增隧道选择器下拉框，限速列表新增隧道名称列
+- **Xray 流量统计**：实现基于 CLI 的 Xray 流量查询（`xray api statsquery -s addr -pattern user -reset`），解析 text-proto 输出，启动 30 秒定时上报
+- **GOST 流量上报修复**：修复 `observeStats` 中 observer 失败时 `continue` 跳过流量上报的 bug，流量上报与 observer 解耦
+- **新建入站嗅探默认关闭**：`inbound-dialog.tsx` 嗅探初始状态和重置逻辑均改为 `enabled: false`
+
+### Bug Fixes
+
+- **UpdateXrayClient 零 NodeId**：查询 inbound 失败时 `inbound.NodeId` 为零值，导致 `syncXrayNodeConfig(0)` 无意义调用。添加 `if inbound.ID > 0` 守卫
+- **SpeedLimitDto TunnelId 校验**：`TunnelId` 字段缺少 `binding:"required"` 标签，允许创建不绑定隧道的限速规则
+- **syncXrayNodeConfig 守卫**：新增 `if nodeId <= 0 { return "" }` 防止无效节点 ID 触发同步
+- **reconcile 客户端合并**：`reconcileXrayInbounds` 缺少 `mergeClientsIntoSettings` 调用，导致对账同步的配置不包含客户端
+- **Xray gRPC client 占位符**：`queryStatsRaw` 原为占位符返回 nil，`StartXrayTrafficReporter` 从未被调用。完整实现并在启动时注册
+
+### Changed Files
+
+**节点端：**
+- `go-gost/x/xray/manager.go` — ApplyConfig 备份/验证/回退 + `GetBinaryPath()` 方法
+- `go-gost/x/xray/grpc_client.go` — 重写为 CLI 方式查询流量统计
+- `go-gost/x/xray/traffic_reporter.go` — `NewTrafficReporter` 接受 `binaryPath` 参数
+- `go-gost/x/service/service.go` — 移除 observer 失败时的 `continue`，解耦流量上报
+- `go-gost/x/socket/websocket_reporter.go` — `StartXrayTrafficReporter` 传递 binary path
+- `go-gost/main.go` — 启动时调用 `StartXrayTrafficReporter`
+
+**后端：**
+- `go-backend/service/xray_inbound.go` — `syncXrayNodeConfig` 返回错误字符串 + nodeId 守卫 + CRUD 传递同步错误
+- `go-backend/service/xray_client.go` — Create/Update/Delete 传递同步错误 + UpdateXrayClient NodeId 守卫
+- `go-backend/service/reconcile.go` — 添加 `mergeClientsIntoSettings` 调用
+- `go-backend/dto/speed_limit.go` — TunnelId 添加 `binding:"required"`
+
+**前端：**
+- `nextjs-frontend/app/(auth)/xray/inbound/page.tsx` — handleSubmit/handleDelete/handleToggleEnable 显示同步警告 toast
+- `nextjs-frontend/app/(auth)/xray/inbound/_components/inbound-dialog.tsx` — 嗅探默认关闭
+- `nextjs-frontend/app/(auth)/limit/page.tsx` — 重写：添加隧道选择器和隧道列
+
+---
+
 ## v1.8.6 — Xray 版本下拉选择 + 自动刷新 + 转发延迟显示
 
 ### Features

@@ -179,7 +179,10 @@ func CreateXrayClient(d dto.XrayClientDto, userId int64, roleId int) dto.R {
 	}
 
 	// Full sync to inject client into Xray config
-	syncXrayNodeConfig(inbound.NodeId)
+	syncErr := syncXrayNodeConfig(inbound.NodeId)
+	if syncErr != "" {
+		return dto.R{Code: 0, Msg: "Xray 同步失败: " + syncErr, Ts: time.Now().UnixMilli(), Data: client}
+	}
 
 	return dto.Ok(client)
 }
@@ -276,7 +279,12 @@ func UpdateXrayClient(d dto.XrayClientUpdateDto, userId int64, roleId int) dto.R
 	DB.Model(&existing).Updates(updates)
 
 	// Full sync on any update (especially enable/disable)
-	syncXrayNodeConfig(inbound.NodeId)
+	if inbound.ID > 0 {
+		syncErr := syncXrayNodeConfig(inbound.NodeId)
+		if syncErr != "" {
+			return dto.R{Code: 0, Msg: "Xray 同步失败: " + syncErr, Ts: time.Now().UnixMilli(), Data: "更新成功"}
+		}
+	}
 
 	return dto.Ok("更新成功")
 }
@@ -309,7 +317,10 @@ func DeleteXrayClient(id int64, userId int64, roleId int) dto.R {
 	DB.Delete(&client)
 
 	if inbound.ID > 0 {
-		syncXrayNodeConfig(inbound.NodeId)
+		syncErr := syncXrayNodeConfig(inbound.NodeId)
+		if syncErr != "" {
+			return dto.R{Code: 0, Msg: "Xray 同步失败: " + syncErr, Ts: time.Now().UnixMilli(), Data: "删除成功"}
+		}
 	}
 
 	return dto.Ok("删除成功")

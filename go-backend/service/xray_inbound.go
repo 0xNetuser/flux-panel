@@ -138,7 +138,10 @@ func CreateXrayInbound(d dto.XrayInboundDto, userId int64, roleId int) dto.R {
 		DB.Model(&inbound).Update("tag", inbound.Tag)
 	}
 
-	syncXrayNodeConfig(node.ID)
+	syncErr := syncXrayNodeConfig(node.ID)
+	if syncErr != "" {
+		return dto.R{Code: 0, Msg: "Xray 同步失败: " + syncErr, Ts: time.Now().UnixMilli(), Data: inbound}
+	}
 
 	return dto.Ok(inbound)
 }
@@ -250,7 +253,10 @@ func UpdateXrayInbound(d dto.XrayInboundUpdateDto, userId int64, roleId int) dto
 	DB.Model(&existing).Updates(updates)
 
 	// Sync config to node
-	syncXrayNodeConfig(existing.NodeId)
+	syncErr := syncXrayNodeConfig(existing.NodeId)
+	if syncErr != "" {
+		return dto.R{Code: 0, Msg: "Xray 同步失败: " + syncErr, Ts: time.Now().UnixMilli(), Data: "更新成功"}
+	}
 
 	return dto.Ok("更新成功")
 }
@@ -275,7 +281,10 @@ func DeleteXrayInbound(id int64, userId int64, roleId int) dto.R {
 	DB.Delete(&inbound)
 
 	// Use full sync instead of single remove — XrayRemoveInbound is a no-op on node side
-	syncXrayNodeConfig(inbound.NodeId)
+	syncErr := syncXrayNodeConfig(inbound.NodeId)
+	if syncErr != "" {
+		return dto.R{Code: 0, Msg: "Xray 同步失败: " + syncErr, Ts: time.Now().UnixMilli(), Data: "删除成功"}
+	}
 
 	return dto.Ok("删除成功")
 }
@@ -298,7 +307,10 @@ func EnableXrayInbound(id int64, userId int64, roleId int) dto.R {
 		"enable":       1,
 		"updated_time": time.Now().UnixMilli(),
 	})
-	syncXrayNodeConfig(inbound.NodeId)
+	syncErr := syncXrayNodeConfig(inbound.NodeId)
+	if syncErr != "" {
+		return dto.R{Code: 0, Msg: "Xray 同步失败: " + syncErr, Ts: time.Now().UnixMilli(), Data: "已启用"}
+	}
 	return dto.Ok("已启用")
 }
 
@@ -320,7 +332,10 @@ func DisableXrayInbound(id int64, userId int64, roleId int) dto.R {
 		"enable":       0,
 		"updated_time": time.Now().UnixMilli(),
 	})
-	syncXrayNodeConfig(inbound.NodeId)
+	syncErr := syncXrayNodeConfig(inbound.NodeId)
+	if syncErr != "" {
+		return dto.R{Code: 0, Msg: "Xray 同步失败: " + syncErr, Ts: time.Now().UnixMilli(), Data: "已禁用"}
+	}
 	return dto.Ok("已禁用")
 }
 
@@ -356,7 +371,10 @@ func mergeClientsIntoSettings(inbound *model.XrayInbound) string {
 	return string(result)
 }
 
-func syncXrayNodeConfig(nodeId int64) {
+func syncXrayNodeConfig(nodeId int64) string {
+	if nodeId <= 0 {
+		return ""
+	}
 	var inbounds []model.XrayInbound
 	DB.Where("node_id = ? AND enable = 1", nodeId).Find(&inbounds)
 	// Merge clients into settingsJson before sending to node
@@ -366,5 +384,7 @@ func syncXrayNodeConfig(nodeId int64) {
 	result := pkg.XrayApplyConfig(nodeId, inbounds)
 	if result != nil && result.Msg != "OK" {
 		log.Printf("全量同步 Xray 配置到节点 %d 失败: %s", nodeId, result.Msg)
+		return result.Msg
 	}
+	return ""
 }

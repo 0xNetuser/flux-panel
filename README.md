@@ -54,7 +54,7 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 
 ```bash
 # 下载 docker-compose 配置文件
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.8.6/docker-compose.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.8.7/docker-compose.yml -o docker-compose.yml
 ```
 
 **2. 创建环境变量文件**
@@ -121,7 +121,7 @@ docker compose up -d
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.8.6
+  0xnetuser/gost-node:1.8.7
 ```
 
 也可以使用 docker-compose，参考项目中的 `docker-compose-node.yml`：
@@ -129,7 +129,7 @@ docker run -d --network=host --restart=unless-stopped --name gost-node \
 ```yaml
 services:
   gost-node:
-    image: 0xnetuser/gost-node:1.8.6
+    image: 0xnetuser/gost-node:1.8.7
     container_name: gost-node
     network_mode: host
     restart: unless-stopped
@@ -178,7 +178,7 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 
 ```bash
 # 下载最新 docker-compose 配置（覆盖旧文件）
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.8.6/docker-compose.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.8.7/docker-compose.yml -o docker-compose.yml
 
 # 拉取最新镜像并重启
 docker compose pull && docker compose up -d
@@ -200,7 +200,7 @@ docker stop gost-node && docker rm gost-node
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.8.6
+  0xnetuser/gost-node:1.8.7
 ```
 
 如果使用 docker-compose 部署，更新 `docker-compose-node.yml` 中的镜像版本后：
@@ -223,6 +223,16 @@ curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && c
 
 ## 更新日志
 
+### v1.8.7
+
+- **Xray 配置同步自动回退**：节点端 ApplyConfig 新增备份→验证→回退机制，写入新配置后等待 2 秒验证 Xray 进程存活，失败自动恢复旧配置
+- **同步错误前端上报**：Xray 入站/客户端的创建、更新、删除、启用、禁用操作，同步失败时前端 toast 显示警告信息，DB 操作不受影响
+- **限速规则绑定隧道**：限速创建表单新增隧道选择器，限速列表新增隧道列
+- **Xray 流量统计修复**：实现 CLI 方式查询 Xray 流量统计，启动流量上报定时器
+- **GOST 流量上报修复**：修复 observer 失败时跳过流量上报的问题
+- **新建入站嗅探默认关闭**：新建入站时嗅探默认关闭，与实际使用习惯一致
+- **多项 Bug 修复**：UpdateXrayClient 零 NodeId 同步、SpeedLimitDto TunnelId 校验、syncXrayNodeConfig nodeId 守卫、reconcile 客户端合并
+
 ### v1.8.6
 
 - **Xray 版本下拉选择**：切换 Xray 版本从手动输入改为下拉选择，后端从 GitHub Releases 获取可用版本列表
@@ -236,7 +246,7 @@ curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && c
 - **入站表单改造**：协议设置、传输层、安全层表单全面优化
 - **修改密码修复**：修复修改密码始终失败的问题
 - **Xray 版本远程切换**：节点管理页面新增版本切换按钮，远程升级/降级 Xray 版本
-- **默认 Xray 版本更新**：Docker 镜像默认 Xray 从 1.8.64 更新为 25.1.30
+- **默认 Xray 版本更新**：Docker 镜像默认 Xray 从 1.8.74 更新为 25.1.30
 
 ### v1.7.1
 

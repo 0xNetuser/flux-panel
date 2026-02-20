@@ -219,7 +219,12 @@ export default function SecuritySettings({ value, onChange }: Props) {
     <div className="space-y-4">
       <div className="space-y-2">
         <Label className="inline-flex items-center gap-1">Security (安全层) <FieldTip content="传输层安全类型。TLS 需要域名和证书；Reality 无需域名证书，通过模拟真实网站 TLS 握手来防检测" /></Label>
-        <Select value={value.security} onValueChange={v => update({ security: v })}>
+        <Select value={value.security} onValueChange={v => {
+          update({ security: v });
+          if (v === 'reality' && !value.realityShortIds) {
+            update({ security: v, realityShortIds: randomShortIds() });
+          }
+        }}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="none">None</SelectItem>
@@ -467,9 +472,10 @@ export function buildSecurityJson(form: SecurityForm): Record<string, any> {
     }
     if (form.realityPrivateKey) realitySettings.privateKey = form.realityPrivateKey;
     if (form.realityPublicKey) realitySettings.publicKey = form.realityPublicKey;
-    if (form.realityShortIds) {
-      realitySettings.shortIds = form.realityShortIds.split(',').map(s => s.trim()).filter(Boolean);
-    }
+    const shortIdList = form.realityShortIds
+      ? form.realityShortIds.split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+    realitySettings.shortIds = shortIdList.length > 0 ? shortIdList : randomShortIds().split(',');
     if (form.realitySpiderX) realitySettings.spiderX = form.realitySpiderX;
     if (form.realityFingerprint) realitySettings.fingerprint = form.realityFingerprint;
     if (form.realityXver !== undefined) realitySettings.xver = form.realityXver;

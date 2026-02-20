@@ -39,7 +39,7 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
   const [transportForm, setTransportForm] = useState<TransportForm>({ network: 'tcp' });
   const [securityForm, setSecurityForm] = useState<SecurityForm>({ security: 'none' });
   const [sniffingForm, setSniffingForm] = useState<SniffingForm>({
-    enabled: true, destOverride: ['http', 'tls', 'quic', 'fakedns'], metadataOnly: false, routeOnly: true,
+    enabled: false, destOverride: ['http', 'tls', 'quic', 'fakedns'], metadataOnly: false, routeOnly: true,
   });
 
   // Advanced mode (raw JSON)
@@ -94,7 +94,7 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
       setProtocolForm({});
       setTransportForm({ network: 'tcp' });
       setSecurityForm({ security: 'none' });
-      setSniffingForm({ enabled: true, destOverride: ['http', 'tls', 'quic', 'fakedns'], metadataOnly: false, routeOnly: true });
+      setSniffingForm({ enabled: false, destOverride: ['http', 'tls', 'quic', 'fakedns'], metadataOnly: false, routeOnly: true });
       setRawSettingsJson('{}');
       setRawStreamSettingsJson('{}');
       setRawSniffingJson('{}');

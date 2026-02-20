@@ -101,7 +101,7 @@ export default function XrayInboundPage() {
 
   const getProtocolBadgeVariant = (protocol: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (protocol?.toLowerCase()) {
-      case 'vmess': return 'default';
+      case 'vmess': return 'secondary';
       case 'vless': return 'secondary';
       case 'trojan': return 'destructive';
       case 'shadowsocks':
@@ -159,6 +159,9 @@ export default function XrayInboundPage() {
 
     if (res.code === 0) {
       toast.success(data.id ? '更新成功' : '创建成功');
+      if (res.msg && res.msg !== '操作成功') {
+        toast.warning(res.msg);
+      }
       setDialogOpen(false);
       loadData();
     } else {
@@ -169,8 +172,15 @@ export default function XrayInboundPage() {
   const handleDelete = async (id: number) => {
     if (!confirm('确定删除此入站? 相关客户端也将被删除。')) return;
     const res = await deleteXrayInbound(id);
-    if (res.code === 0) { toast.success('删除成功'); loadData(); }
-    else toast.error(res.msg);
+    if (res.code === 0) {
+      toast.success('删除成功');
+      if (res.msg && res.msg !== '操作成功') {
+        toast.warning(res.msg);
+      }
+      loadData();
+    } else {
+      toast.error(res.msg);
+    }
   };
 
   const handleToggleEnable = async (inbound: any) => {
@@ -179,6 +189,9 @@ export default function XrayInboundPage() {
       : await enableXrayInbound(inbound.id);
     if (res.code === 0) {
       toast.success(inbound.enable ? '已禁用' : '已启用');
+      if (res.msg && res.msg !== '操作成功') {
+        toast.warning(res.msg);
+      }
       loadData();
     } else {
       toast.error(res.msg);

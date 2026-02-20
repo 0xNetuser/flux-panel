@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
-	"regexp"
-	"strconv"
 	"strings"
 )
 
@@ -97,70 +95,70 @@ func (c *XrayGrpcClient) QueryTraffic(reset bool) ([]TrafficStat, error) {
 		return nil, fmt.Errorf("xray api statsquery failed: %v, output: %s", err, string(output))
 	}
 
-	return parseStatsQueryOutput(string(output)), nil
+	return parseStatsOutput(string(output)), nil
 }
 
-// statNameValueRe matches lines like:
+// statsQueryJSON represents the JSON output from `xray api statsquery`.
+// Example:
 //
-//	name: "user>>>email@test.com>>>traffic>>>uplink"
-//	value: 12345
-var statNameRe = regexp.MustCompile(`name:\s*"([^"]+)"`)
-var statValueRe = regexp.MustCompile(`value:\s*(\d+)`)
+//	{
+//	  "stat": [
+//	    {"name": "user>>>email@test.com>>>traffic>>>uplink", "value": 12345},
+//	    {"name": "user>>>email@test.com>>>traffic>>>downlink", "value": 67890}
+//	  ]
+//	}
+type statsQueryJSON struct {
+	Stat []struct {
+		Name  string `json:"name"`
+		Value int64  `json:"value"`
+	} `json:"stat"`
+}
 
-// parseStatsQueryOutput parses the text-proto output from `xray api statsquery`.
-// Example output:
-//
-//	stat: <
-//	  name: "user>>>test@test.com>>>traffic>>>uplink"
-//	  value: 12345
-//	>
-//	stat: <
-//	  name: "user>>>test@test.com>>>traffic>>>downlink"
-//	  value: 67890
-//	>
-func parseStatsQueryOutput(output string) []TrafficStat {
+// parseStatsOutput tries JSON parsing first, then falls back to text-proto.
+func parseStatsOutput(output string) []TrafficStat {
+	output = strings.TrimSpace(output)
+	if output == "" {
+		return nil
+	}
+
+	// Try JSON format (Xray-core modern versions)
+	var jsonResult statsQueryJSON
+	if err := json.Unmarshal([]byte(output), &jsonResult); err == nil && len(jsonResult.Stat) > 0 {
+		return extractUserStats(jsonResult)
+	}
+
+	return nil
+}
+
+// extractUserStats extracts per-user traffic stats from parsed JSON.
+func extractUserStats(result statsQueryJSON) []TrafficStat {
 	trafficMap := make(map[string]*TrafficStat)
 
-	lines := strings.Split(output, "\n")
-	var currentName string
+	for _, s := range result.Stat {
+		// Parse: user>>>{email}>>>traffic>>>uplink|downlink
+		parts := strings.Split(s.Name, ">>>")
+		if len(parts) >= 4 && parts[0] == "user" {
+			email := parts[1]
+			direction := parts[3]
 
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-
-		if m := statNameRe.FindStringSubmatch(line); len(m) > 1 {
-			currentName = m[1]
-			continue
-		}
-
-		if m := statValueRe.FindStringSubmatch(line); len(m) > 1 && currentName != "" {
-			value, _ := strconv.ParseInt(m[1], 10, 64)
-
-			// Parse: user>>>{email}>>>traffic>>>uplink|downlink
-			parts := strings.Split(currentName, ">>>")
-			if len(parts) >= 4 && parts[0] == "user" {
-				email := parts[1]
-				direction := parts[3]
-
-				if _, ok := trafficMap[email]; !ok {
-					trafficMap[email] = &TrafficStat{Email: email}
-				}
-
-				switch direction {
-				case "uplink":
-					trafficMap[email].Uplink = value
-				case "downlink":
-					trafficMap[email].Downlink = value
-				}
+			if _, ok := trafficMap[email]; !ok {
+				trafficMap[email] = &TrafficStat{Email: email}
 			}
-			currentName = ""
+
+			switch direction {
+			case "uplink":
+				trafficMap[email].Uplink = s.Value
+			case "downlink":
+				trafficMap[email].Downlink = s.Value
+			}
 		}
 	}
 
-	result := make([]TrafficStat, 0, len(trafficMap))
+	result2 := make([]TrafficStat, 0, len(trafficMap))
 	for _, stat := range trafficMap {
 		if stat.Uplink > 0 || stat.Downlink > 0 {
-			result = append(result, *stat)
+			result2 = append(result2, *stat)
 		}
 	}
-	return result
+	return result2
 }

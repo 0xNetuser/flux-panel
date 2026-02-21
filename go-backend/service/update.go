@@ -10,8 +10,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -183,33 +181,13 @@ func SelfUpdate() dto.R {
 		return dto.Err("已是最新版本")
 	}
 
-	// 2. Read and update docker-compose.yml
-	composePath := "/data/compose/docker-compose.yml"
-	content, err := os.ReadFile(composePath)
-	if err != nil {
-		return dto.Err(fmt.Sprintf("读取 docker-compose.yml 失败: %v", err))
-	}
-
-	// Backup
-	if err := os.WriteFile(composePath+".bak", content, 0644); err != nil {
-		return dto.Err(fmt.Sprintf("备份 docker-compose.yml 失败: %v", err))
-	}
-
-	// Replace image tags: 0xnetuser/xxx:OLD → 0xnetuser/xxx:NEW
-	re := regexp.MustCompile(`(0xnetuser/[^:]+:)\d+\.\d+\.\d+[^\s"]*`)
-	updated := re.ReplaceAllString(string(content), "${1}"+latestVersion)
-
-	if err := os.WriteFile(composePath, []byte(updated), 0644); err != nil {
-		return dto.Err(fmt.Sprintf("更新 docker-compose.yml 失败: %v", err))
-	}
-
-	// 3. Get host compose directory and project name from container labels
+	// 2. Get host compose directory and project name from container labels
 	hostDir, projectName, err := getComposeInfo()
 	if err != nil {
 		return dto.Err(err.Error())
 	}
 
-	// 4. Pull docker:cli image and create updater container via Docker API
+	// 3. Pull docker:cli image
 	updaterImage := "docker:cli"
 	pullClient := &http.Client{
 		Transport: &http.Transport{
@@ -230,9 +208,18 @@ func SelfUpdate() dto.R {
 		return dto.Err(fmt.Sprintf("拉取更新镜像失败，状态码: %d", pullResp.StatusCode))
 	}
 
+	// 4. Create updater container
+	// The updater mounts the host compose directory and does all the work:
+	// - sed replaces image version tags in docker-compose.yml
+	// - docker compose pull + up -d restarts with new images
+	// This avoids needing a bind mount on the backend container.
+	sedCmd := fmt.Sprintf(`sed -i 's|\(0xnetuser/[^:]*:\)[^ "]*|\1%s|g' docker-compose.yml`, latestVersion)
+	updaterCmd := fmt.Sprintf("sleep 3 && cd /compose && cp docker-compose.yml docker-compose.yml.bak && %s && docker compose -p %s pull && docker compose -p %s up -d",
+		sedCmd, projectName, projectName)
+
 	createBody := map[string]interface{}{
 		"Image": updaterImage,
-		"Cmd":   []string{"sh", "-c", fmt.Sprintf("sleep 3 && cd /compose && docker compose -p %s pull && docker compose -p %s up -d", projectName, projectName)},
+		"Cmd":   []string{"sh", "-c", updaterCmd},
 		"HostConfig": map[string]interface{}{
 			"Binds": []string{"/var/run/docker.sock:/var/run/docker.sock", hostDir + ":/compose"},
 		},

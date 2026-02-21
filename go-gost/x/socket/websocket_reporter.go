@@ -735,8 +735,14 @@ func (w *WebSocketReporter) handleUpdateForwarder(data interface{}) error {
 		return fmt.Errorf("序列化数据失败: %v", err)
 	}
 
+	// 预处理：将字符串格式的 duration 转换为纳秒数（如 failTimeout: "600s" → int64）
+	processedData, err := w.preprocessDurationFields(jsonData)
+	if err != nil {
+		return fmt.Errorf("预处理duration字段失败: %v", err)
+	}
+
 	var req updateForwarderRequest
-	if err := json.Unmarshal(jsonData, &req); err != nil {
+	if err := json.Unmarshal(processedData, &req); err != nil {
 		return fmt.Errorf("解析更新转发器请求失败: %v", err)
 	}
 

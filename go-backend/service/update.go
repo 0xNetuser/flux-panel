@@ -214,10 +214,15 @@ func SelfUpdate() dto.R {
 		},
 		Timeout: 5 * time.Minute,
 	}
-	pullReq, _ := http.NewRequest("POST", "http://localhost/images/create?fromImage="+updaterImage+"&tag=latest", nil)
-	if pullResp, pullErr := pullClient.Do(pullReq); pullErr == nil {
-		io.Copy(io.Discard, pullResp.Body)
-		pullResp.Body.Close()
+	pullReq, _ := http.NewRequest("POST", "http://localhost/images/create?fromImage=docker&tag=cli", nil)
+	pullResp, pullErr := pullClient.Do(pullReq)
+	if pullErr != nil {
+		return dto.Err(fmt.Sprintf("拉取更新镜像失败: %v", pullErr))
+	}
+	io.Copy(io.Discard, pullResp.Body)
+	pullResp.Body.Close()
+	if pullResp.StatusCode >= 400 {
+		return dto.Err(fmt.Sprintf("拉取更新镜像失败，状态码: %d", pullResp.StatusCode))
 	}
 
 	createBody := map[string]interface{}{

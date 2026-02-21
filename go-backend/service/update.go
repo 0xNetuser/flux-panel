@@ -142,11 +142,11 @@ func dockerRequest(method, path string, body interface{}) ([]byte, error) {
 	return respBody, nil
 }
 
-// getHostComposeDir reads the compose working directory from the backend container's labels.
-func getHostComposeDir() (string, error) {
+// getComposeInfo reads the compose working directory and project name from the backend container's labels.
+func getComposeInfo() (hostDir string, projectName string, err error) {
 	data, err := dockerRequest("GET", "/containers/go-backend/json", nil)
 	if err != nil {
-		return "", fmt.Errorf("获取容器信息失败: %v", err)
+		return "", "", fmt.Errorf("获取容器信息失败: %v", err)
 	}
 
 	var info struct {
@@ -155,15 +155,20 @@ func getHostComposeDir() (string, error) {
 		} `json:"Config"`
 	}
 	if err := json.Unmarshal(data, &info); err != nil {
-		return "", fmt.Errorf("解析容器信息失败: %v", err)
+		return "", "", fmt.Errorf("解析容器信息失败: %v", err)
 	}
 
-	dir, ok := info.Config.Labels["com.docker.compose.project.working_dir"]
-	if !ok || dir == "" {
-		return "", fmt.Errorf("未找到 compose 工作目录 label")
+	hostDir, ok := info.Config.Labels["com.docker.compose.project.working_dir"]
+	if !ok || hostDir == "" {
+		return "", "", fmt.Errorf("未找到 compose 工作目录 label")
 	}
 
-	return dir, nil
+	projectName = info.Config.Labels["com.docker.compose.project"]
+	if projectName == "" {
+		projectName = "flux-panel"
+	}
+
+	return hostDir, projectName, nil
 }
 
 func SelfUpdate() dto.R {
@@ -198,8 +203,8 @@ func SelfUpdate() dto.R {
 		return dto.Err(fmt.Sprintf("更新 docker-compose.yml 失败: %v", err))
 	}
 
-	// 3. Get host compose directory from container labels
-	hostDir, err := getHostComposeDir()
+	// 3. Get host compose directory and project name from container labels
+	hostDir, projectName, err := getComposeInfo()
 	if err != nil {
 		return dto.Err(err.Error())
 	}
@@ -227,7 +232,7 @@ func SelfUpdate() dto.R {
 
 	createBody := map[string]interface{}{
 		"Image": updaterImage,
-		"Cmd":   []string{"sh", "-c", "sleep 3 && cd /compose && docker compose pull && docker compose up -d"},
+		"Cmd":   []string{"sh", "-c", fmt.Sprintf("sleep 3 && cd /compose && docker compose -p %s pull && docker compose -p %s up -d", projectName, projectName)},
 		"HostConfig": map[string]interface{}{
 			"Binds":      []string{"/var/run/docker.sock:/var/run/docker.sock", hostDir + ":/compose"},
 			"AutoRemove": true,

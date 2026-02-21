@@ -34,7 +34,7 @@ export default function XrayClientPage() {
   const [form, setForm] = useState({
     inboundId: '', userId: '', email: '', uuid: '', flow: '',
     alterId: '0', totalTraffic: '', expTime: '', remark: '',
-    limitIp: '0', reset: '0', tgId: '', subId: '',
+    limitIp: '0', reset: '0',
   });
 
   const formatBytes = (bytes: number) => {
@@ -51,12 +51,6 @@ export default function XrayClientPage() {
       const v = c === 'x' ? r : (r & 0x3) | 0x8;
       return v.toString(16);
     });
-  };
-
-  const generateSubId = () => {
-    const arr = new Uint8Array(16);
-    crypto.getRandomValues(arr);
-    return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
   };
 
   const loadData = useCallback(async () => {
@@ -93,7 +87,7 @@ export default function XrayClientPage() {
     setForm({
       inboundId: '', userId: '', email: '', uuid: generateUUID(), flow: '',
       alterId: '0', totalTraffic: '', expTime: '', remark: '',
-      limitIp: '0', reset: '0', tgId: '', subId: '',
+      limitIp: '0', reset: '0',
     });
     setDialogOpen(true);
   };
@@ -112,8 +106,6 @@ export default function XrayClientPage() {
       remark: client.remark || '',
       limitIp: client.limitIp?.toString() || '0',
       reset: client.reset?.toString() || '0',
-      tgId: client.tgId || '',
-      subId: client.subId || '',
     });
     setDialogOpen(true);
   };
@@ -132,8 +124,6 @@ export default function XrayClientPage() {
       alterId: parseInt(form.alterId) || 0,
       limitIp: parseInt(form.limitIp) || 0,
       reset: parseInt(form.reset) || 0,
-      tgId: form.tgId || undefined,
-      subId: form.subId || undefined,
       remark: form.remark || undefined,
     };
     if (form.userId) data.userId = parseInt(form.userId);
@@ -429,21 +419,6 @@ export default function XrayClientPage() {
                   onChange={e => setForm(p => ({ ...p, reset: e.target.value }))}
                   placeholder="0 = 不重置"
                 />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Telegram ID</Label>
-                <Input value={form.tgId} onChange={e => setForm(p => ({ ...p, tgId: e.target.value }))} placeholder="可选" />
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>订阅 ID</Label>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setForm(p => ({ ...p, subId: generateSubId() }))}>
-                    <RefreshCw className="mr-1 h-3 w-3" />生成
-                  </Button>
-                </div>
-                <Input value={form.subId} onChange={e => setForm(p => ({ ...p, subId: e.target.value }))} placeholder="自动生成" className="font-mono text-sm" />
               </div>
             </div>
             <div className="space-y-2">

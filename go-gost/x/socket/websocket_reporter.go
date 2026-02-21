@@ -1278,9 +1278,17 @@ func (w *WebSocketReporter) handleNodeUpdateBinary(data interface{}) error {
 			fmt.Printf("📦 已备份旧二进制到 %s\n", backupPath)
 		}
 
-		// 4. 替换二进制
+		// 4. 替换二进制（先删除旧文件再写入，避免 "text file busy"）
+		os.Remove(currentBinary)
 		if err := copyFileForUpdate(tmpPath, currentBinary); err != nil {
 			fmt.Printf("❌ 替换二进制失败: %v\n", err)
+			// 尝试从备份恢复
+			if restoreErr := copyFileForUpdate(backupPath, currentBinary); restoreErr != nil {
+				fmt.Printf("❌ 恢复备份也失败: %v\n", restoreErr)
+			} else {
+				os.Chmod(currentBinary, 0755)
+				fmt.Printf("📦 已从备份恢复\n")
+			}
 			os.Remove(tmpPath)
 			return
 		}

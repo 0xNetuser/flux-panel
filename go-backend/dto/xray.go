@@ -36,8 +36,6 @@ type XrayClientDto struct {
 	ExpTime        *int64 `json:"expTime"`
 	LimitIp        *int   `json:"limitIp"`
 	Reset          *int   `json:"reset"`
-	TgId           string `json:"tgId"`
-	SubId          string `json:"subId"`
 	Remark         string `json:"remark"`
 }
 
@@ -51,8 +49,6 @@ type XrayClientUpdateDto struct {
 	ExpTime      *int64 `json:"expTime"`
 	LimitIp      *int   `json:"limitIp"`
 	Reset        *int   `json:"reset"`
-	TgId         string `json:"tgId"`
-	SubId        string `json:"subId"`
 	Enable       *int   `json:"enable"`
 	Remark       string `json:"remark"`
 }

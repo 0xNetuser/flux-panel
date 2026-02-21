@@ -26,7 +26,7 @@ import {
 import { getAccessibleNodeList } from '@/lib/api/node';
 import { getAllUsers } from '@/lib/api/user';
 import { useAuth } from '@/lib/hooks/use-auth';
-import { randomUUID, randomHex } from '@/lib/utils/random';
+import { randomUUID } from '@/lib/utils/random';
 import InboundDialog from './_components/inbound-dialog';
 
 export default function XrayInboundPage() {
@@ -52,7 +52,7 @@ export default function XrayInboundPage() {
   const [clientForm, setClientForm] = useState({
     userId: '', email: '', uuid: '', flow: '',
     alterId: '0', totalTraffic: '', expTime: '', remark: '',
-    limitIp: '0', reset: '0', tgId: '', subId: '',
+    limitIp: '0', reset: '0',
   });
 
   // QR dialog
@@ -228,7 +228,7 @@ export default function XrayInboundPage() {
     setClientForm({
       userId: '', email: '', uuid: randomUUID(), flow: '',
       alterId: '0', totalTraffic: '', expTime: '', remark: '',
-      limitIp: '0', reset: '0', tgId: '', subId: '',
+      limitIp: '0', reset: '0',
     });
     setClientDialogOpen(true);
   };
@@ -247,8 +247,6 @@ export default function XrayInboundPage() {
       remark: client.remark || '',
       limitIp: client.limitIp?.toString() || '0',
       reset: client.reset?.toString() || '0',
-      tgId: client.tgId || '',
-      subId: client.subId || '',
     });
     setClientDialogOpen(true);
   };
@@ -267,8 +265,6 @@ export default function XrayInboundPage() {
       alterId: parseInt(clientForm.alterId) || 0,
       limitIp: parseInt(clientForm.limitIp) || 0,
       reset: parseInt(clientForm.reset) || 0,
-      tgId: clientForm.tgId || undefined,
-      subId: clientForm.subId || undefined,
       remark: clientForm.remark || undefined,
     };
     if (clientForm.userId) data.userId = parseInt(clientForm.userId);
@@ -676,21 +672,6 @@ export default function XrayInboundPage() {
                   onChange={e => setClientForm(p => ({ ...p, reset: e.target.value }))}
                   placeholder="0 = 不重置"
                 />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Telegram ID</Label>
-                <Input value={clientForm.tgId} onChange={e => setClientForm(p => ({ ...p, tgId: e.target.value }))} placeholder="可选" />
-              </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label>订阅 ID</Label>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => setClientForm(p => ({ ...p, subId: randomHex(16) }))}>
-                    <RefreshCw className="mr-1 h-3 w-3" />生成
-                  </Button>
-                </div>
-                <Input value={clientForm.subId} onChange={e => setClientForm(p => ({ ...p, subId: e.target.value }))} placeholder="自动生成" className="font-mono text-sm" />
               </div>
             </div>
             <div className="space-y-2">

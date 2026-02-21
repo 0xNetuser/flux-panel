@@ -62,6 +62,10 @@ func main() {
 	// Drop legacy unique constraints that are no longer needed
 	db.Exec("ALTER TABLE `xray_inbound` DROP INDEX `uk_node_tag`")
 
+	// Drop unused tg_id and sub_id columns from xray_client
+	db.Exec("ALTER TABLE `xray_client` DROP COLUMN `tg_id`")
+	db.Exec("ALTER TABLE `xray_client` DROP COLUMN `sub_id`")
+
 	// Ensure default config exists (replaces gost.sql seed data)
 	ensureDefaultConfig(db)
 

@@ -1,5 +1,27 @@
 # Changelog
 
+## v1.9.10 — 删除无用字段 + 修复节点更新 text file busy
+
+### Bug Fixes
+
+- **修复节点自更新 "text file busy"**：Linux 不允许覆盖正在运行的二进制文件，改为先 `os.Remove` 旧文件再写入新文件，避免报错；失败时自动从备份恢复
+
+### Changed
+
+- **删除 Xray 客户端 tgId/subId 字段**：这两个字段从未被实际使用（仅存储，无任何读取逻辑），从 model、DTO、service、前端表单中全部移除，启动时自动 DROP 对应数据库列
+
+### Changed Files
+
+- `go-gost/x/socket/websocket_reporter.go` — 替换二进制前先 Remove，避免 text file busy
+- `go-backend/model/xray_client.go` — 移除 TgId、SubId 字段
+- `go-backend/dto/xray.go` — 移除 XrayClientDto/XrayClientUpdateDto 中的 tgId、subId
+- `go-backend/service/xray_client.go` — 移除 tgId 赋值、subId 生成逻辑、更新逻辑
+- `go-backend/main.go` — 启动时 DROP tg_id、sub_id 列
+- `nextjs-frontend/app/(auth)/xray/client/page.tsx` — 移除表单中 Telegram ID 和订阅 ID 字段
+- `nextjs-frontend/app/(auth)/xray/inbound/page.tsx` — 移除客户端表单中 Telegram ID 和订阅 ID 字段
+
+---
+
 ## v1.9.9 — 系统配置检查更新 + 登录页去品牌化 + 多项修复
 
 ### Features

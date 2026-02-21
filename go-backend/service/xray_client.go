@@ -131,7 +131,6 @@ func CreateXrayClient(d dto.XrayClientDto, userId int64, roleId int) dto.R {
 		UpTraffic:    0,
 		DownTraffic:  0,
 		Enable:       1,
-		TgId:         d.TgId,
 		Remark:       d.Remark,
 		CreatedTime:  time.Now().UnixMilli(),
 		UpdatedTime:  time.Now().UnixMilli(),
@@ -151,13 +150,6 @@ func CreateXrayClient(d dto.XrayClientDto, userId int64, roleId int) dto.R {
 	}
 	if d.Reset != nil {
 		client.Reset = *d.Reset
-	}
-
-	// Generate or use provided subId
-	if d.SubId != "" {
-		client.SubId = d.SubId
-	} else {
-		client.SubId = pkg.GenerateRandomString(16)
 	}
 
 	// Generate UUID or use specified password
@@ -266,12 +258,6 @@ func UpdateXrayClient(d dto.XrayClientUpdateDto, userId int64, roleId int) dto.R
 	}
 	if d.Reset != nil {
 		updates["reset"] = *d.Reset
-	}
-	if d.TgId != "" {
-		updates["tg_id"] = d.TgId
-	}
-	if d.SubId != "" {
-		updates["sub_id"] = d.SubId
 	}
 	if d.Enable != nil {
 		updates["enable"] = *d.Enable

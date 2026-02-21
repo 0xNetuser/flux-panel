@@ -235,21 +235,25 @@ func reconcileXrayInbounds(nodeId int64, result *ReconcileResult) {
 		inbounds[i].SettingsJson = mergeClientsIntoSettings(&inbounds[i])
 	}
 
-	// Check if Xray is running on the node.
-	// If not running (e.g. after node restart), use XrayApplyConfig to start it.
-	// If running (e.g. after panel restart), use per-inbound hot-add to avoid killing connections.
-	xrayRunning := false
-	if status := pkg.XrayStatus(nodeId); status != nil && status.Msg == gostSuccessMsg {
-		if dataMap, ok := status.Data.(map[string]interface{}); ok {
-			if running, ok := dataMap["running"].(bool); ok {
-				xrayRunning = running
-			}
-		}
+	// Strategy: try hot-add first inbound via gRPC. If it fails with a
+	// connection/dial error, Xray isn't running → fall back to ApplyConfig.
+	// If it succeeds or returns "already exists", Xray is running → continue hot-add.
+	firstResult := pkg.XrayAddInbound(nodeId, &inbounds[0])
+	firstMsg := ""
+	if firstResult != nil {
+		firstMsg = firstResult.Msg
 	}
 
-	if !xrayRunning {
+	needApplyConfig := firstResult == nil ||
+		strings.Contains(firstMsg, "dial") ||
+		strings.Contains(firstMsg, "connection refused") ||
+		strings.Contains(firstMsg, "failed") ||
+		strings.Contains(firstMsg, "not running") ||
+		strings.Contains(firstMsg, "超时")
+
+	if needApplyConfig {
 		// Xray not running — use ApplyConfig to write config and start the process
-		log.Printf("[Reconcile] 节点 %d Xray 未运行，使用 ApplyConfig 启动", nodeId)
+		log.Printf("[Reconcile] 节点 %d Xray 未运行 (%s)，使用 ApplyConfig 启动", nodeId, firstMsg)
 		r := pkg.XrayApplyConfig(nodeId, inbounds)
 		if r != nil && r.Msg != gostSuccessMsg {
 			result.Errors = append(result.Errors, fmt.Sprintf("Xray ApplyConfig: %s", r.Msg))
@@ -258,10 +262,14 @@ func reconcileXrayInbounds(nodeId int64, result *ReconcileResult) {
 		return
 	}
 
-	// Xray is running — use per-inbound hot-add (gRPC), no restart needed.
-	// If inbound already exists on the node, the add will fail harmlessly —
-	// we skip it to avoid restarting the Xray process and killing connections.
-	for _, ib := range inbounds {
+	// First inbound succeeded (or already exists) — Xray is running.
+	// Hot-add remaining inbounds.
+	if firstMsg != gostSuccessMsg {
+		log.Printf("[Reconcile] Xray inbound %s: %s (跳过)", inbounds[0].Tag, firstMsg)
+	}
+	result.Inbounds++
+
+	for _, ib := range inbounds[1:] {
 		r := pkg.XrayAddInbound(nodeId, &ib)
 		if r != nil && r.Msg != gostSuccessMsg {
 			log.Printf("[Reconcile] Xray inbound %s: %s (跳过)", ib.Tag, r.Msg)

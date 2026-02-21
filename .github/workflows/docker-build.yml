@@ -2,7 +2,7 @@ name: Build and Push Images Based on Version
 
 # 在这里定义统一版本号
 env:
-  VERSION: "1.9.13"
+  VERSION: "1.9.14"
 
 on:
   push:

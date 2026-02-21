@@ -1,12 +1,12 @@
 # Changelog
 
-## v1.9.13 — 修复面板自更新镜像拉取 + Reconcile Xray + 清理无用字段
+## v1.9.14 — 修复 Reconcile Xray 探测策略 + 修复面板自更新
 
 ### Bug Fixes
 
 - **修复节点自更新 "text file busy"**：Linux 不允许覆盖正在运行的二进制文件，改为先 `os.Remove` 旧文件再写入新文件，避免报错；失败时自动从备份恢复
 - **修复面板一键更新 "No such image"**：Docker pull API 参数修正为 `fromImage=docker&tag=cli`，并检查 pull 返回状态码，失败时返回明确错误
-- **修复 Reconcile 节点重启后 Xray 未启动**：reconcile 先检查 XrayStatus，未运行时使用 `XrayApplyConfig` 启动进程；已运行时使用热添加避免断连
+- **修复 Reconcile 节点重启后 Xray 未启动**：改用 try-first 策略——先尝试热添加第一个 inbound，如果返回连接错误（Xray 未运行），自动 fallback 到 `XrayApplyConfig` 启动进程
 
 ### Changed
 

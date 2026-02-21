@@ -40,9 +40,10 @@ type XrayClientDto struct {
 }
 
 type XrayClientUpdateDto struct {
-	ID           int64  `json:"id" binding:"required"`
-	Email        string `json:"email"`
-	Flow         string `json:"flow"`
+	ID             int64  `json:"id" binding:"required"`
+	Email          string `json:"email"`
+	UuidOrPassword string `json:"uuidOrPassword"`
+	Flow           string `json:"flow"`
 	AlterId      *int   `json:"alterId"`
 	TotalTraffic *int64 `json:"totalTraffic"`
 	ExpTime      *int64 `json:"expTime"`

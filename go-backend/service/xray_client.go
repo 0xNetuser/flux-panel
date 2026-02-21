@@ -246,6 +246,9 @@ func UpdateXrayClient(d dto.XrayClientUpdateDto, userId int64, roleId int) dto.R
 	if d.Email != "" {
 		updates["email"] = d.Email
 	}
+	if d.UuidOrPassword != "" {
+		updates["uuid_or_password"] = d.UuidOrPassword
+	}
 	if d.Flow != "" {
 		updates["flow"] = d.Flow
 	}

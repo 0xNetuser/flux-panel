@@ -3,6 +3,7 @@ package xray
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -22,69 +23,61 @@ func NewXrayGrpcClient(addr string, binaryPaths ...string) *XrayGrpcClient {
 	return &XrayGrpcClient{addr: addr, binaryPath: bp}
 }
 
-// AddUser adds a user to an inbound via Xray API CLI command
+// AddUser adds a user to an inbound via Xray API CLI command.
+// Requires Xray v25.7.26+ (adu command). Returns error on older versions.
 func (c *XrayGrpcClient) AddUser(inboundTag, email, uuidOrPassword, flow, protocol string, alterId int) error {
-	var userJSON string
-
+	clientObj := map[string]interface{}{"email": email, "level": 0}
 	switch protocol {
 	case "vmess":
-		user := map[string]interface{}{
-			"email":   email,
-			"level":   0,
-			"alterId": alterId,
-			"id":      uuidOrPassword,
-		}
-		data, _ := json.Marshal(user)
-		userJSON = string(data)
+		clientObj["id"] = uuidOrPassword
+		clientObj["alterId"] = alterId
 	case "vless":
-		user := map[string]interface{}{
-			"email":      email,
-			"level":      0,
-			"id":         uuidOrPassword,
-			"flow":       flow,
-			"encryption": "none",
-		}
-		data, _ := json.Marshal(user)
-		userJSON = string(data)
+		clientObj["id"] = uuidOrPassword
+		clientObj["flow"] = flow
 	case "trojan":
-		user := map[string]interface{}{
-			"email":    email,
-			"level":    0,
-			"password": uuidOrPassword,
-		}
-		data, _ := json.Marshal(user)
-		userJSON = string(data)
+		clientObj["password"] = uuidOrPassword
 	case "shadowsocks":
-		user := map[string]interface{}{
-			"email":    email,
-			"level":    0,
-			"password": uuidOrPassword,
-			"method":   "aes-256-gcm",
-		}
-		data, _ := json.Marshal(user)
-		userJSON = string(data)
+		clientObj["password"] = uuidOrPassword
 	default:
 		return fmt.Errorf("unsupported protocol: %s", protocol)
 	}
 
+	// adu expects a JSON file in InboundDetourConfig format: {tag, settings: {clients: [...]}}
+	config := map[string]interface{}{
+		"tag": inboundTag,
+		"settings": map[string]interface{}{
+			"clients": []interface{}{clientObj},
+		},
+	}
+	configData, _ := json.Marshal(config)
+
+	tmpFile, err := os.CreateTemp("", "xray-adu-*.json")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	tmpFile.Write(configData)
+	tmpFile.Close()
+
 	fmt.Printf("📡 Xray gRPC addUser: tag=%s email=%s\n", inboundTag, email)
 	cmd := exec.Command(c.binaryPath, "api", "adu",
-		"--server="+c.addr, "--inbound="+inboundTag, "--user="+userJSON)
+		"--server="+c.addr, tmpFile.Name())
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("xray api adduser failed: %v, output: %s", err, string(output))
+		return fmt.Errorf("xray api adu failed: %v, output: %s", err, string(output))
 	}
 	return nil
 }
 
-// RemoveUser removes a user from an inbound via Xray API CLI command
+// RemoveUser removes a user from an inbound via Xray API CLI command.
+// Requires Xray v25.7.26+ (rmu command). Returns error on older versions.
 func (c *XrayGrpcClient) RemoveUser(inboundTag, email string) error {
 	fmt.Printf("📡 Xray gRPC removeUser: tag=%s email=%s\n", inboundTag, email)
 	cmd := exec.Command(c.binaryPath, "api", "rmu",
-		"--server="+c.addr, "--inbound="+inboundTag, "--email="+email)
+		"--server="+c.addr, "-tag="+inboundTag, email)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("xray api rmuser failed: %v, output: %s", err, string(output))
+		return fmt.Errorf("xray api rmu failed: %v, output: %s", err, string(output))
 	}
 	return nil
 }
@@ -92,12 +85,21 @@ func (c *XrayGrpcClient) RemoveUser(inboundTag, email string) error {
 // AddInbound adds an inbound to a running Xray instance via gRPC API
 func (c *XrayGrpcClient) AddInbound(configJSON string) error {
 	fmt.Printf("📡 Xray gRPC addInbound\n")
+
+	// adi expects a JSON file path as positional argument
+	tmpFile, err := os.CreateTemp("", "xray-adi-*.json")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	tmpFile.WriteString(configJSON)
+	tmpFile.Close()
+
 	cmd := exec.Command(c.binaryPath, "api", "adi",
-		"--server="+c.addr, "--config=stdin")
-	cmd.Stdin = strings.NewReader(configJSON)
+		"--server="+c.addr, tmpFile.Name())
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("xray api addinbound failed: %v, output: %s", err, string(output))
+		return fmt.Errorf("xray api adi failed: %v, output: %s", err, string(output))
 	}
 	return nil
 }
@@ -106,10 +108,10 @@ func (c *XrayGrpcClient) AddInbound(configJSON string) error {
 func (c *XrayGrpcClient) RemoveInbound(tag string) error {
 	fmt.Printf("📡 Xray gRPC removeInbound: tag=%s\n", tag)
 	cmd := exec.Command(c.binaryPath, "api", "rmi",
-		"--server="+c.addr, "--tag="+tag)
+		"--server="+c.addr, tag)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("xray api rminbound failed: %v, output: %s", err, string(output))
+		return fmt.Errorf("xray api rmi failed: %v, output: %s", err, string(output))
 	}
 	return nil
 }

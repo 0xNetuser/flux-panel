@@ -592,17 +592,13 @@ func (m *XrayManager) HotRemoveInbound(tag string) error {
 
 // HotAddUser adds a user to an inbound on the running Xray instance via gRPC API
 // and updates the config file for persistence (no restart needed).
+// If adu command is unavailable (Xray < v25.7.26), falls back to rmi+adi (brief inbound reconnect).
 func (m *XrayManager) HotAddUser(tag, email, uuidOrPassword, flow, protocol string, alterId int) error {
 	if !m.IsRunning() {
 		return fmt.Errorf("Xray is not running")
 	}
 
-	client := NewXrayGrpcClient(m.grpcAddr, m.binaryPath)
-	if err := client.AddUser(tag, email, uuidOrPassword, flow, protocol, alterId); err != nil {
-		return fmt.Errorf("hot add user failed: %v", err)
-	}
-
-	// Update config file: add client to the inbound's settings.clients
+	// Update config file first (always, for persistence)
 	m.updateConfigFile(func(config map[string]interface{}) {
 		inbounds, _ := config["inbounds"].([]interface{})
 		for _, ib := range inbounds {
@@ -636,23 +632,33 @@ func (m *XrayManager) HotAddUser(tag, email, uuidOrPassword, flow, protocol stri
 		}
 	})
 
-	fmt.Printf("✅ Hot-added user: %s to %s\n", email, tag)
+	// Try adu command (Xray v25.7.26+)
+	client := NewXrayGrpcClient(m.grpcAddr, m.binaryPath)
+	err := client.AddUser(tag, email, uuidOrPassword, flow, protocol, alterId)
+	if err == nil {
+		fmt.Printf("✅ Hot-added user: %s to %s\n", email, tag)
+		return nil
+	}
+
+	// Fallback: reload inbound via rmi+adi (works with all Xray versions)
+	fmt.Printf("⚠️ adu command failed (%v), falling back to inbound reload\n", err)
+	if reloadErr := m.reloadInbound(tag); reloadErr != nil {
+		return fmt.Errorf("hot add user failed: adu: %v, reload: %v", err, reloadErr)
+	}
+
+	fmt.Printf("✅ Hot-added user (via reload): %s to %s\n", email, tag)
 	return nil
 }
 
 // HotRemoveUser removes a user from an inbound on the running Xray instance via gRPC API
 // and updates the config file for persistence (no restart needed).
+// If rmu command is unavailable (Xray < v25.7.26), falls back to rmi+adi (brief inbound reconnect).
 func (m *XrayManager) HotRemoveUser(tag, email string) error {
 	if !m.IsRunning() {
 		return fmt.Errorf("Xray is not running")
 	}
 
-	client := NewXrayGrpcClient(m.grpcAddr, m.binaryPath)
-	if err := client.RemoveUser(tag, email); err != nil {
-		return fmt.Errorf("hot remove user failed: %v", err)
-	}
-
-	// Update config file: remove client from the inbound's settings.clients
+	// Update config file first (always, for persistence)
 	m.updateConfigFile(func(config map[string]interface{}) {
 		inbounds, _ := config["inbounds"].([]interface{})
 		for _, ib := range inbounds {
@@ -678,8 +684,59 @@ func (m *XrayManager) HotRemoveUser(tag, email string) error {
 		}
 	})
 
-	fmt.Printf("✅ Hot-removed user: %s from %s\n", email, tag)
+	// Try rmu command (Xray v25.7.26+)
+	client := NewXrayGrpcClient(m.grpcAddr, m.binaryPath)
+	err := client.RemoveUser(tag, email)
+	if err == nil {
+		fmt.Printf("✅ Hot-removed user: %s from %s\n", email, tag)
+		return nil
+	}
+
+	// Fallback: reload inbound via rmi+adi (works with all Xray versions)
+	fmt.Printf("⚠️ rmu command failed (%v), falling back to inbound reload\n", err)
+	if reloadErr := m.reloadInbound(tag); reloadErr != nil {
+		return fmt.Errorf("hot remove user failed: rmu: %v, reload: %v", err, reloadErr)
+	}
+
+	fmt.Printf("✅ Hot-removed user (via reload): %s from %s\n", email, tag)
 	return nil
+}
+
+// reloadInbound removes and re-adds an inbound to apply config file changes to the running Xray.
+// Used as fallback when adu/rmu commands are unavailable (Xray < v25.7.26).
+func (m *XrayManager) reloadInbound(tag string) error {
+	data, err := os.ReadFile(m.configPath)
+	if err != nil {
+		return fmt.Errorf("failed to read config: %v", err)
+	}
+
+	var config map[string]interface{}
+	if err := json.Unmarshal(data, &config); err != nil {
+		return fmt.Errorf("failed to parse config: %v", err)
+	}
+
+	inbounds, _ := config["inbounds"].([]interface{})
+	var inboundJSON string
+	for _, ib := range inbounds {
+		ibMap, ok := ib.(map[string]interface{})
+		if !ok || ibMap["tag"] != tag {
+			continue
+		}
+		d, _ := json.Marshal(ibMap)
+		inboundJSON = string(d)
+		break
+	}
+	if inboundJSON == "" {
+		return fmt.Errorf("inbound %s not found in config", tag)
+	}
+
+	client := NewXrayGrpcClient(m.grpcAddr, m.binaryPath)
+
+	// Remove old inbound (ignore error — may not exist yet)
+	_ = client.RemoveInbound(tag)
+
+	// Re-add with updated config
+	return client.AddInbound(inboundJSON)
 }
 
 // updateConfigFile reads the current config, applies a mutation, and writes it back.

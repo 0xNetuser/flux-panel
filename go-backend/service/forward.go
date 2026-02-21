@@ -257,6 +257,9 @@ func UpdateForward(d dto.ForwardUpdateDto, userId int64, roleId int) dto.R {
 		}
 	} else {
 		userTunnel = getUserTunnel(existForward.UserId, tunnel.ID)
+		if userTunnel == nil {
+			return dto.Err("该用户没有此隧道的权限记录，无法构建正确的服务名")
+		}
 	}
 
 	// Use permission result userTunnel if available and tunnel changed
@@ -791,9 +794,13 @@ func checkUserPermissions(userId int64, roleId int, tunnel *model.Tunnel, exclud
 }
 
 func checkForwardQuota(userId int64, tunnelId int64, userTunnel *model.UserTunnel, user *model.User, excludeForwardId *int64) string {
-	// Check user total forward count
+	// Check user total forward count (exclude current forward during edit)
 	var userForwardCount int64
-	DB.Model(&model.Forward{}).Where("user_id = ?", userId).Count(&userForwardCount)
+	userTx := DB.Model(&model.Forward{}).Where("user_id = ?", userId)
+	if excludeForwardId != nil {
+		userTx = userTx.Where("id != ?", *excludeForwardId)
+	}
+	userTx.Count(&userForwardCount)
 	if userForwardCount >= int64(user.Num) {
 		return fmt.Sprintf("用户总转发数量已达上限，当前限制：%d个", user.Num)
 	}

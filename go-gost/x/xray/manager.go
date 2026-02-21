@@ -683,7 +683,11 @@ func (m *XrayManager) HotRemoveUser(tag, email string) error {
 }
 
 // updateConfigFile reads the current config, applies a mutation, and writes it back.
+// Uses m.mu to prevent concurrent read-modify-write races between Hot* methods.
 func (m *XrayManager) updateConfigFile(mutate func(config map[string]interface{})) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	data, err := os.ReadFile(m.configPath)
 	if err != nil {
 		fmt.Printf("⚠️ Failed to read config for persistence: %v\n", err)

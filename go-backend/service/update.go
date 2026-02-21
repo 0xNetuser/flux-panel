@@ -196,7 +196,7 @@ func SelfUpdate() dto.R {
 	}
 
 	// Replace image tags: 0xnetuser/xxx:OLD → 0xnetuser/xxx:NEW
-	re := regexp.MustCompile(`(0xnetuser/[^:]+:)\d+\.\d+\.\d+`)
+	re := regexp.MustCompile(`(0xnetuser/[^:]+:)\d+\.\d+\.\d+[^\s"]*`)
 	updated := re.ReplaceAllString(string(content), "${1}"+latestVersion)
 
 	if err := os.WriteFile(composePath, []byte(updated), 0644); err != nil {

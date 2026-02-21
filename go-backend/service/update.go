@@ -214,14 +214,17 @@ func SelfUpdate() dto.R {
 	// - docker compose pull + up -d restarts with new images
 	// This avoids needing a bind mount on the backend container.
 	sedCmd := fmt.Sprintf(`sed -i 's|\(0xnetuser/[^:]*:\)[^ "]*|\1%s|g' docker-compose.yml`, latestVersion)
-	updaterCmd := fmt.Sprintf("sleep 3 && cd /compose && cp docker-compose.yml docker-compose.yml.bak && %s && docker compose -p %s pull && docker compose -p %s up -d",
-		sedCmd, projectName, projectName)
+	// Mount host compose dir at the SAME path inside the updater container.
+	// This ensures `docker compose up -d` sets the working_dir label to the
+	// real host path, so subsequent updates can find the compose file.
+	updaterCmd := fmt.Sprintf("sleep 3 && cd '%s' && cp docker-compose.yml docker-compose.yml.bak && %s && docker compose -p %s pull && docker compose -p %s up -d",
+		hostDir, sedCmd, projectName, projectName)
 
 	createBody := map[string]interface{}{
 		"Image": updaterImage,
 		"Cmd":   []string{"sh", "-c", updaterCmd},
 		"HostConfig": map[string]interface{}{
-			"Binds": []string{"/var/run/docker.sock:/var/run/docker.sock", hostDir + ":/compose"},
+			"Binds": []string{"/var/run/docker.sock:/var/run/docker.sock", hostDir + ":" + hostDir},
 		},
 	}
 

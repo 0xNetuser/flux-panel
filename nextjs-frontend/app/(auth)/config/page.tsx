@@ -9,7 +9,7 @@ import { Switch } from '@/components/ui/switch';
 import { Save, Loader2, Eye, EyeOff, RefreshCw, CheckCircle, ArrowUpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { getConfigs, updateConfigs } from '@/lib/api/config';
-import { forceCheckUpdate, UpdateInfo } from '@/lib/api/system';
+import { forceCheckUpdate, selfUpdate, UpdateInfo } from '@/lib/api/system';
 import { useAuth } from '@/lib/hooks/use-auth';
 
 interface ConfigFieldDef {
@@ -136,6 +136,7 @@ export default function ConfigPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [checking, setChecking] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
 
   const loadData = useCallback(async () => {
@@ -199,6 +200,23 @@ export default function ConfigPage() {
     }
   };
 
+  const handleSelfUpdate = async () => {
+    if (!confirm('确定要更新面板吗？面板将在几秒后自动重启。')) return;
+    setUpdating(true);
+    try {
+      const res = await selfUpdate();
+      if (res.code === 0) {
+        toast.success('更新已启动，面板将在几秒后自动重启');
+      } else {
+        toast.error(res.msg || '更新失败');
+      }
+    } catch {
+      toast.error('更新失败');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -257,6 +275,11 @@ export default function ConfigPage() {
                   <>
                     <ArrowUpCircle className="h-4 w-4 text-orange-500" />
                     <span>当前 {updateInfo.current}，最新 <a href={updateInfo.releaseUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">{updateInfo.latest}</a></span>
+                    <Button size="sm" variant="outline" onClick={handleSelfUpdate} disabled={updating}
+                      className="ml-2 text-orange-600 border-orange-500/50 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-950/40">
+                      {updating ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
+                      {updating ? '更新中...' : '一键更新'}
+                    </Button>
                   </>
                 ) : (
                   <>

@@ -54,7 +54,7 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 
 ```bash
 # 下载 docker-compose 配置文件
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.9.0/docker-compose.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.9.1/docker-compose.yml -o docker-compose.yml
 ```
 
 **2. 创建环境变量文件**
@@ -121,7 +121,7 @@ docker compose up -d
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.9.0
+  0xnetuser/gost-node:1.9.1
 ```
 
 也可以使用 docker-compose，参考项目中的 `docker-compose-node.yml`：
@@ -129,7 +129,7 @@ docker run -d --network=host --restart=unless-stopped --name gost-node \
 ```yaml
 services:
   gost-node:
-    image: 0xnetuser/gost-node:1.9.0
+    image: 0xnetuser/gost-node:1.9.1
     container_name: gost-node
     network_mode: host
     restart: unless-stopped
@@ -178,7 +178,7 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 
 ```bash
 # 下载最新 docker-compose 配置（覆盖旧文件）
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.9.0/docker-compose.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.9.1/docker-compose.yml -o docker-compose.yml
 
 # 拉取最新镜像并重启
 docker compose pull && docker compose up -d
@@ -200,7 +200,7 @@ docker stop gost-node && docker rm gost-node
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.9.0
+  0xnetuser/gost-node:1.9.1
 ```
 
 如果使用 docker-compose 部署，更新 `docker-compose-node.yml` 中的镜像版本后：
@@ -222,6 +222,15 @@ curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && c
 ---
 
 ## 更新日志
+
+### v1.9.1
+
+- **修复面板更新后转发异常**：Reconcile 不再将转发状态设为异常，瞬时超时不破坏 DB 状态
+- **修复流量超限暂停错误**：`pauseForwardServices` 之前用错误的 serviceName 导致只暂停了触发的转发，其他转发 DB 显示暂停但实际仍在运行；同时补充多 IP 暂停支持
+- **Xray 客户端超限立即切断**：流量超限时同时调用 `XrayRemoveClient` 热移除，不再等到下次节点重连
+- **Xray 配置文件并发写入加锁**：防止并发 Hot* 调用竞争导致配置变更丢失
+- **转发配额检查修复**：编辑转发更换隧道时，用户总转发数检查排除当前转发，满额用户可正常切换隧道
+- **Admin 操作隧道权限检查**：管理员编辑转发时若用户隧道权限不存在，返回错误而非用错误的 serviceName 留下孤儿服务
 
 ### v1.9.0
 

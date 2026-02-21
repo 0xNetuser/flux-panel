@@ -544,6 +544,9 @@ func (w *WebSocketReporter) routeCommand(cmd CommandMessage) {
 	case "ResumeService":
 		err = w.handleResumeService(cmd.Data)
 		response.Type = "ResumeServiceResponse"
+	case "UpdateForwarder":
+		err = w.handleUpdateForwarder(cmd.Data)
+		response.Type = "UpdateForwarderResponse"
 
 	// Chain 相关命令
 	case "AddChains":
@@ -724,6 +727,20 @@ func (w *WebSocketReporter) handleResumeService(data interface{}) error {
 	}
 
 	return resumeServices(req)
+}
+
+func (w *WebSocketReporter) handleUpdateForwarder(data interface{}) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("序列化数据失败: %v", err)
+	}
+
+	var req updateForwarderRequest
+	if err := json.Unmarshal(jsonData, &req); err != nil {
+		return fmt.Errorf("解析更新转发器请求失败: %v", err)
+	}
+
+	return updateForwarder(req)
 }
 
 // Chain 命令处理函数
@@ -1003,9 +1020,8 @@ func (w *WebSocketReporter) handleXrayAddInbound(data interface{}) error {
 		return fmt.Errorf("解析入站配置失败: %v", err)
 	}
 
-	// Adding inbound requires config rewrite + restart
 	mgr := w.getOrInitXrayManager()
-	return mgr.ApplyConfig([]xray.InboundConfig{inbound})
+	return mgr.HotAddInbound(inbound)
 }
 
 func (w *WebSocketReporter) handleXrayRemoveInbound(data interface{}) error {
@@ -1021,9 +1037,8 @@ func (w *WebSocketReporter) handleXrayRemoveInbound(data interface{}) error {
 		return fmt.Errorf("解析删除入站请求失败: %v", err)
 	}
 
-	fmt.Printf("🗑️ Xray remove inbound: tag=%s\n", req.Tag)
-	// Config sync will be handled by XrayApplyConfig
-	return nil
+	mgr := w.getOrInitXrayManager()
+	return mgr.HotRemoveInbound(req.Tag)
 }
 
 func (w *WebSocketReporter) handleXrayAddClient(data interface{}) error {
@@ -1045,8 +1060,7 @@ func (w *WebSocketReporter) handleXrayAddClient(data interface{}) error {
 	}
 
 	mgr := w.getOrInitXrayManager()
-	grpcClient := xray.NewXrayGrpcClient(mgr.GetGrpcAddr())
-	return grpcClient.AddUser(req.InboundTag, req.Email, req.UuidOrPassword, req.Flow, req.Protocol, req.AlterId)
+	return mgr.HotAddUser(req.InboundTag, req.Email, req.UuidOrPassword, req.Flow, req.Protocol, req.AlterId)
 }
 
 func (w *WebSocketReporter) handleXrayRemoveClient(data interface{}) error {
@@ -1064,8 +1078,7 @@ func (w *WebSocketReporter) handleXrayRemoveClient(data interface{}) error {
 	}
 
 	mgr := w.getOrInitXrayManager()
-	grpcClient := xray.NewXrayGrpcClient(mgr.GetGrpcAddr())
-	return grpcClient.RemoveUser(req.InboundTag, req.Email)
+	return mgr.HotRemoveUser(req.InboundTag, req.Email)
 }
 
 func (w *WebSocketReporter) handleXrayGetTraffic(data interface{}) (interface{}, error) {

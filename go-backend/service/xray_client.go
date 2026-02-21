@@ -178,11 +178,11 @@ func CreateXrayClient(d dto.XrayClientDto, userId int64, roleId int) dto.R {
 		return dto.Err("创建客户端失败")
 	}
 
-	// Full sync to inject client into Xray config
-	syncErr := syncXrayNodeConfig(inbound.NodeId)
-	if syncErr != "" {
+	// Hot add client (no Xray restart needed)
+	result := pkg.XrayAddClient(inbound.NodeId, inbound.Tag, client.Email, client.UuidOrPassword, client.Flow, client.AlterId, inbound.Protocol)
+	if result != nil && result.Msg != "OK" {
 		DB.Delete(&client)
-		return dto.Err("Xray 同步失败，客户端未创建: " + syncErr)
+		return dto.Err("Xray 热加载客户端失败: " + result.Msg)
 	}
 
 	return dto.Ok(client)
@@ -282,12 +282,32 @@ func UpdateXrayClient(d dto.XrayClientUpdateDto, userId int64, roleId int) dto.R
 
 	DB.Model(&existing).Updates(updates)
 
-	// Full sync on any update (especially enable/disable)
+	// Hot update: remove old user + add new user (no Xray restart needed)
 	if inbound.ID > 0 {
-		syncErr := syncXrayNodeConfig(inbound.NodeId)
-		if syncErr != "" {
-			DB.Save(&oldClient)
-			return dto.Err("Xray 同步失败，已回退更新: " + syncErr)
+		// Remove old user (only if was enabled; skip if disabled since user isn't in Xray)
+		if oldClient.Enable == 1 {
+			removeResult := pkg.XrayRemoveClient(inbound.NodeId, inbound.Tag, oldClient.Email)
+			if removeResult != nil && removeResult.Msg != "OK" {
+				// Revert DB
+				DB.Save(&oldClient)
+				return dto.Err("Xray 热移除旧客户端失败，已回退: " + removeResult.Msg)
+			}
+		}
+
+		// Reload updated client from DB
+		DB.First(&existing, d.ID)
+
+		// Only re-add if enabled
+		if existing.Enable == 1 {
+			result := pkg.XrayAddClient(inbound.NodeId, inbound.Tag, existing.Email, existing.UuidOrPassword, existing.Flow, existing.AlterId, inbound.Protocol)
+			if result != nil && result.Msg != "OK" {
+				// Revert: restore old client in both DB and Xray
+				DB.Save(&oldClient)
+				if oldClient.Enable == 1 {
+					pkg.XrayAddClient(inbound.NodeId, inbound.Tag, oldClient.Email, oldClient.UuidOrPassword, oldClient.Flow, oldClient.AlterId, inbound.Protocol)
+				}
+				return dto.Err("Xray 热加载客户端失败，已回退: " + result.Msg)
+			}
 		}
 	}
 
@@ -319,16 +339,15 @@ func DeleteXrayClient(id int64, userId int64, roleId int) dto.R {
 		}
 	}
 
-	DB.Delete(&client)
-
+	// Hot remove client first (no Xray restart needed)
 	if inbound.ID > 0 {
-		syncErr := syncXrayNodeConfig(inbound.NodeId)
-		if syncErr != "" {
-			// Restore client
-			DB.Create(&client)
-			return dto.Err("Xray 同步失败，删除已回退: " + syncErr)
+		result := pkg.XrayRemoveClient(inbound.NodeId, inbound.Tag, client.Email)
+		if result != nil && result.Msg != "OK" {
+			return dto.Err("Xray 热移除客户端失败: " + result.Msg)
 		}
 	}
+
+	DB.Delete(&client)
 
 	return dto.Ok("删除成功")
 }

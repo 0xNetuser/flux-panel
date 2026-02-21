@@ -331,7 +331,7 @@ func ParseService(cfg *config.ServiceConfig) (service.Service, error) {
 	}
 
 	if forwarder, ok := h.(handler.Forwarder); ok {
-		hop, err := parseForwarder(cfg.Forwarder, log)
+		hop, err := ParseForwarder(cfg.Forwarder, log)
 		if err != nil {
 			return nil, err
 		}
@@ -374,7 +374,8 @@ func ParseService(cfg *config.ServiceConfig) (service.Service, error) {
 	return s, nil
 }
 
-func parseForwarder(cfg *config.ForwarderConfig, log logger.Logger) (hop.Hop, error) {
+// ParseForwarder parses a forwarder config into a hop.Hop.
+func ParseForwarder(cfg *config.ForwarderConfig, log logger.Logger) (hop.Hop, error) {
 	if cfg == nil {
 		return nil, nil
 	}

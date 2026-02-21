@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-gost/core/handler"
+	"github.com/go-gost/core/logger"
 	"github.com/go-gost/core/service"
 	"github.com/go-gost/x/config"
 	parser "github.com/go-gost/x/config/parsing/service"
@@ -513,6 +515,76 @@ func rollbackResumedServices(resumedServices []struct {
 			return nil
 		})
 	}
+}
+
+// updateForwarder hot-updates the forwarder (hop nodes) on existing services
+// without restarting the listener. Only the target addresses change; existing
+// connections keep using the old hop until they naturally close.
+func updateForwarder(req updateForwarderRequest) error {
+	if len(req.Services) == 0 {
+		return errors.New("services list cannot be empty")
+	}
+
+	for _, svcReq := range req.Services {
+		name := strings.TrimSpace(svcReq.Name)
+		if name == "" {
+			return errors.New("service name is required")
+		}
+
+		svc := registry.ServiceRegistry().Get(name)
+		if svc == nil {
+			return fmt.Errorf("service %s not found", name)
+		}
+
+		// Type-assert to get the handler
+		type handlerGetter interface {
+			Handler() handler.Handler
+		}
+		hg, ok := svc.(handlerGetter)
+		if !ok {
+			return fmt.Errorf("service %s does not support Handler()", name)
+		}
+
+		h := hg.Handler()
+		forwarder, ok := h.(handler.Forwarder)
+		if !ok {
+			return fmt.Errorf("service %s handler does not support Forward()", name)
+		}
+
+		if svcReq.Forwarder == nil {
+			return fmt.Errorf("service %s: forwarder config is required", name)
+		}
+
+		hop, err := parser.ParseForwarder(svcReq.Forwarder, logger.Default())
+		if err != nil {
+			return fmt.Errorf("service %s: parse forwarder failed: %v", name, err)
+		}
+
+		forwarder.Forward(hop)
+		fmt.Printf("🔄 Hot-updated forwarder for service %s\n", name)
+	}
+
+	// Update the persisted config
+	config.OnUpdate(func(c *config.Config) error {
+		for _, svcReq := range req.Services {
+			for i := range c.Services {
+				if c.Services[i].Name == svcReq.Name {
+					c.Services[i].Forwarder = svcReq.Forwarder
+					break
+				}
+			}
+		}
+		return nil
+	})
+
+	return nil
+}
+
+type updateForwarderRequest struct {
+	Services []struct {
+		Name      string                  `json:"name"`
+		Forwarder *config.ForwarderConfig `json:"forwarder"`
+	} `json:"services"`
 }
 
 type resumeServicesRequest struct {

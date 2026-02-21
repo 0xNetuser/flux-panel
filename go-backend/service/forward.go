@@ -334,11 +334,45 @@ func UpdateForward(d dto.ForwardUpdateDto, userId int64, roleId int) dto.R {
 			return dto.Err("创建新配置失败: " + gostErr)
 		}
 	} else {
-		// Tunnel unchanged: direct update
-		gostErr := updateGostServices(&updatedForward, &tunnel, limiterInt, inNode, outNode, serviceName)
-		if gostErr != "" {
-			updateForwardStatusToError(updatedForward.ID)
-			return dto.Err(gostErr)
+		// Tunnel unchanged: figure out what changed and pick the lightest update path
+		portSame := existForward.InPort == updatedForward.InPort
+		interfaceSame := existForward.InterfaceName == updatedForward.InterfaceName
+		addrChanged := existForward.RemoteAddr != updatedForward.RemoteAddr || existForward.Strategy != updatedForward.Strategy
+
+		if portSame && interfaceSame && addrChanged {
+			// Only remoteAddr/strategy changed — hot update forwarder (no listener restart)
+			var hotOk bool
+			if tunnel.Type == tunnelTypePortForward {
+				// Direct forward: update forwarder on inNode
+				hotResult := pkg.UpdateForwarder(inNode.ID, serviceName, updatedForward.RemoteAddr, updatedForward.Strategy)
+				hotOk = isGostSuccess(hotResult)
+			} else if tunnel.Type == tunnelTypeTunnelForward && outNode != nil {
+				// Tunnel forward: only the outNode remote service forwarder changes;
+				// inNode service + chain are unchanged (chain points to outNode, not to targets)
+				hotResult := pkg.UpdateRemoteForwarder(outNode.ID, serviceName, updatedForward.RemoteAddr, updatedForward.Strategy)
+				hotOk = isGostSuccess(hotResult)
+			}
+
+			if !hotOk {
+				// Fall back to full update
+				gostErr := updateGostServices(&updatedForward, &tunnel, limiterInt, inNode, outNode, serviceName)
+				if gostErr != "" {
+					updateForwardStatusToError(updatedForward.ID)
+					return dto.Err(gostErr)
+				}
+			}
+		} else if portSame && interfaceSame && !addrChanged {
+			// Nothing service-critical changed (e.g. only name updated).
+			// Limiter changes are handled separately via UpdateUserTunnel.
+		} else {
+			// Port or interface changed — must rebuild listener (same service name,
+			// so we cannot create-then-delete; must use UpdateService which does
+			// close → recreate). Only THIS forward's listener is affected.
+			gostErr := updateGostServices(&updatedForward, &tunnel, limiterInt, inNode, outNode, serviceName)
+			if gostErr != "" {
+				updateForwardStatusToError(updatedForward.ID)
+				return dto.Err(gostErr)
+			}
 		}
 	}
 

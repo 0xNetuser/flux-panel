@@ -33,6 +33,8 @@ func GetNodeHealthList() dto.R {
 				item["xrayRunning"] = sysInfo.XrayRunning
 				item["xrayVersion"] = sysInfo.XrayVersion
 				item["interfaces"] = sysInfo.Interfaces
+				item["bytesReceived"] = sysInfo.BytesReceived
+				item["bytesTransmitted"] = sysInfo.BytesTransmitted
 			}
 		}
 

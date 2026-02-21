@@ -50,6 +50,16 @@ interface NodeHealth {
   xrayRunning?: boolean;
   xrayVersion?: string;
   interfaces?: { name: string; ips: string[] }[];
+  bytesReceived?: number;
+  bytesTransmitted?: number;
+}
+
+function formatSpeed(bytesPerSec: number) {
+  if (bytesPerSec <= 0) return '0 B/s';
+  const k = 1024;
+  const sizes = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+  const i = Math.floor(Math.log(Math.abs(bytesPerSec)) / Math.log(k));
+  return parseFloat((bytesPerSec / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[Math.min(i, sizes.length - 1)];
 }
 
 interface ForwardItem {
@@ -85,6 +95,90 @@ export default function MonitorPage() {
   const initialLoad = useRef(true);
   const filterRef = useRef<HTMLDivElement>(null);
   const forwardsInitialized = useRef(false);
+
+  // Real-time speed tracking
+  const [nodeSpeeds, setNodeSpeeds] = useState<Record<number, { uploadSpeed: number; downloadSpeed: number }>>({});
+  const prevBytesRef = useRef<Record<number, { rx: number; tx: number; time: number }>>({});
+
+  // WebSocket for real-time system info updates
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const wsBase = process.env.NEXT_PUBLIC_API_BASE || window.location.origin;
+    const wsUrl = wsBase.replace(/^http/, 'ws') + '/system-info?type=0';
+
+    let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout>;
+
+    const connect = () => {
+      ws = new WebSocket(wsUrl, [token]);
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'info' && msg.data) {
+            const sysData = typeof msg.data === 'string' ? JSON.parse(msg.data) : msg.data;
+            const nodeId = parseInt(msg.id, 10);
+
+            if (sysData.bytes_received !== undefined && sysData.bytes_transmitted !== undefined) {
+              const now = Date.now() / 1000;
+              const rx = sysData.bytes_received;
+              const tx = sysData.bytes_transmitted;
+
+              const prev = prevBytesRef.current[nodeId];
+              if (prev) {
+                const dt = now - prev.time;
+                if (dt > 0) {
+                  if (rx >= prev.rx && tx >= prev.tx) {
+                    // Normal increment — compute speed
+                    setNodeSpeeds(s => ({
+                      ...s,
+                      [nodeId]: {
+                        downloadSpeed: (rx - prev.rx) / dt,
+                        uploadSpeed: (tx - prev.tx) / dt,
+                      }
+                    }));
+                  } else {
+                    // Counter reset (node restarted) — reset speed to 0
+                    setNodeSpeeds(s => ({
+                      ...s,
+                      [nodeId]: { downloadSpeed: 0, uploadSpeed: 0 }
+                    }));
+                  }
+                }
+              }
+              prevBytesRef.current[nodeId] = { rx, tx, time: now };
+
+              // Also update node bytes for total display
+              setNodes(prev => prev.map(n =>
+                n.id === nodeId
+                  ? { ...n, bytesReceived: rx, bytesTransmitted: tx, cpuUsage: sysData.cpu_usage, memUsage: sysData.memory_usage, uptime: sysData.uptime }
+                  : n
+              ));
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to parse WebSocket message:', e);
+        }
+      };
+
+      ws.onclose = () => {
+        reconnectTimer = setTimeout(connect, 5000);
+      };
+
+      ws.onerror = () => {
+        ws?.close();
+      };
+    };
+
+    connect();
+
+    return () => {
+      clearTimeout(reconnectTimer);
+      ws?.close();
+    };
+  }, []);
 
   const loadData = useCallback(async () => {
     if (initialLoad.current) setLoading(true);
@@ -281,6 +375,40 @@ export default function MonitorPage() {
                         <Badge variant="secondary" className="text-xs">未运行</Badge>
                       )}
                     </div>
+                    {/* Real-time speed */}
+                    {(nodeSpeeds[node.id] || node.bytesReceived !== undefined) && (
+                      <div className="pt-1 border-t space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <Network className="h-3 w-3" />实时速度
+                          </span>
+                        </div>
+                        {nodeSpeeds[node.id] && (
+                          <div className="grid grid-cols-2 gap-1 text-xs">
+                            <div className="flex items-center gap-1">
+                              <span className="text-green-500">↑</span>
+                              <span>{formatSpeed(nodeSpeeds[node.id].uploadSpeed)}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-blue-500">↓</span>
+                              <span>{formatSpeed(nodeSpeeds[node.id].downloadSpeed)}</span>
+                            </div>
+                          </div>
+                        )}
+                        {node.bytesTransmitted !== undefined && node.bytesReceived !== undefined && (
+                          <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <span>↑ 总计</span>
+                              <span>{formatBytes(node.bytesTransmitted)}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span>↓ 总计</span>
+                              <span>{formatBytes(node.bytesReceived)}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     {node.interfaces && node.interfaces.length > 0 && (
                       <div className="pt-1 border-t">
                         <div className="flex items-center gap-1 text-muted-foreground mb-1">

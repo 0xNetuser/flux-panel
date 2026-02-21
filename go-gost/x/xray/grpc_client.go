@@ -14,11 +14,15 @@ type XrayGrpcClient struct {
 }
 
 // NewXrayGrpcClient creates a new gRPC client
-func NewXrayGrpcClient(addr string) *XrayGrpcClient {
-	return &XrayGrpcClient{addr: addr, binaryPath: "xray"}
+func NewXrayGrpcClient(addr string, binaryPaths ...string) *XrayGrpcClient {
+	bp := "xray"
+	if len(binaryPaths) > 0 && binaryPaths[0] != "" {
+		bp = binaryPaths[0]
+	}
+	return &XrayGrpcClient{addr: addr, binaryPath: bp}
 }
 
-// AddUser adds a user to an inbound via Xray API command
+// AddUser adds a user to an inbound via Xray API CLI command
 func (c *XrayGrpcClient) AddUser(inboundTag, email, uuidOrPassword, flow, protocol string, alterId int) error {
 	var userJSON string
 
@@ -64,13 +68,49 @@ func (c *XrayGrpcClient) AddUser(inboundTag, email, uuidOrPassword, flow, protoc
 	}
 
 	fmt.Printf("📡 Xray gRPC addUser: tag=%s email=%s\n", inboundTag, email)
-	_ = userJSON
+	cmd := exec.Command(c.binaryPath, "api", "adu",
+		"--server="+c.addr, "--inbound="+inboundTag, "--user="+userJSON)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("xray api adduser failed: %v, output: %s", err, string(output))
+	}
 	return nil
 }
 
-// RemoveUser removes a user from an inbound
+// RemoveUser removes a user from an inbound via Xray API CLI command
 func (c *XrayGrpcClient) RemoveUser(inboundTag, email string) error {
 	fmt.Printf("📡 Xray gRPC removeUser: tag=%s email=%s\n", inboundTag, email)
+	cmd := exec.Command(c.binaryPath, "api", "rmu",
+		"--server="+c.addr, "--inbound="+inboundTag, "--email="+email)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("xray api rmuser failed: %v, output: %s", err, string(output))
+	}
+	return nil
+}
+
+// AddInbound adds an inbound to a running Xray instance via gRPC API
+func (c *XrayGrpcClient) AddInbound(configJSON string) error {
+	fmt.Printf("📡 Xray gRPC addInbound\n")
+	cmd := exec.Command(c.binaryPath, "api", "adi",
+		"--server="+c.addr, "--config=stdin")
+	cmd.Stdin = strings.NewReader(configJSON)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("xray api addinbound failed: %v, output: %s", err, string(output))
+	}
+	return nil
+}
+
+// RemoveInbound removes an inbound from a running Xray instance via gRPC API
+func (c *XrayGrpcClient) RemoveInbound(tag string) error {
+	fmt.Printf("📡 Xray gRPC removeInbound: tag=%s\n", tag)
+	cmd := exec.Command(c.binaryPath, "api", "rmi",
+		"--server="+c.addr, "--tag="+tag)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("xray api rminbound failed: %v, output: %s", err, string(output))
+	}
 	return nil
 }
 

@@ -1,5 +1,43 @@
 # Changelog
 
+## v1.9.0 — GOST/Xray 热加载 + 监控实时速度
+
+### Features
+
+- **GOST 转发热更新**：编辑转发仅修改目标地址/策略时，通过 `UpdateForwarder` 热替换 handler 的 hop 节点列表，现有连接不中断，新连接使用新目标。端口/监听 IP 变化仍走 `UpdateService` 重建 listener（仅影响该转发）
+- **GOST 隧道转发热更新**：隧道转发目标地址变化时，通过 `UpdateRemoteForwarder` 热更新出口节点的 forwarder，入口节点 chain 不受影响
+- **Xray 入站热加载**：创建/删除/启用/禁用入站通过 Xray gRPC API（`adi`/`rmi`）热操作，不再重启 Xray 进程；修改入站通过 remove + add 实现，仅影响该入站
+- **Xray 客户端热加载**：新增/删除/修改客户端通过 Xray gRPC API（`adu`/`rmu`）热操作，其他入站连接不受影响
+- **监控实时速度**：监控页通过 WebSocket 接收节点 `bytes_received`/`bytes_transmitted` 累积值，前端计算 delta 速度，每 2-3 秒自动更新
+
+### Bug Fixes
+
+- **XrayRemoveClient 错误处理**：`UpdateXrayClient` 中删除旧客户端失败时正确回退 DB，避免在节点离线时产生不一致状态
+- **字节计数器重置处理**：监控页 WebSocket 收到的字节计数器降低（节点重启）时，速度重置为 0 而非冻结在上一个值
+
+### Changed Files
+
+**节点端（go-gost）：**
+- `x/service/service.go` — 新增 `Handler()` getter
+- `x/config/parsing/service/parse.go` — 导出 `ParseForwarder`
+- `x/socket/service.go` — 新增 `updateForwarder` 函数
+- `x/socket/websocket_reporter.go` — 新增 `UpdateForwarder` 命令 + Xray Hot* handler 路由
+- `x/xray/grpc_client.go` — 实现 `AddUser`/`RemoveUser`/`AddInbound`/`RemoveInbound` CLI 调用
+- `x/xray/manager.go` — 新增 `HotAddInbound`/`HotRemoveInbound`/`HotAddUser`/`HotRemoveUser` + `updateConfigFile`
+
+**后端（go-backend）：**
+- `pkg/gost.go` — 新增 `UpdateForwarder`/`UpdateRemoteForwarder`
+- `service/forward.go` — 智能判断热更新/重建路径
+- `service/xray_inbound.go` — CRUD 改用热加载
+- `service/xray_client.go` — CRUD 改用热加载 + RemoveClient 错误检查
+- `service/monitor.go` — 返回 `bytesReceived`/`bytesTransmitted`
+- `service/user_tunnel.go` — 保留 `UpdateService`（limiter 需重建）
+
+**前端：**
+- `app/(auth)/monitor/page.tsx` — WebSocket 实时速度 + 总流量显示
+
+---
+
 ## v1.8.8 — 流量统计全面修复 + 同步回退 + 操作加载态
 
 ### Bug Fixes

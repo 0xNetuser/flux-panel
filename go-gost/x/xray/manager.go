@@ -505,6 +505,204 @@ func (m *XrayManager) writeConfig(config map[string]interface{}) error {
 	return os.WriteFile(m.configPath, data, 0644)
 }
 
+// HotAddInbound adds an inbound to the running Xray instance via gRPC API
+// and updates the config file for persistence (no restart needed).
+func (m *XrayManager) HotAddInbound(cfg InboundConfig) error {
+	if !m.IsRunning() {
+		return fmt.Errorf("Xray is not running")
+	}
+
+	// Build the inbound JSON for the gRPC API
+	inboundObj := map[string]interface{}{
+		"listen":   cfg.Listen,
+		"port":     cfg.Port,
+		"protocol": cfg.Protocol,
+		"tag":      cfg.Tag,
+	}
+	if cfg.SettingsJSON != "" {
+		var settings interface{}
+		if err := json.Unmarshal([]byte(cfg.SettingsJSON), &settings); err == nil {
+			inboundObj["settings"] = settings
+		}
+	}
+	if cfg.StreamSettingsJSON != "" {
+		var streamSettings interface{}
+		if err := json.Unmarshal([]byte(cfg.StreamSettingsJSON), &streamSettings); err == nil {
+			inboundObj["streamSettings"] = streamSettings
+		}
+	}
+	if cfg.SniffingJSON != "" {
+		var sniffing interface{}
+		if err := json.Unmarshal([]byte(cfg.SniffingJSON), &sniffing); err == nil {
+			inboundObj["sniffing"] = sniffing
+		}
+	}
+
+	configJSON, err := json.Marshal(inboundObj)
+	if err != nil {
+		return fmt.Errorf("failed to marshal inbound config: %v", err)
+	}
+
+	client := NewXrayGrpcClient(m.grpcAddr, m.binaryPath)
+	if err := client.AddInbound(string(configJSON)); err != nil {
+		return fmt.Errorf("hot add inbound failed: %v", err)
+	}
+
+	// Update config file for persistence
+	m.updateConfigFile(func(config map[string]interface{}) {
+		inbounds, _ := config["inbounds"].([]interface{})
+		inbounds = append(inbounds, inboundObj)
+		config["inbounds"] = inbounds
+	})
+
+	fmt.Printf("✅ Hot-added inbound: %s\n", cfg.Tag)
+	return nil
+}
+
+// HotRemoveInbound removes an inbound from the running Xray instance via gRPC API
+// and updates the config file for persistence (no restart needed).
+func (m *XrayManager) HotRemoveInbound(tag string) error {
+	if !m.IsRunning() {
+		return fmt.Errorf("Xray is not running")
+	}
+
+	client := NewXrayGrpcClient(m.grpcAddr, m.binaryPath)
+	if err := client.RemoveInbound(tag); err != nil {
+		return fmt.Errorf("hot remove inbound failed: %v", err)
+	}
+
+	// Update config file for persistence
+	m.updateConfigFile(func(config map[string]interface{}) {
+		inbounds, _ := config["inbounds"].([]interface{})
+		var filtered []interface{}
+		for _, ib := range inbounds {
+			if ibMap, ok := ib.(map[string]interface{}); ok {
+				if ibMap["tag"] == tag {
+					continue
+				}
+			}
+			filtered = append(filtered, ib)
+		}
+		config["inbounds"] = filtered
+	})
+
+	fmt.Printf("✅ Hot-removed inbound: %s\n", tag)
+	return nil
+}
+
+// HotAddUser adds a user to an inbound on the running Xray instance via gRPC API
+// and updates the config file for persistence (no restart needed).
+func (m *XrayManager) HotAddUser(tag, email, uuidOrPassword, flow, protocol string, alterId int) error {
+	if !m.IsRunning() {
+		return fmt.Errorf("Xray is not running")
+	}
+
+	client := NewXrayGrpcClient(m.grpcAddr, m.binaryPath)
+	if err := client.AddUser(tag, email, uuidOrPassword, flow, protocol, alterId); err != nil {
+		return fmt.Errorf("hot add user failed: %v", err)
+	}
+
+	// Update config file: add client to the inbound's settings.clients
+	m.updateConfigFile(func(config map[string]interface{}) {
+		inbounds, _ := config["inbounds"].([]interface{})
+		for _, ib := range inbounds {
+			ibMap, ok := ib.(map[string]interface{})
+			if !ok || ibMap["tag"] != tag {
+				continue
+			}
+			settings, _ := ibMap["settings"].(map[string]interface{})
+			if settings == nil {
+				settings = map[string]interface{}{}
+				ibMap["settings"] = settings
+			}
+			clients, _ := settings["clients"].([]interface{})
+
+			clientObj := map[string]interface{}{"email": email, "level": 0}
+			switch protocol {
+			case "vmess":
+				clientObj["id"] = uuidOrPassword
+				clientObj["alterId"] = alterId
+			case "vless":
+				clientObj["id"] = uuidOrPassword
+				clientObj["flow"] = flow
+			case "trojan":
+				clientObj["password"] = uuidOrPassword
+			case "shadowsocks":
+				clientObj["password"] = uuidOrPassword
+			}
+			clients = append(clients, clientObj)
+			settings["clients"] = clients
+			break
+		}
+	})
+
+	fmt.Printf("✅ Hot-added user: %s to %s\n", email, tag)
+	return nil
+}
+
+// HotRemoveUser removes a user from an inbound on the running Xray instance via gRPC API
+// and updates the config file for persistence (no restart needed).
+func (m *XrayManager) HotRemoveUser(tag, email string) error {
+	if !m.IsRunning() {
+		return fmt.Errorf("Xray is not running")
+	}
+
+	client := NewXrayGrpcClient(m.grpcAddr, m.binaryPath)
+	if err := client.RemoveUser(tag, email); err != nil {
+		return fmt.Errorf("hot remove user failed: %v", err)
+	}
+
+	// Update config file: remove client from the inbound's settings.clients
+	m.updateConfigFile(func(config map[string]interface{}) {
+		inbounds, _ := config["inbounds"].([]interface{})
+		for _, ib := range inbounds {
+			ibMap, ok := ib.(map[string]interface{})
+			if !ok || ibMap["tag"] != tag {
+				continue
+			}
+			settings, _ := ibMap["settings"].(map[string]interface{})
+			if settings == nil {
+				continue
+			}
+			clients, _ := settings["clients"].([]interface{})
+			var filtered []interface{}
+			for _, c := range clients {
+				cMap, ok := c.(map[string]interface{})
+				if ok && cMap["email"] == email {
+					continue
+				}
+				filtered = append(filtered, c)
+			}
+			settings["clients"] = filtered
+			break
+		}
+	})
+
+	fmt.Printf("✅ Hot-removed user: %s from %s\n", email, tag)
+	return nil
+}
+
+// updateConfigFile reads the current config, applies a mutation, and writes it back.
+func (m *XrayManager) updateConfigFile(mutate func(config map[string]interface{})) {
+	data, err := os.ReadFile(m.configPath)
+	if err != nil {
+		fmt.Printf("⚠️ Failed to read config for persistence: %v\n", err)
+		return
+	}
+
+	var config map[string]interface{}
+	if err := json.Unmarshal(data, &config); err != nil {
+		fmt.Printf("⚠️ Failed to parse config for persistence: %v\n", err)
+		return
+	}
+
+	mutate(config)
+
+	if err := m.writeConfig(config); err != nil {
+		fmt.Printf("⚠️ Failed to write updated config: %v\n", err)
+	}
+}
+
 // InboundConfig represents an inbound configuration from the panel
 type InboundConfig struct {
 	Tag                string `json:"tag"`

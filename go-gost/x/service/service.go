@@ -166,6 +166,11 @@ func (s *defaultService) Addr() net.Addr {
 	return s.listener.Addr()
 }
 
+// Handler returns the handler of this service.
+func (s *defaultService) Handler() handler.Handler {
+	return s.handler
+}
+
 func (s *defaultService) Serve() error {
 
 	s.execCmds("post-up", s.options.postUp)

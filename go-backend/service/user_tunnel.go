@@ -196,5 +196,8 @@ func updateForwardWithNewSpeed(fwd model.Forward, tunnel model.Tunnel, ut *model
 		interfaceName = fwd.InterfaceName
 	}
 
+	// Limiter change requires service rebuild because the CachedTrafficLimiter
+	// stores the limiter object reference at creation time. Updating the registry
+	// alone does not propagate to running services.
 	pkg.UpdateService(inNode.ID, serviceName, fwd.InPort, limiter, fwd.RemoteAddr, tunnel.Type, &tunnel, fwd.Strategy, interfaceName)
 }

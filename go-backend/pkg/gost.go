@@ -38,6 +38,37 @@ func UpdateService(nodeId int64, name string, inPort int, limiter *int, remoteAd
 	return WS.SendMsg(nodeId, services, "UpdateService")
 }
 
+// UpdateForwarder hot-updates only the forwarder (target addresses/strategy) on existing services
+// without restarting the listener. Existing connections are not interrupted.
+func UpdateForwarder(nodeId int64, name string, remoteAddr string, strategy string) *dto.GostResponse {
+	forwarder := buildForwarder(remoteAddr, strategy)
+	var services []map[string]interface{}
+	for _, proto := range []string{"tcp", "udp"} {
+		services = append(services, map[string]interface{}{
+			"name":      name + "_" + proto,
+			"forwarder": forwarder,
+		})
+	}
+	data := map[string]interface{}{
+		"services": services,
+	}
+	return WS.SendMsg(nodeId, data, "UpdateForwarder")
+}
+
+// UpdateRemoteForwarder hot-updates the forwarder on a remote (relay) service (_tls suffix).
+func UpdateRemoteForwarder(nodeId int64, name string, remoteAddr string, strategy string) *dto.GostResponse {
+	forwarder := buildForwarder(remoteAddr, strategy)
+	data := map[string]interface{}{
+		"services": []map[string]interface{}{
+			{
+				"name":      name + "_tls",
+				"forwarder": forwarder,
+			},
+		},
+	}
+	return WS.SendMsg(nodeId, data, "UpdateForwarder")
+}
+
 func DeleteService(nodeId int64, name string) *dto.GostResponse {
 	data := map[string]interface{}{
 		"services": []string{name + "_tcp", name + "_udp"},

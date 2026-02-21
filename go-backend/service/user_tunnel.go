@@ -187,6 +187,12 @@ func UpdateUserTunnel(d dto.UserTunnelUpdateDto) dto.R {
 }
 
 func updateForwardWithNewSpeed(fwd model.Forward, tunnel model.Tunnel, ut *model.UserTunnel) {
+	// Override tunnel listen address if forward has custom listenIp
+	if fwd.ListenIp != "" {
+		tunnel.TcpListenAddr = fwd.ListenIp
+		tunnel.UdpListenAddr = fwd.ListenIp
+	}
+
 	serviceName := fmt.Sprintf("%d_%d_%d", fwd.ID, fwd.UserId, ut.ID)
 
 	inNode := GetNodeById(tunnel.InNodeId)

@@ -6,6 +6,7 @@ import (
 	"flux-panel/go-backend/model"
 	"flux-panel/go-backend/pkg"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -353,6 +354,17 @@ func DeleteUser(id int64) dto.R {
 		DB.Delete(&model.Forward{}, fwd.ID)
 	}
 
+	// 3.5 Delete xray clients and hot-remove from nodes
+	var xrayClients []model.XrayClient
+	DB.Where("user_id = ?", id).Find(&xrayClients)
+	for _, client := range xrayClients {
+		var inbound model.XrayInbound
+		if err := DB.First(&inbound, client.InboundId).Error; err == nil {
+			pkg.XrayRemoveClient(inbound.NodeId, inbound.Tag, client.Email)
+		}
+	}
+	DB.Where("user_id = ?", id).Delete(&model.XrayClient{})
+
 	// 4. Delete user_tunnel records
 	DB.Where("user_id = ?", id).Delete(&model.UserTunnel{})
 
@@ -382,16 +394,21 @@ func deleteGostServicesForForward(fwd *model.Forward, userId int64) {
 		return
 	}
 
-	// Locate the user-tunnel relation
+	// Locate the user-tunnel relation (may be nil for admin-created forwards → userTunnelId=0)
 	var ut model.UserTunnel
-	if err := DB.Where("user_id = ? AND tunnel_id = ?", userId, tunnel.ID).First(&ut).Error; err != nil {
-		return
+	utId := int64(0)
+	if err := DB.Where("user_id = ? AND tunnel_id = ?", userId, tunnel.ID).First(&ut).Error; err == nil {
+		utId = ut.ID
 	}
 
-	serviceName := fmt.Sprintf("%d_%d_%d", fwd.ID, userId, ut.ID)
+	serviceName := fmt.Sprintf("%d_%d_%d", fwd.ID, userId, utId)
 
-	// Delete main service on the in-node
-	pkg.DeleteService(inNode.ID, serviceName)
+	// Delete main service on the in-node (handle multi-IP)
+	if fwd.ListenIp != "" && strings.Contains(fwd.ListenIp, ",") {
+		pkg.DeleteServiceMultiIP(inNode.ID, serviceName, fwd.ListenIp)
+	} else {
+		pkg.DeleteService(inNode.ID, serviceName)
+	}
 
 	// For tunnel-forward type, also clean up chains and remote service
 	if tunnel.Type == tunnelTypeTunnelForward {

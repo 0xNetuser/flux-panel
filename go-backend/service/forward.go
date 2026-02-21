@@ -785,11 +785,11 @@ func checkUserPermissions(userId int64, roleId int, tunnel *model.Tunnel, exclud
 		return nil, nil, "该隧道权限已到期"
 	}
 
-	// Flow limits
-	if user.Flow <= 0 {
+	// Flow limits — compare actual usage against limit (same logic as checkUserFlowLimits)
+	if user.Flow*bytesToGB <= user.InFlow+user.OutFlow {
 		return nil, nil, "用户总流量已用完"
 	}
-	if ut.Flow <= 0 {
+	if ut.Flow*bytesToGB <= ut.InFlow+ut.OutFlow {
 		return nil, nil, "该隧道流量已用完"
 	}
 

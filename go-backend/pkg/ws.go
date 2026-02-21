@@ -43,9 +43,15 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+// AdminSession wraps a websocket.Conn with a mutex to prevent concurrent writes.
+type AdminSession struct {
+	Conn *websocket.Conn
+	mu   sync.Mutex
+}
+
 type WSManager struct {
 	nodeSessions    sync.Map // nodeID(int64) → *NodeSession
-	adminSessions   sync.Map // sessionID(string) → *websocket.Conn
+	adminSessions   sync.Map // sessionID(string) → *AdminSession
 	pendingRequests sync.Map // requestID(string) → chan *dto.GostResponse
 	nodeSystemInfo  sync.Map // nodeID(int64) → *NodeSystemInfo
 
@@ -204,9 +210,10 @@ func (m *WSManager) HandleConnection(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// Admin connection
 		sessionId := conn.RemoteAddr().String()
-		m.adminSessions.Store(sessionId, conn)
+		as := &AdminSession{Conn: conn}
+		m.adminSessions.Store(sessionId, as)
 
-		go m.readAdminMessages(sessionId, conn)
+		go m.readAdminMessages(sessionId, as)
 	}
 }
 
@@ -312,14 +319,14 @@ func (m *WSManager) readNodeMessages(nodeId int64, ns *NodeSession) {
 	}
 }
 
-func (m *WSManager) readAdminMessages(sessionId string, conn *websocket.Conn) {
+func (m *WSManager) readAdminMessages(sessionId string, as *AdminSession) {
 	defer func() {
 		m.adminSessions.Delete(sessionId)
-		conn.Close()
+		as.Conn.Close()
 	}()
 
 	for {
-		_, _, err := conn.ReadMessage()
+		_, _, err := as.Conn.ReadMessage()
 		if err != nil {
 			return
 		}
@@ -385,8 +392,10 @@ func (m *WSManager) sendToNode(ns *NodeSession, message string) {
 
 func (m *WSManager) broadcastToAdmins(message string) {
 	m.adminSessions.Range(func(key, value interface{}) bool {
-		conn := value.(*websocket.Conn)
-		conn.WriteMessage(websocket.TextMessage, []byte(message))
+		as := value.(*AdminSession)
+		as.mu.Lock()
+		as.Conn.WriteMessage(websocket.TextMessage, []byte(message))
+		as.mu.Unlock()
 		return true
 	})
 }

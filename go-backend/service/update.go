@@ -204,9 +204,24 @@ func SelfUpdate() dto.R {
 		return dto.Err(err.Error())
 	}
 
-	// 4. Create updater container via Docker API
+	// 4. Pull docker:cli image and create updater container via Docker API
+	updaterImage := "docker:cli"
+	pullClient := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(_ context.Context, _, _ string) (net.Conn, error) {
+				return net.Dial("unix", "/var/run/docker.sock")
+			},
+		},
+		Timeout: 5 * time.Minute,
+	}
+	pullReq, _ := http.NewRequest("POST", "http://localhost/images/create?fromImage="+updaterImage+"&tag=latest", nil)
+	if pullResp, pullErr := pullClient.Do(pullReq); pullErr == nil {
+		io.Copy(io.Discard, pullResp.Body)
+		pullResp.Body.Close()
+	}
+
 	createBody := map[string]interface{}{
-		"Image": "docker:latest",
+		"Image": updaterImage,
 		"Cmd":   []string{"sh", "-c", "sleep 3 && cd /compose && docker compose pull && docker compose up -d"},
 		"HostConfig": map[string]interface{}{
 			"Binds":      []string{"/var/run/docker.sock:/var/run/docker.sock", hostDir + ":/compose"},

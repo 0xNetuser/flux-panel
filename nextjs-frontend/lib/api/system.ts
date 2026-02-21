@@ -20,6 +20,10 @@ export async function checkUpdate() {
   return post<UpdateInfo>('system/check-update');
 }
 
+export async function forceCheckUpdate() {
+  return post<UpdateInfo>('system/force-check-update');
+}
+
 export async function selfUpdate() {
   return post('system/update', {});
 }

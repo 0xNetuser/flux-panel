@@ -64,6 +64,20 @@ func CheckUpdate() dto.R {
 		return dto.Ok(updateCache)
 	}
 
+	return checkUpdateNoCache()
+}
+
+// ForceCheckUpdate bypasses cache and always fetches latest from GitHub.
+func ForceCheckUpdate() dto.R {
+	updateCacheMu.Lock()
+	defer updateCacheMu.Unlock()
+
+	return checkUpdateNoCache()
+}
+
+// checkUpdateNoCache fetches the latest release and updates the cache.
+// Caller must hold updateCacheMu.
+func checkUpdateNoCache() dto.R {
 	latest, tag, err := getLatestRelease()
 	if err != nil {
 		return dto.Err(err.Error())

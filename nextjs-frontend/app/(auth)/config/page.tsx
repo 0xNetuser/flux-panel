@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Save, Loader2, Eye, EyeOff } from 'lucide-react';
+import { Save, Loader2, Eye, EyeOff, RefreshCw, CheckCircle, ArrowUpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { getConfigs, updateConfigs } from '@/lib/api/config';
+import { forceCheckUpdate, UpdateInfo } from '@/lib/api/system';
 import { useAuth } from '@/lib/hooks/use-auth';
 
 interface ConfigFieldDef {
@@ -134,6 +135,8 @@ export default function ConfigPage() {
   const [configs, setConfigs] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -167,6 +170,27 @@ export default function ConfigPage() {
       toast.error(res.msg || '保存失败');
     }
     setSaving(false);
+  };
+
+  const handleCheckUpdate = async () => {
+    setChecking(true);
+    try {
+      const res = await forceCheckUpdate();
+      if (res.code === 0 && res.data) {
+        setUpdateInfo(res.data);
+        if (res.data.hasUpdate) {
+          toast.success(`发现新版本 ${res.data.latest}`);
+        } else {
+          toast.success('已是最新版本');
+        }
+      } else {
+        toast.error(res.msg || '检查更新失败');
+      }
+    } catch {
+      toast.error('检查更新失败');
+    } finally {
+      setChecking(false);
+    }
   };
 
   if (!isAdmin) {
@@ -210,6 +234,35 @@ export default function ConfigPage() {
           保存配置
         </Button>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">版本更新</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center gap-4">
+            <Button variant="outline" onClick={handleCheckUpdate} disabled={checking}>
+              {checking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              检查更新
+            </Button>
+            {updateInfo && (
+              <div className="flex items-center gap-2 text-sm">
+                {updateInfo.hasUpdate ? (
+                  <>
+                    <ArrowUpCircle className="h-4 w-4 text-orange-500" />
+                    <span>当前 {updateInfo.current}，最新 <a href={updateInfo.releaseUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">{updateInfo.latest}</a></span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <span className="text-muted-foreground">当前 {updateInfo.current}，已是最新版本</span>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {loading ? (
         <Card>

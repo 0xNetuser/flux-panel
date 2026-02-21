@@ -161,6 +161,7 @@ func Setup(r *gin.Engine) {
 
 		// System
 		auth.POST("/system/check-update", middleware.Admin(), handler.CheckUpdate)
+		auth.POST("/system/force-check-update", middleware.Admin(), handler.ForceCheckUpdate)
 		auth.POST("/system/update", middleware.Admin(), handler.SelfUpdate)
 	}
 }

@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowRightLeft, Server, Users, Activity, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ArrowRightLeft, Server, Users, Activity, AlertTriangle, ExternalLink, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/use-auth';
-import { getDashboardStats, checkUpdate, UpdateInfo } from '@/lib/api/system';
+import { getDashboardStats, checkUpdate, selfUpdate, UpdateInfo } from '@/lib/api/system';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -68,6 +69,20 @@ export default function DashboardPage() {
 }
 
 function AdminDashboard({ stats, updateInfo }: { stats: any; updateInfo: UpdateInfo | null }) {
+  const [updating, setUpdating] = useState(false);
+
+  const handleSelfUpdate = async () => {
+    if (!confirm('确定要更新面板吗？面板将在几秒后自动重启。')) return;
+    setUpdating(true);
+    const res = await selfUpdate();
+    if (res.code === 0) {
+      alert('更新已启动，面板将在几秒后自动重启');
+    } else {
+      alert(res.msg || '更新失败');
+      setUpdating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <h2 className="text-2xl font-bold">仪表板</h2>
@@ -85,14 +100,26 @@ function AdminDashboard({ stats, updateInfo }: { stats: any; updateInfo: UpdateI
                 更新命令：<code className="bg-muted px-1 rounded">docker compose pull && docker compose up -d</code>
               </p>
             </div>
-            <a
-              href={updateInfo.releaseUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-orange-600 hover:text-orange-700 dark:text-orange-400 flex items-center gap-1 flex-shrink-0"
-            >
-              Release <ExternalLink className="h-3 w-3" />
-            </a>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSelfUpdate}
+                disabled={updating}
+                className="text-orange-600 border-orange-500/50 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-950/40"
+              >
+                <RefreshCw className={`h-3 w-3 mr-1 ${updating ? 'animate-spin' : ''}`} />
+                {updating ? '更新中...' : '一键更新'}
+              </Button>
+              <a
+                href={updateInfo.releaseUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-orange-600 hover:text-orange-700 dark:text-orange-400 flex items-center gap-1"
+              >
+                Release <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
           </CardContent>
         </Card>
       )}

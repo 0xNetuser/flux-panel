@@ -84,7 +84,7 @@ func NodeInstallBinary(c *gin.Context) {
 		return
 	}
 
-	binaryPath := filepath.Join(config.Cfg.NodeBinaryDir, fmt.Sprintf("gost-node-%s", arch))
+	binaryPath := filepath.Join(config.Cfg.NodeBinaryDir, fmt.Sprintf("gost-%s", arch))
 
 	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
 		c.String(http.StatusNotFound, "Binary not found for architecture: "+arch)
@@ -92,6 +92,6 @@ func NodeInstallBinary(c *gin.Context) {
 	}
 
 	c.Header("Content-Type", "application/octet-stream")
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=gost-node-%s", arch))
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=gost-%s", arch))
 	c.File(binaryPath)
 }

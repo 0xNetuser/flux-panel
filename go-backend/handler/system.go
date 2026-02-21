@@ -10,3 +10,7 @@ import (
 func CheckUpdate(c *gin.Context) {
 	c.JSON(http.StatusOK, service.CheckUpdate())
 }
+
+func SelfUpdate(c *gin.Context) {
+	c.JSON(http.StatusOK, service.SelfUpdate())
+}

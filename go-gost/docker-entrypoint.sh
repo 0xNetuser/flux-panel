@@ -46,8 +46,22 @@ else
   echo "使用已有运行时配置: $GOST_CONFIG"
 fi
 
+# 恢复持久化的自定义 gost 版本
+if [ -f /etc/gost/gost ]; then
+  cp /etc/gost/gost /usr/local/bin/gost
+  chmod +x /usr/local/bin/gost
+  echo "恢复持久化的自定义 gost 版本"
+fi
+
 # Xray 配置
 if [ "$XRAY_ENABLE" = "true" ] || [ "$XRAY_ENABLE" = "1" ]; then
+  # 恢复持久化的自定义 Xray 版本
+  if [ -f /etc/gost/xray ]; then
+    cp /etc/gost/xray /usr/local/bin/xray
+    chmod +x /usr/local/bin/xray
+    echo "恢复持久化的自定义 Xray 版本"
+  fi
+
   echo "Xray 已启用，检查 xray 二进制..."
   if [ -x /usr/local/bin/xray ]; then
     XRAY_VERSION=$(/usr/local/bin/xray version 2>/dev/null | head -1 || echo "unknown")

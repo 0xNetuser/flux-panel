@@ -148,6 +148,11 @@ func ResumeRemoteService(nodeId int64, name string) *dto.GostResponse {
 	return WS.SendMsg(nodeId, data, "ResumeService")
 }
 
+func NodeUpdateBinary(nodeId int64, panelAddr string) *dto.GostResponse {
+	data := map[string]interface{}{"panelAddr": panelAddr}
+	return WS.SendMsg(nodeId, data, "NodeUpdateBinary")
+}
+
 func AddChains(nodeId int64, name string, remoteAddr string, protocol string, interfaceName string) *dto.GostResponse {
 	data := buildChainData(name, remoteAddr, protocol, interfaceName)
 	return WS.SendMsg(nodeId, data, "AddChains")

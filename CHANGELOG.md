@@ -1,5 +1,63 @@
 # Changelog
 
+## v1.9.4 — 面板一键自更新 + 节点更新 + 多项修复
+
+### Features
+
+- **面板一键自更新**：Dashboard 更新 banner 新增「一键更新」按钮，后端通过 Docker Socket API 创建临时 updater 容器（`docker:latest`），挂载 `docker.sock` + 宿主机 compose 目录，执行 `docker compose pull && docker compose up -d` 完成面板自更新
+- **节点一键更新**：节点管理页面新增「更新节点」按钮，后端通过 WebSocket 发送 `NodeUpdateBinary` 命令，节点从面板下载最新二进制文件替换自身并重启
+- **Xray 入站自定义入口域名**：入站新增 `customEntry` 字段，配置后订阅链接使用自定义域名替代节点 IP，适用于 CDN/域名中转场景
+- **节点二进制版本持久化**：Docker 节点 entrypoint 启动时检查 `/etc/gost/gost` 和 `/etc/gost/xray`，恢复之前通过远程切换版本持久化的自定义二进制
+- **订阅链接管理员可见全部客户端**：管理员调用订阅链接 API 时返回所有启用客户端，不限于特定用户
+
+### Bug Fixes
+
+- **修复 Shadowsocks 客户端添加失败**：cipher method 为空导致 Xray 拒绝添加 Shadowsocks 客户端
+- **修复侧边栏导航断连时 URL 异常**：侧边栏导航改用 Next.js `Link` 组件，避免 WebSocket 断连时 URL 变为 `localhost`
+- **修复编辑 Xray 客户端 UUID/密码不生效**：编辑客户端时 UUID/密码字段更新未正确写入
+- **修复节点安装二进制文件名**：`gost-node-{arch}` → `gost-{arch}`，与实际构建产物一致
+
+### Changed Files
+
+**后端：**
+- `go-backend/service/update.go` — 新增 `SelfUpdate()` + Docker Socket API helpers（`dockerRequest`/`getHostComposeDir`）
+- `go-backend/handler/system.go` — 新增 `SelfUpdate` handler
+- `go-backend/handler/node.go` — 新增 `NodeUpdateBinary` handler
+- `go-backend/handler/node_install.go` — 修复二进制文件名 `gost-node-{arch}` → `gost-{arch}`
+- `go-backend/router/router.go` — 新增 `POST /system/update` + `POST /node/update-binary` 路由
+- `go-backend/pkg/gost.go` — 新增 `NodeUpdateBinary()` WebSocket 命令
+- `go-backend/service/node.go` — `getPanelAddress` → `GetPanelAddress`（导出）
+- `go-backend/dto/xray.go` — 新增 `CustomEntry` 字段
+- `go-backend/model/xray_inbound.go` — 新增 `custom_entry` 列
+- `go-backend/service/xray_inbound.go` — Create/List/Update 处理 `customEntry`
+- `go-backend/service/xray_client.go` — 订阅链接使用 `customEntry`，管理员可见全部客户端
+
+**节点端：**
+- `go-gost/docker-entrypoint.sh` — 启动时恢复持久化的 gost/xray 二进制
+- `go-gost/x/socket/websocket_reporter.go` — 新增 `handleNodeUpdateBinary` 命令路由
+- `go-gost/x/xray/manager.go` — Xray 版本切换持久化到 `/etc/gost/xray`
+
+**前端：**
+- `nextjs-frontend/app/(auth)/dashboard/page.tsx` — 更新 banner 添加「一键更新」按钮
+- `nextjs-frontend/app/(auth)/node/page.tsx` — 新增「更新节点」按钮
+- `nextjs-frontend/app/(auth)/xray/inbound/_components/inbound-dialog.tsx` — 新增 customEntry 表单字段
+- `nextjs-frontend/lib/api/system.ts` — 新增 `selfUpdate` API
+- `nextjs-frontend/lib/api/node.ts` — 新增 `updateNodeBinary` API
+
+**部署：**
+- `docker-compose.yml` — backend 新增 `docker.sock` + compose 目录挂载
+
+---
+
+## v1.9.3 — 修复 Xray/GOST 热加载格式问题
+
+### Bug Fixes
+
+- **修复 Xray 热加载 JSON 格式**：`xray api adi`/`adu` 命令要求 `{"inbounds": [...]}` 包装格式，之前传递裸入站对象导致 "no valid inbound found" 错误
+- **修复 GOST 转发热更新失效**：`handleUpdateForwarder` 缺少 `preprocessDurationFields` 调用，`failTimeout: "600s"` 无法反序列化为 `time.Duration`，导致热更新始终失败并 fallback 到全量重建（断开连接）
+
+---
+
 ## v1.9.0 — GOST/Xray 热加载 + 监控实时速度
 
 ### Features

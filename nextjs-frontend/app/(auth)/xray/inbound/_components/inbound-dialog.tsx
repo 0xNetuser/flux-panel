@@ -35,6 +35,8 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
   const [port, setPort] = useState('');
   const [listen, setListen] = useState('::');
   const [remark, setRemark] = useState('');
+  const [customEntry, setCustomEntry] = useState('');
+  const [customEntryManual, setCustomEntryManual] = useState(false);
 
   // Structured form states
   const [protocolForm, setProtocolForm] = useState<ProtocolForm>({});
@@ -64,6 +66,8 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
       setPort(editingInbound.port?.toString() || '');
       setListen(editingInbound.listen || '::');
       setRemark(editingInbound.remark || '');
+      setCustomEntry(editingInbound.customEntry || '');
+      setCustomEntryManual(false);
 
       const settingsStr = editingInbound.settingsJson || editingInbound.settings || '{}';
       const streamStr = editingInbound.streamSettingsJson || editingInbound.streamSettings || '{}';
@@ -93,6 +97,8 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
       setPort('');
       setListen('::');
       setRemark('');
+      setCustomEntry('');
+      setCustomEntryManual(false);
       setProtocolForm({});
       setTransportForm({ network: 'tcp' });
       setSecurityForm({ security: 'none' });
@@ -174,6 +180,7 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
       streamSettingsJson,
       sniffingJson,
       remark: remark || undefined,
+      customEntry: customEntry || '',
     };
 
     if (editingInbound) {
@@ -276,6 +283,45 @@ export default function InboundDialog({ open, onOpenChange, editingInbound, node
           <div className="space-y-2">
             <Label className="inline-flex items-center gap-1">备注 <FieldTip content="用于标记该入站的说明文字，不影响实际功能" /></Label>
             <Input value={remark} onChange={e => setRemark(e.target.value)} placeholder="入站备注" />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="inline-flex items-center gap-1">自定义入口 <FieldTip content="订阅链接和二维码使用的地址，留空则使用节点服务器IP。适用于 CDN / 中转等需要自定义入口地址的场景" /></Label>
+            {(() => {
+              const selectedNode = nodes.find((n: any) => n.id?.toString() === nodeId);
+              const entryIps: string[] = selectedNode?.entryIps ? selectedNode.entryIps.split(',').map((s: string) => s.trim()).filter(Boolean) : [];
+              const serverIp: string = selectedNode?.serverIp || '';
+              const allOptions = [...new Set([...(serverIp ? [serverIp] : []), ...entryIps])];
+              const isKnown = !customEntry || allOptions.includes(customEntry);
+              const showManual = customEntryManual || (!isKnown && customEntry);
+              return (
+                <>
+                  <Select value={showManual ? '__custom__' : (customEntry || '__default__')} onValueChange={v => {
+                    if (v === '__custom__') {
+                      setCustomEntryManual(true);
+                    } else if (v === '__default__') {
+                      setCustomEntry('');
+                      setCustomEntryManual(false);
+                    } else {
+                      setCustomEntry(v);
+                      setCustomEntryManual(false);
+                    }
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="使用节点IP（默认）" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default__">使用节点IP（默认）</SelectItem>
+                      {allOptions.map((ip) => (
+                        <SelectItem key={ip} value={ip}>{ip}</SelectItem>
+                      ))}
+                      <SelectItem value="__custom__">自定义...</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {showManual && (
+                    <Input value={customEntry} onChange={e => setCustomEntry(e.target.value)} placeholder="输入域名或IP地址" className="mt-1" />
+                  )}
+                </>
+              );
+            })()}
           </div>
 
           {/* Structured Mode — sequential sections (3x-ui style) */}

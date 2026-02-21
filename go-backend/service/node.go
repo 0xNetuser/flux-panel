@@ -213,7 +213,7 @@ func GenerateInstallCommand(id int64, clientAddr string) dto.R {
 		return dto.Err("节点不存在")
 	}
 
-	panelAddr := getPanelAddress(clientAddr)
+	panelAddr := GetPanelAddress(clientAddr)
 
 	cmd := fmt.Sprintf("curl -fsSL %s/node-install/script | bash -s -- %d %s %s",
 		panelAddr, node.ID, node.Secret, panelAddr)
@@ -227,7 +227,7 @@ func GenerateDockerInstallCommand(id int64, clientAddr string) dto.R {
 		return dto.Err("节点不存在")
 	}
 
-	panelAddr := getPanelAddress(clientAddr)
+	panelAddr := GetPanelAddress(clientAddr)
 
 	imageTag := pkg.Version
 	if imageTag == "" || imageTag == "dev" {
@@ -243,7 +243,7 @@ func GenerateDockerInstallCommand(id int64, clientAddr string) dto.R {
 // 1. vite_config panel_addr (admin explicitly configured)
 // 2. clientAddr from frontend (window.location.origin)
 // 3. fallback to localhost
-func getPanelAddress(clientAddr string) string {
+func GetPanelAddress(clientAddr string) string {
 	var cfg model.ViteConfig
 	if err := DB.Where("name = ?", "panel_addr").First(&cfg).Error; err == nil && cfg.Value != "" {
 		return cfg.Value

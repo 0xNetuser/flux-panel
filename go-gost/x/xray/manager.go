@@ -262,10 +262,20 @@ func (m *XrayManager) SwitchVersion(version string) error {
 		return fmt.Errorf("failed to chmod binary: %v", err)
 	}
 
-	// 6. Clear cached version
+	// 6. Persist binary to config directory (survives container restarts)
+	persistDir, _ := filepath.Abs(filepath.Dir(m.configPath))
+	persistPath := filepath.Join(persistDir, "xray")
+	if err := copyFile(binaryPath, persistPath); err != nil {
+		fmt.Printf("⚠️ Failed to persist Xray binary: %v\n", err)
+	} else {
+		os.Chmod(persistPath, 0755)
+		fmt.Printf("📦 Persisted Xray binary to %s\n", persistPath)
+	}
+
+	// 7. Clear cached version
 	m.version = ""
 
-	// 7. Start Xray
+	// 8. Start Xray
 	fmt.Printf("🚀 Starting Xray v%s...\n", version)
 	if err := m.Start(); err != nil {
 		// Restore backup on failure

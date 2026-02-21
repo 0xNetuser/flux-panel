@@ -9,9 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Trash2, Edit2, Terminal, Container, Copy, Eye, EyeOff, RefreshCw, ArrowUpDown, Network } from 'lucide-react';
+import { Plus, Trash2, Edit2, Terminal, Container, Copy, Eye, EyeOff, RefreshCw, ArrowUpDown, Network, Download } from 'lucide-react';
 import { toast } from 'sonner';
-import { getNodeList, createNode, updateNode, deleteNode, getNodeInstallCommand, getNodeDockerCommand, reconcileNode } from '@/lib/api/node';
+import { getNodeList, createNode, updateNode, deleteNode, getNodeInstallCommand, getNodeDockerCommand, reconcileNode, updateNodeBinary } from '@/lib/api/node';
 import { switchXrayVersion, getXrayVersions } from '@/lib/api/xray-node';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getVersion } from '@/lib/api/system';
@@ -62,7 +62,7 @@ export default function NodePage() {
 
   const handleCreate = () => {
     setEditingNode(null);
-    setForm({ name: '', entryIps: '', serverIp: '', portSta: '', portEnd: '', secret: '' });
+    setForm({ name: '', entryIps: '', serverIp: '', portSta: '10000', portEnd: '60000', secret: '' });
     setShowSecret(false);
     setDialogOpen(true);
   };
@@ -142,6 +142,7 @@ export default function NodePage() {
 
   const [ifaceNode, setIfaceNode] = useState<any>(null);
   const [reconcilingId, setReconcilingId] = useState<number | null>(null);
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [xrayVersionDialog, setXrayVersionDialog] = useState(false);
   const [xrayVersionNode, setXrayVersionNode] = useState<any>(null);
   const [xrayTargetVersion, setXrayTargetVersion] = useState('');
@@ -204,6 +205,21 @@ export default function NodePage() {
       }
     } finally {
       setReconcilingId(null);
+    }
+  };
+
+  const handleUpdateBinary = async (node: any) => {
+    if (!confirm(`确定更新节点 "${node.name}" 的二进制文件？节点将自动下载新版本并重启。`)) return;
+    setUpdatingId(node.id);
+    try {
+      const res = await updateNodeBinary(node.id);
+      if (res.code === 0) {
+        toast.success('更新指令已发送，节点将自动下载并重启');
+      } else {
+        toast.error(res.msg || '更新失败');
+      }
+    } finally {
+      setUpdatingId(null);
     }
   };
 
@@ -273,7 +289,20 @@ export default function NodePage() {
                     <TableCell className="text-sm">
                       {n.version || '-'}
                       {n.version && panelVersion && n.version !== panelVersion && n.version !== 'dev' && compareVersions(n.version, panelVersion) < 0 && (
-                        <Badge variant="outline" className="ml-1 text-orange-600 border-orange-400">需更新</Badge>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="ml-1 h-5 px-1.5 text-xs text-orange-600 border-orange-400 hover:bg-orange-50"
+                          onClick={() => handleUpdateBinary(n)}
+                          disabled={updatingId === n.id}
+                        >
+                          {updatingId === n.id ? (
+                            <RefreshCw className="mr-1 h-3 w-3 animate-spin" />
+                          ) : (
+                            <Download className="mr-1 h-3 w-3" />
+                          )}
+                          {updatingId === n.id ? '更新中' : '更新'}
+                        </Button>
                       )}
                     </TableCell>
                     <TableCell className="text-sm">
@@ -342,11 +371,11 @@ export default function NodePage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>起始端口</Label>
-                <Input value={form.portSta} onChange={e => setForm(p => ({ ...p, portSta: e.target.value }))} placeholder="10000" />
+                <Input value={form.portSta} onChange={e => setForm(p => ({ ...p, portSta: e.target.value }))} placeholder="10000" autoComplete="off" />
               </div>
               <div className="space-y-2">
                 <Label>结束端口</Label>
-                <Input value={form.portEnd} onChange={e => setForm(p => ({ ...p, portEnd: e.target.value }))} placeholder="60000" />
+                <Input value={form.portEnd} onChange={e => setForm(p => ({ ...p, portEnd: e.target.value }))} placeholder="60000" autoComplete="off" />
               </div>
             </div>
             <div className="space-y-2">
@@ -359,6 +388,7 @@ export default function NodePage() {
                   placeholder="留空自动生成"
                   readOnly={!!editingNode}
                   className={editingNode ? 'bg-muted' : ''}
+                  autoComplete="off"
                 />
                 <Button
                   variant="ghost"

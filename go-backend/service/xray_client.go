@@ -399,7 +399,11 @@ func GetSubscriptionLinks(userId int64) dto.R {
 	}
 
 	var clients []model.XrayClient
-	DB.Where("user_id = ? AND enable = 1", userId).Find(&clients)
+	if user.RoleId == 0 {
+		DB.Where("enable = 1").Find(&clients)
+	} else {
+		DB.Where("user_id = ? AND enable = 1", userId).Find(&clients)
+	}
 
 	var links []map[string]interface{}
 
@@ -443,6 +447,9 @@ func GetSubscriptionLinks(userId int64) dto.R {
 
 func generateProtocolLink(client *model.XrayClient, inbound *model.XrayInbound, node *model.Node) string {
 	host := node.ServerIp
+	if inbound.CustomEntry != "" {
+		host = inbound.CustomEntry
+	}
 	port := inbound.Port
 	remark := client.Remark
 	if remark == "" {

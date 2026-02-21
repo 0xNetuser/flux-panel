@@ -6,8 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Server, Cpu, HardDrive, Network, RefreshCw, Filter, Info } from 'lucide-react';
-import { Tooltip as UiTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Server, Cpu, HardDrive, Network, RefreshCw, Filter } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { getNodeHealth, getLatencyHistory, getTrafficOverview } from '@/lib/api/monitor';
 import { post } from '@/lib/api/client';
@@ -352,25 +351,9 @@ export default function MonitorPage() {
                     <div className="flex items-center justify-between">
                       <span>Xray</span>
                       {node.xrayRunning ? (
-                        <div className="flex items-center gap-1">
-                          <Badge variant="default" className="text-xs">
-                            {node.xrayVersion?.match(/Xray\s+([\d.]+)/)?.[1] ? `Xray ${node.xrayVersion.match(/Xray\s+([\d.]+)/)![1]}` : (node.xrayVersion || '运行中')}
-                          </Badge>
-                          {node.xrayVersion && (
-                            <TooltipProvider>
-                              <UiTooltip>
-                                <TooltipTrigger asChild>
-                                  <button type="button" className="text-muted-foreground hover:text-foreground">
-                                    <Info className="h-3 w-3" />
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top" className="max-w-xs break-all">
-                                  {node.xrayVersion}
-                                </TooltipContent>
-                              </UiTooltip>
-                            </TooltipProvider>
-                          )}
-                        </div>
+                        <Badge variant="default" className="text-xs">
+                          {node.xrayVersion?.match(/Xray\s+([\d.]+)/)?.[1] ? `Xray ${node.xrayVersion.match(/Xray\s+([\d.]+)/)![1]}` : (node.xrayVersion || '运行中')}
+                        </Badge>
                       ) : (
                         <Badge variant="secondary" className="text-xs">未运行</Badge>
                       )}

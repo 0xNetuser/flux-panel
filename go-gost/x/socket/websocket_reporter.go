@@ -6,11 +6,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
-	"sync" // 新增：用于管理连接状态的互斥锁
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-gost/x/config"
@@ -22,7 +28,6 @@ import (
 	"github.com/shirou/gopsutil/v3/host"
 	"github.com/shirou/gopsutil/v3/mem"
 	psnet "github.com/shirou/gopsutil/v3/net"
-	"os"
 )
 
 // NetInterface 网卡信息
@@ -113,6 +118,7 @@ type WebSocketReporter struct {
 	aesCrypto      *crypto.AESCrypto // 新增：AES加密器
 	xrayManager    *xray.XrayManager        // Xray 进程管理
 	xrayTraffic    *xray.TrafficReporter    // Xray 流量上报
+	updating       int32                    // 原子标记：节点更新中
 }
 
 // NewWebSocketReporter 创建一个新的WebSocket报告器
@@ -623,6 +629,10 @@ func (w *WebSocketReporter) routeCommand(cmd CommandMessage) {
 	case "XraySwitchVersion":
 		err = w.handleXraySwitchVersion(cmd.Data)
 		response.Type = "XraySwitchVersionResponse"
+
+	case "NodeUpdateBinary":
+		err = w.handleNodeUpdateBinary(cmd.Data)
+		response.Type = "NodeUpdateBinaryResponse"
 
 	default:
 		err = fmt.Errorf("未知命令类型: %s", cmd.Type)
@@ -1179,6 +1189,141 @@ func (w *WebSocketReporter) handleXraySwitchVersion(data interface{}) error {
 
 	// Return immediately — result will be reflected in SystemInfo xray_version
 	return nil
+}
+
+func (w *WebSocketReporter) handleNodeUpdateBinary(data interface{}) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("序列化数据失败: %v", err)
+	}
+
+	var req struct {
+		PanelAddr string `json:"panelAddr"`
+	}
+	if err := json.Unmarshal(jsonData, &req); err != nil {
+		return fmt.Errorf("解析更新请求失败: %v", err)
+	}
+
+	if req.PanelAddr == "" {
+		return fmt.Errorf("panelAddr 不能为空")
+	}
+
+	if !atomic.CompareAndSwapInt32(&w.updating, 0, 1) {
+		return fmt.Errorf("节点正在更新中，请勿重复操作")
+	}
+
+	go func() {
+		defer atomic.StoreInt32(&w.updating, 0)
+		time.Sleep(1 * time.Second) // 等待 response 发送完成
+
+		downloadURL := fmt.Sprintf("%s/node-install/binary/%s", req.PanelAddr, runtime.GOARCH)
+		fmt.Printf("⬇️ 开始下载节点更新: %s\n", downloadURL)
+
+		// 1. 下载到临时文件
+		httpClient := &http.Client{Timeout: 5 * time.Minute}
+		resp, err := httpClient.Get(downloadURL)
+		if err != nil {
+			fmt.Printf("❌ 下载失败: %v\n", err)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			fmt.Printf("❌ 下载失败，状态码: %d\n", resp.StatusCode)
+			return
+		}
+
+		tmpFile, err := os.CreateTemp("", "gost-update-*")
+		if err != nil {
+			fmt.Printf("❌ 创建临时文件失败: %v\n", err)
+			return
+		}
+		tmpPath := tmpFile.Name()
+
+		// 限制下载大小为 256MB，防止恶意/异常响应耗尽磁盘
+		const maxBinarySize = 256 * 1024 * 1024
+		written, err := io.Copy(tmpFile, io.LimitReader(resp.Body, maxBinarySize+1))
+		tmpFile.Close()
+		if err != nil {
+			os.Remove(tmpPath)
+			fmt.Printf("❌ 保存下载文件失败: %v\n", err)
+			return
+		}
+		if written > maxBinarySize {
+			os.Remove(tmpPath)
+			fmt.Printf("❌ 下载文件过大 (%d bytes)，已中止\n", written)
+			return
+		}
+		if written < 1024 {
+			os.Remove(tmpPath)
+			fmt.Printf("❌ 下载文件异常 (%d bytes)，文件过小\n", written)
+			return
+		}
+
+		// 2. 获取当前二进制路径
+		currentBinary, err := os.Executable()
+		if err != nil {
+			os.Remove(tmpPath)
+			fmt.Printf("❌ 获取当前二进制路径失败: %v\n", err)
+			return
+		}
+		// 解析软链接得到真实路径
+		currentBinary, _ = filepath.EvalSymlinks(currentBinary)
+
+		// 3. 备份旧二进制
+		backupPath := currentBinary + ".bak"
+		if err := copyFileForUpdate(currentBinary, backupPath); err != nil {
+			fmt.Printf("⚠️ 备份旧二进制失败: %v\n", err)
+		} else {
+			fmt.Printf("📦 已备份旧二进制到 %s\n", backupPath)
+		}
+
+		// 4. 替换二进制
+		if err := copyFileForUpdate(tmpPath, currentBinary); err != nil {
+			fmt.Printf("❌ 替换二进制失败: %v\n", err)
+			os.Remove(tmpPath)
+			return
+		}
+		os.Chmod(currentBinary, 0755)
+		os.Remove(tmpPath)
+
+		// 5. Docker 持久化：如果是 Docker 环境，保存到 /etc/gost/gost
+		if _, err := os.Stat("/.dockerenv"); err == nil {
+			persistPath := "/etc/gost/gost"
+			if err := copyFileForUpdate(currentBinary, persistPath); err != nil {
+				fmt.Printf("⚠️ Docker 持久化失败: %v\n", err)
+			} else {
+				os.Chmod(persistPath, 0755)
+				fmt.Printf("📦 已持久化到 %s\n", persistPath)
+			}
+		}
+
+		fmt.Printf("✅ 节点更新完成 (%d bytes)，正在退出进程...\n", written)
+		// 6. 退出进程，由 systemd/Docker 自动重启
+		os.Exit(0)
+	}()
+
+	return nil
+}
+
+// copyFileForUpdate copies a file from src to dst (used by node self-update)
+func copyFileForUpdate(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, in); err != nil {
+		return err
+	}
+	return out.Sync()
 }
 
 // handleCall 处理服务端的call回调消息

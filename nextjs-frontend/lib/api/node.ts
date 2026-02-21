@@ -9,3 +9,4 @@ export const getNodeDockerCommand = (id: number) => post('/node/install/docker',
 export const getAccessibleNodeList = () => post('/node/accessible');
 export const checkNodeStatus = (nodeId?: number) => post('/node/check-status', nodeId ? { nodeId } : {});
 export const reconcileNode = (id: number) => post('/node/reconcile', { id });
+export const updateNodeBinary = (id: number) => post('/node/update-binary', { id });

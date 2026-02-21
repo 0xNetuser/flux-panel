@@ -11,6 +11,7 @@ type XrayInbound struct {
 	StreamSettingsJson string `gorm:"column:stream_settings_json" json:"streamSettingsJson"`
 	SniffingJson       string `gorm:"column:sniffing_json" json:"sniffingJson"`
 	Remark             string `gorm:"column:remark" json:"remark"`
+	CustomEntry        string `gorm:"column:custom_entry" json:"customEntry"`
 	Enable             int    `gorm:"column:enable" json:"enable"`
 	CreatedTime        int64  `gorm:"column:created_time" json:"createdTime"`
 	UpdatedTime        int64  `gorm:"column:updated_time" json:"updatedTime"`

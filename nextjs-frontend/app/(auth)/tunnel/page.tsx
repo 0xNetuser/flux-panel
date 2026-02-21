@@ -67,7 +67,7 @@ export default function TunnelPage() {
 
   const handleCreate = () => {
     setEditingTunnel(null);
-    setForm({ name: '', inNodeId: '', outNodeId: '', type: 'port', protocol: 'tcp+udp', portSta: '', portEnd: '', interfaceName: '' });
+    setForm({ name: '', inNodeId: '', outNodeId: '', type: 'port', protocol: 'tcp+udp', portSta: '10000', portEnd: '60000', interfaceName: '' });
     setDialogOpen(true);
   };
 

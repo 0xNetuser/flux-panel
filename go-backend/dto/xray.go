@@ -10,18 +10,20 @@ type XrayInboundDto struct {
 	StreamSettingsJson string `json:"streamSettingsJson"`
 	SniffingJson       string `json:"sniffingJson"`
 	Remark             string `json:"remark"`
+	CustomEntry        string `json:"customEntry"`
 }
 
 type XrayInboundUpdateDto struct {
-	ID                 int64  `json:"id" binding:"required"`
-	Tag                string `json:"tag"`
-	Protocol           string `json:"protocol"`
-	Listen             string `json:"listen"`
-	Port               *int   `json:"port"`
-	SettingsJson       string `json:"settingsJson"`
-	StreamSettingsJson string `json:"streamSettingsJson"`
-	SniffingJson       string `json:"sniffingJson"`
-	Remark             string `json:"remark"`
+	ID                 int64   `json:"id" binding:"required"`
+	Tag                string  `json:"tag"`
+	Protocol           string  `json:"protocol"`
+	Listen             string  `json:"listen"`
+	Port               *int    `json:"port"`
+	SettingsJson       string  `json:"settingsJson"`
+	StreamSettingsJson string  `json:"streamSettingsJson"`
+	SniffingJson       string  `json:"sniffingJson"`
+	Remark             string  `json:"remark"`
+	CustomEntry        *string `json:"customEntry"`
 }
 
 type XrayClientDto struct {

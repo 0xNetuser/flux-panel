@@ -123,6 +123,7 @@ func CreateXrayInbound(d dto.XrayInboundDto, userId int64, roleId int) dto.R {
 		StreamSettingsJson: d.StreamSettingsJson,
 		SniffingJson:       d.SniffingJson,
 		Remark:             d.Remark,
+		CustomEntry:        d.CustomEntry,
 		Enable:             1,
 		CreatedTime:        time.Now().UnixMilli(),
 		UpdatedTime:        time.Now().UnixMilli(),
@@ -195,6 +196,7 @@ func ListXrayInbounds(nodeId *int64, userId int64, roleId int) dto.R {
 			"streamSettingsJson": ib.StreamSettingsJson,
 			"sniffingJson":       ib.SniffingJson,
 			"remark":             ib.Remark,
+			"customEntry":        ib.CustomEntry,
 			"enable":             ib.Enable,
 			"createdTime":        ib.CreatedTime,
 			"updatedTime":        ib.UpdatedTime,
@@ -254,6 +256,9 @@ func UpdateXrayInbound(d dto.XrayInboundUpdateDto, userId int64, roleId int) dto
 	}
 	if d.Remark != "" {
 		updates["remark"] = d.Remark
+	}
+	if d.CustomEntry != nil {
+		updates["custom_entry"] = *d.CustomEntry
 	}
 
 	DB.Model(&existing).Updates(updates)

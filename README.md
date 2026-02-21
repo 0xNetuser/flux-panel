@@ -54,7 +54,7 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 
 ```bash
 # 下载 docker-compose 配置文件
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.9.3/docker-compose.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.9.4/docker-compose.yml -o docker-compose.yml
 ```
 
 **2. 创建环境变量文件**
@@ -121,7 +121,7 @@ docker compose up -d
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.9.3
+  0xnetuser/gost-node:1.9.4
 ```
 
 也可以使用 docker-compose，参考项目中的 `docker-compose-node.yml`：
@@ -129,7 +129,7 @@ docker run -d --network=host --restart=unless-stopped --name gost-node \
 ```yaml
 services:
   gost-node:
-    image: 0xnetuser/gost-node:1.9.3
+    image: 0xnetuser/gost-node:1.9.4
     container_name: gost-node
     network_mode: host
     restart: unless-stopped
@@ -178,7 +178,7 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 
 ```bash
 # 下载最新 docker-compose 配置（覆盖旧文件）
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.9.3/docker-compose.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.9.4/docker-compose.yml -o docker-compose.yml
 
 # 拉取最新镜像并重启
 docker compose pull && docker compose up -d
@@ -200,7 +200,7 @@ docker stop gost-node && docker rm gost-node
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.9.3
+  0xnetuser/gost-node:1.9.4
 ```
 
 如果使用 docker-compose 部署，更新 `docker-compose-node.yml` 中的镜像版本后：
@@ -222,6 +222,18 @@ curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && c
 ---
 
 ## 更新日志
+
+### v1.9.4
+
+- **面板一键自更新**：Dashboard 新增「一键更新」按钮，后端通过 Docker Socket API 创建临时 updater 容器执行 `docker compose pull && up -d`，自动拉取新镜像并重建容器
+- **节点一键更新**：节点管理页面新增「更新节点」按钮，从面板下载最新二进制替换并重启节点服务
+- **Xray 入站自定义入口域名**：入站新增 `customEntry` 字段，订阅链接使用自定义域名替代节点 IP
+- **节点二进制持久化**：Docker 节点启动时恢复持久化的自定义 gost/xray 二进制版本
+- **修复 Shadowsocks 客户端添加失败**：cipher method 为空导致添加失败
+- **修复侧边栏导航断连**：改用 Link 组件避免断连时 URL 变为 localhost
+- **修复编辑 Xray 客户端 UUID/密码不生效**
+- **修复节点安装二进制文件名**：`gost-node-{arch}` → `gost-{arch}`
+- **订阅链接管理员可见全部客户端**
 
 ### v1.9.3
 

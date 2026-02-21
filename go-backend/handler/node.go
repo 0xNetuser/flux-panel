@@ -2,6 +2,7 @@ package handler
 
 import (
 	"flux-panel/go-backend/dto"
+	"flux-panel/go-backend/pkg"
 	"flux-panel/go-backend/service"
 	"net/http"
 
@@ -80,4 +81,23 @@ func NodeReconcile(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, service.ReconcileNodeAPI(d.ID))
+}
+
+func NodeUpdateBinary(c *gin.Context) {
+	var d struct {
+		ID int64 `json:"id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&d); err != nil {
+		c.JSON(http.StatusOK, dto.Err("参数错误"))
+		return
+	}
+	// 安全：不接受前端传入的 panelAddr，从数据库配置或 request Host 推导
+	scheme := "http"
+	if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+		scheme = "https"
+	}
+	clientOrigin := scheme + "://" + c.Request.Host
+	panelAddr := service.GetPanelAddress(clientOrigin)
+	result := pkg.NodeUpdateBinary(d.ID, panelAddr)
+	c.JSON(http.StatusOK, dto.Ok(result))
 }

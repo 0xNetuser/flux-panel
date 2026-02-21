@@ -77,6 +77,7 @@ func Setup(r *gin.Engine) {
 		auth.POST("/node/install", middleware.Admin(), handler.NodeInstall)
 		auth.POST("/node/install/docker", middleware.Admin(), handler.NodeInstallDocker)
 		auth.POST("/node/reconcile", middleware.Admin(), handler.NodeReconcile)
+		auth.POST("/node/update-binary", middleware.Admin(), handler.NodeUpdateBinary)
 
 		// Tunnel
 		auth.POST("/tunnel/create", middleware.Admin(), handler.TunnelCreate)
@@ -160,5 +161,6 @@ func Setup(r *gin.Engine) {
 
 		// System
 		auth.POST("/system/check-update", middleware.Admin(), handler.CheckUpdate)
+		auth.POST("/system/update", middleware.Admin(), handler.SelfUpdate)
 	}
 }

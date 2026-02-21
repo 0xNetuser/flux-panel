@@ -256,10 +256,10 @@ func UpdateForward(d dto.ForwardUpdateDto, userId int64, roleId int) dto.R {
 			return dto.Err("你没有该隧道权限")
 		}
 	} else {
+		// Admin: look up the forward owner's UserTunnel for correct service name.
+		// nil is expected when admin owns the forward (admins don't have UserTunnel records),
+		// which produces userTunnelId=0, matching the service name from creation.
 		userTunnel = getUserTunnel(existForward.UserId, tunnel.ID)
-		if userTunnel == nil {
-			return dto.Err("该用户没有此隧道的权限记录，无法构建正确的服务名")
-		}
 	}
 
 	// Use permission result userTunnel if available and tunnel changed

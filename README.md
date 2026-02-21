@@ -1,495 +1,482 @@
-# flux-panel 转发面板
+# Flux Panel
 
-本项目基于 [go-gost/gost](https://github.com/go-gost/gost) 和 [go-gost/x](https://github.com/go-gost/x) 两个开源库，实现了转发面板。集成 Xray 代理管理，支持多协议入站、客户端管理和 ACME 证书自动签发。
-
-## 特性
-
-### GOST 转发
-
-- 支持按 **隧道账号级别** 管理流量转发数量，可用于用户/隧道配额控制
-- 支持 **TCP** 和 **UDP** 协议的转发
-- 支持两种转发模式：**端口转发** 与 **隧道转发**
-- 可针对 **指定用户的指定隧道进行限速** 设置
-- 支持配置 **单向或双向流量计费方式**，灵活适配不同计费模型
-
-### Xray 代理
-
-- **入站管理**：结构化表单配置 VMess / VLESS / Trojan / Shadowsocks 入站，支持 TCP / WebSocket / gRPC / HTTPUpgrade / xHTTP / mKCP 传输层，None / TLS / Reality 安全层
-- **高级模式**：可随时切换到原始 JSON 编辑，表单与 JSON 双向转换
-- **客户端管理**：UUID 自动生成、流量限制、到期时间、IP 连接数限制、流量自动重置周期、Telegram 绑定、订阅 ID
-- **证书管理**：支持手动上传 PEM 证书，也支持 **ACME 自动申请**（Let's Encrypt，DNS-01 验证，Cloudflare）
-- **自动续签**：ACME 证书到期前 30 天自动续签，支持手动触发续签
-- **订阅链接**：自动生成 VMess / VLESS / Trojan / Shadowsocks 协议订阅链接
-
-### 权限与安全
-
-- 用户级 GOST / Xray 功能权限开关
-- 节点访问权限控制（按用户分配可访问节点）
-- bcrypt 密码存储、JWT 认证、WebSocket 认证
-- 登录/验证码限流、SSRF 防护、API 响应脱敏
+基于 [GOST](https://github.com/go-gost/gost) 和 [Xray](https://github.com/XTLS/Xray-core) 的流量转发与代理管理面板。
 
 ---
 
-## 部署流程
+## 目录
 
-整个系统分为 **面板端**（管理后台）和 **节点端**（转发服务），需要分别部署。
+- [功能概览](#功能概览)
+- [系统架构](#系统架构)
+- [部署面板](#部署面板)
+- [部署节点](#部署节点)
+- [使用指南](#使用指南)
+- [更新升级](#更新升级)
+- [环境变量](#环境变量)
+- [常见问题](#常见问题)
+- [免责声明](#免责声明)
+- [License](#license)
 
 ---
 
-### 第一步：部署面板端
+## 功能概览
 
-#### 方式一：一键脚本安装（推荐新手）
+### GOST 流量转发
 
-脚本会自动完成下述所有步骤（下载配置文件、生成随机密码、启动服务）：
+| 功能 | 说明 |
+|------|------|
+| **端口转发** | TCP + UDP 双协议同时转发，支持多目标地址负载均衡 |
+| **隧道转发** | 入口节点 → 出口节点加密隧道，支持 TLS / mTLS / WSS / QUIC / gRPC 等协议 |
+| **多 IP 监听** | 单条转发同时监听多个 IP，每个 IP 生成独立服务组 |
+| **负载策略** | 轮询 / 随机 / 哈希 / 灾备切换（自动故障转移） |
+| **用户限速** | 按用户+隧道维度独立限速 |
+| **流量计费** | 支持单向或双向流量统计，按隧道账号级别管理配额 |
+| **热更新** | 修改目标地址/策略时 listener 不重启，现有连接不中断 |
+| **转发诊断** | 一键检测链路连通性、延迟、丢包率 |
 
-```bash
-curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
+### Xray 代理管理
+
+| 功能 | 说明 |
+|------|------|
+| **多协议入站** | VMess / VLESS / Trojan / Shadowsocks |
+| **传输层** | TCP / WebSocket / gRPC / HTTPUpgrade / xHTTP / mKCP |
+| **安全层** | None / TLS / Reality |
+| **结构化表单** | 可视化配置入站参数，支持随时切换到原始 JSON 编辑 |
+| **客户端管理** | UUID 自动生成、流量限制、到期时间、IP 连接数限制、流量自动重置 |
+| **ACME 证书** | Let's Encrypt 自动签发（DNS-01 / Cloudflare），到期前 30 天自动续签 |
+| **订阅链接** | 自动生成各协议订阅链接，支持自定义入口域名 |
+| **热加载** | 入站和客户端的增删改通过 gRPC API 热操作，Xray 进程不重启 |
+| **版本切换** | 面板远程切换节点 Xray 版本，无需 SSH |
+
+### 系统管理
+
+| 功能 | 说明 |
+|------|------|
+| **用户权限** | GOST / Xray 功能级开关，节点访问权限按用户分配 |
+| **节点管理** | 在线状态、系统信息实时监控、一键安装/更新节点 |
+| **状态监控** | 实时上传/下载速度、CPU/内存使用率、网卡信息 |
+| **延迟监控** | 转发延迟历史图表，支持多转发对比 |
+| **面板自更新** | Dashboard 一键更新面板到最新版本 |
+| **暗黑模式** | 支持明/暗主题切换 |
+
+### 安全特性
+
+- bcrypt 密码存储，JWT 认证（7 天有效期）
+- WebSocket JWT 认证（Sec-WebSocket-Protocol）
+- 登录限流（10 次/分钟）、验证码限流（20 次/分钟）
+- SSRF 防护（拦截内网地址）
+- CORS 域名白名单可配置
+- API 响应脱敏（密钥、私钥、密码哈希）
+- 首次启动自动重置默认密码
+
+---
+
+## 系统架构
+
+```
+┌─────────────────────────────────────────────────┐
+│                   面板端 (Panel)                  │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐       │
+│  │ Frontend │  │ Backend  │  │  MySQL   │       │
+│  │ (Nginx)  │──│  (Gin)   │──│  (5.7)   │       │
+│  │  :80     │  │  :6365   │  │          │       │
+│  └──────────┘  └────┬─────┘  └──────────┘       │
+│       统一端口       │                            │
+│    (默认 6366)      │ WebSocket                   │
+└─────────────────────┼───────────────────────────┘
+                      │
+          ┌───────────┼───────────┐
+          │           │           │
+    ┌─────▼─────┐ ┌──▼────┐ ┌──▼────┐
+    │  节点 A   │ │节点 B │ │节点 C │
+    │  (GOST)   │ │(GOST) │ │(GOST) │
+    │  + Xray   │ │+ Xray │ │+ Xray │
+    └───────────┘ └───────┘ └───────┘
 ```
 
-#### 方式二：手动 Docker Compose 部署
+**组件说明：**
 
-适用于需要自定义配置或了解部署细节的用户。
+| 组件 | 技术栈 | 说明 |
+|------|--------|------|
+| Frontend | Next.js + TypeScript + Tailwind CSS | 静态导出，Nginx 托管 |
+| Backend | Go + Gin + GORM | REST API + WebSocket |
+| Database | MySQL 5.7 | 持久化存储 |
+| Node Agent | Go (GOST) | 接收面板指令，管理转发和 Xray |
+| Xray | Xray-core | 代理服务，由节点进程管理 |
 
-**1. 下载必要文件**
+**通信方式：**
+
+- **面板 ↔ 节点**：WebSocket 长连接（`/system-info`），双向通信
+- **面板 → 节点**：通过 WebSocket 发送命令（AddService / XrayAddInbound 等）
+- **节点 → 面板**：每 2-3 秒上报系统信息（CPU、内存、网卡、流量）
+- **前端 ↔ 后端**：REST API + Admin WebSocket（实时监控数据推送）
+
+---
+
+## 部署面板
+
+> 面板需要 Docker 环境，支持 amd64 和 arm64 架构。
+
+### 方式一：一键脚本（推荐）
 
 ```bash
-# 下载 docker-compose 配置文件
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.9.4/docker-compose.yml -o docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/0xNetuser/flux-panel/main/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
 ```
 
-**2. 创建环境变量文件**
+脚本提供交互式菜单：
 
-在同一目录下创建 `.env` 文件，内容如下（请自行修改密码等敏感信息）：
+| 选项 | 说明 |
+|------|------|
+| 1. 安装面板 | 自动安装 Docker、生成随机密码、下载配置、启动服务 |
+| 2. 更新面板 | 拉取最新镜像、执行数据库迁移、重启服务 |
+| 3. 卸载面板 | 删除容器、卷和配置文件 |
+| 4. 导出备份 | 导出 MySQL 数据库备份到当前目录 |
+
+脚本会自动检测 IPv6 环境并配置 Docker IPv6 支持。中国大陆用户自动使用 CDN 加速下载。
+
+### 方式二：手动 Docker Compose
+
+**1. 下载配置文件**
+
+```bash
+mkdir -p flux-panel && cd flux-panel
+curl -fsSL https://github.com/0xNetuser/flux-panel/releases/latest/download/docker-compose.yml -o docker-compose.yml
+```
+
+**2. 创建 `.env` 文件**
 
 ```env
+# 数据库配置
 DB_NAME=gost_db
 DB_USER=gost_user
-DB_PASSWORD=请替换为随机密码
-JWT_SECRET=请替换为随机密码
+DB_PASSWORD=<随机密码>
+
+# JWT 密钥（必须设置，否则每次重启失效）
+JWT_SECRET=<随机密码>
+
+# 面板端口（默认 6366）
 PANEL_PORT=6366
-# IPv6 环境设置为 true，默认 false
+
+# 可选：IPv6 支持
 # ENABLE_IPV6=true
-# 可选：限制 CORS 允许的域名（逗号分隔），不设置则允许所有
-# ALLOWED_ORIGINS=https://panel.example.com,http://localhost:3000
+
+# 可选：CORS 域名白名单（逗号分隔，不设置则允许所有）
+# ALLOWED_ORIGINS=https://panel.example.com
 ```
 
-> 可使用 `openssl rand -base64 16` 生成随机密码。
+> 使用 `openssl rand -base64 32` 生成随机密码。
 
-**3. 启动服务**
+**3. 启动**
 
 ```bash
 docker compose up -d
 ```
 
-**4. IPv6 环境额外配置**
+**4. 获取管理员密码**
 
-在 `.env` 文件中设置 `ENABLE_IPV6=true`，并确保 Docker 已启用 IPv6 支持。编辑 `/etc/docker/daemon.json`：
+首次启动会自动生成随机管理员密码：
 
-```json
+```bash
+docker logs go-backend 2>&1 | grep "密码"
+```
+
+| 项目 | 值 |
+|------|------|
+| 地址 | `http://<服务器IP>:6366` |
+| 账号 | `admin_user` |
+| 密码 | 查看启动日志 |
+
+### IPv6 配置
+
+如需 IPv6 支持，在 `.env` 中设置 `ENABLE_IPV6=true`，并确保 Docker 已启用 IPv6：
+
+```bash
+# 编辑 /etc/docker/daemon.json
 {
   "ipv6": true,
   "fixed-cidr-v6": "fd00::/80"
 }
+
+# 重启 Docker
+systemctl restart docker
 ```
 
-修改后重启 Docker：`systemctl restart docker`
-
 ---
 
-#### 面板默认登录信息
+## 部署节点
 
-| 项目 | 值 |
-|------|------|
-| 账号 | `admin_user` |
-| 密码 | 首次启动时自动生成，请查看启动日志 |
+> **推荐方式**：在面板「节点管理」页面先添加节点，点击「安装」按钮，面板会自动生成已填好地址和密钥的安装命令，复制到节点服务器执行即可。
 
-> v1.5.0 起，首次启动会自动检测默认密码并重置为随机密码，新密码会打印在启动日志中。请使用 `docker logs go-backend` 查看。
+节点支持两种部署方式：
 
----
-
-### 第二步：部署节点端
-
-> **推荐方式**：在面板「节点管理」页面先添加节点，然后点击「安装」按钮，面板会自动生成已填好面板地址和密钥的安装命令，复制到节点服务器执行即可。
-
-节点端支持两种部署方式，任选其一：
-
-#### 方式一：Docker 安装（推荐）
+### 方式一：Docker 部署（推荐）
 
 使用 `host` 网络模式以支持动态端口转发：
 
 ```bash
-docker run -d --network=host --restart=unless-stopped --name gost-node \
+docker run -d \
+  --network=host \
+  --restart=unless-stopped \
+  --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.9.4
+  0xnetuser/gost-node:latest
 ```
 
-也可以使用 docker-compose，参考项目中的 `docker-compose-node.yml`：
+或使用 docker-compose：
 
 ```yaml
 services:
   gost-node:
-    image: 0xnetuser/gost-node:1.9.4
+    image: 0xnetuser/gost-node:latest
     container_name: gost-node
     network_mode: host
     restart: unless-stopped
     environment:
-      - PANEL_ADDR=http://面板IP:6366
-      - SECRET=节点密钥
+      - PANEL_ADDR=http://<面板IP>:6366
+      - SECRET=<节点密钥>
 ```
 
-#### 方式二：脚本安装（裸机 systemd 服务）
+### 方式二：脚本部署（systemd 服务）
 
-安装脚本和节点二进制均从面板下载，无需访问 GitHub：
+安装脚本从面板下载，无需访问 GitHub：
 
 ```bash
-curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && chmod +x install.sh && ./install.sh -a 'http://<面板IP>:<面板端口>' -s '<节点密钥>'
+curl -fsSL http://<面板IP>:<面板端口>/node-install/script -o install.sh && chmod +x install.sh && ./install.sh -a 'http://<面板IP>:<面板端口>' -s '<节点密钥>'
 ```
 
-- 安装后以 systemd 服务运行，开机自启
-- 支持 amd64 和 arm64 架构
-- 交互式菜单支持安装 / 更新 / 卸载
+脚本提供交互式菜单：安装 / 更新 / 卸载。安装后以 systemd 服务运行，开机自启。支持 amd64 和 arm64 架构。
 
-#### 参数说明
+### 参数说明
 
 | 参数 | 说明 | 示例 |
 |------|------|------|
 | `面板IP` | 面板服务器的公网 IP 或域名 | `203.0.113.1` |
-| `面板端口` | 面板服务端口（默认 `6366`） | `6366` |
-| `节点密钥` | 在面板添加节点后自动生成的密钥 | `a1b2c3d4e5f6...` |
+| `面板端口` | 面板服务端口（默认 6366） | `6366` |
+| `节点密钥` | 在面板添加节点后自动生成 | `a1b2c3d4e5f6...` |
 
 ---
 
-## 更新说明
+## 使用指南
 
-### 更新面板端
+### GOST 转发配置
 
-#### 脚本部署更新
+**基本流程：** 创建隧道 → 分配用户 → 创建转发规则
 
-重新运行安装脚本，选择「更新面板」：
+#### 1. 创建隧道
+
+隧道定义了入口节点、出口节点和协议。两种类型：
+
+- **端口转发**：入口节点直接转发到目标地址，协议固定为 TCP+UDP
+- **隧道转发**：入口节点通过加密隧道连接出口节点，再由出口节点转发到目标。支持 TLS / mTLS / WSS / mWSS / QUIC / gRPC 等加密协议
+
+#### 2. 分配隧道给用户
+
+在隧道管理页面为用户分配隧道权限，可设置：
+
+- **转发数量限制**：该用户在此隧道可创建的最大转发数
+- **流量限制**：流量配额（MB），支持单向/双向计费
+- **限速**：绑定限速规则
+
+#### 3. 创建转发规则
+
+| 字段 | 说明 |
+|------|------|
+| 监听端口 | 入口节点监听的端口 |
+| 监听地址 | 可选，指定监听的 IP（支持多个，逗号分隔） |
+| 目标地址 | `ip:port` 格式，支持多个（每行一个，负载均衡） |
+| 出口地址 | 可选，指定出口网卡或 IP |
+| 负载策略 | 轮询 / 随机 / 哈希 / 灾备切换 |
+
+### Xray 代理配置
+
+**基本流程：** 创建入站 → 添加客户端 → 获取订阅链接
+
+#### 1. 创建入站
+
+选择节点和协议后，通过结构化表单配置：
+
+- **协议设置**：VMess / VLESS / Trojan / Shadowsocks 各自的参数
+- **传输层**：TCP / WebSocket / gRPC / HTTPUpgrade / xHTTP / mKCP
+- **安全层**：None / TLS（支持 ALPN、Fingerprint、SNI） / Reality（支持生成 X25519 密钥对）
+- **嗅探**：HTTP / TLS / QUIC / FakeDNS
+
+可随时点击「高级模式」切换到 JSON 编辑器，表单与 JSON 双向转换。
+
+#### 2. 添加客户端
+
+展开入站行即可管理客户端。每个客户端可设置：
+
+| 字段 | 说明 |
+|------|------|
+| UUID/密码 | 自动生成，也可手动指定 |
+| 流量限制 | 上行+下行流量配额 |
+| 到期时间 | 过期后自动禁用 |
+| IP 连接数限制 | 同时在线设备数 |
+| 流量重置周期 | 每 N 天自动清零流量 |
+
+#### 3. 获取订阅链接
+
+在「订阅管理」页面获取订阅链接，导入到客户端软件（V2rayN / Clash / Shadowrocket 等）。
+
+### 证书管理
+
+支持两种方式：
+
+- **手动上传**：上传 PEM 格式的证书和私钥
+- **ACME 自动签发**：填写域名和 Cloudflare API Token，一键签发 Let's Encrypt 证书。到期前 30 天自动续签
+
+### 节点管理
+
+| 操作 | 说明 |
+|------|------|
+| 安装节点 | 自动生成安装命令（Docker / 脚本），复制到服务器执行 |
+| 同步配置 | 手动触发全量配置对账，确保节点状态与面板一致 |
+| 更新节点 | 远程推送最新节点二进制并重启 |
+| 切换 Xray 版本 | 从下拉列表选择版本，远程升级/降级 |
+
+### 状态监控
+
+监控页面通过 WebSocket 实时显示：
+
+- 各节点 CPU / 内存使用率
+- 实时上传 / 下载速度
+- 累积收发流量
+- 网卡信息和 IP 地址
+
+---
+
+## 更新升级
+
+### 更新面板
+
+#### 方式一：面板内一键更新
+
+Dashboard 顶部出现更新提示时，点击「一键更新」按钮即可自动完成。
+
+> 面板通过 Docker Socket API 创建临时容器执行 `docker compose pull && up -d`，自动拉取新镜像并重建容器。
+
+#### 方式二：脚本更新
 
 ```bash
-curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
+curl -fsSL https://raw.githubusercontent.com/0xNetuser/flux-panel/main/panel_install.sh -o panel_install.sh && chmod +x panel_install.sh && ./panel_install.sh
 ```
 
-脚本会自动拉取最新镜像、执行数据库迁移并重启服务，`.env` 配置保持不变。
+选择「更新面板」，脚本自动拉取最新镜像并重启。
 
-#### Docker Compose 手动更新
+#### 方式三：手动更新
 
 ```bash
-# 下载最新 docker-compose 配置（覆盖旧文件）
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.9.4/docker-compose.yml -o docker-compose.yml
+# 下载最新配置
+curl -fsSL https://github.com/0xNetuser/flux-panel/releases/latest/download/docker-compose.yml -o docker-compose.yml
 
 # 拉取最新镜像并重启
 docker compose pull && docker compose up -d
 ```
 
-> `.env` 无需重新下载，数据库数据保留在 Docker 卷中。
+> `.env` 配置和数据库数据保留在 Docker 卷中，无需重新配置。
 
----
+### 更新节点
 
-### 更新节点端
+#### 方式一：面板远程更新
 
-#### Docker 部署更新
+在节点管理页面点击「更新节点」按钮，面板通过 WebSocket 推送最新二进制到节点并重启。
+
+#### 方式二：Docker 节点更新
 
 ```bash
-# 停止并删除旧容器
 docker stop gost-node && docker rm gost-node
-
-# 拉取最新镜像并启动
+docker pull 0xnetuser/gost-node:latest
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.9.4
+  0xnetuser/gost-node:latest
 ```
 
-如果使用 docker-compose 部署，更新 `docker-compose-node.yml` 中的镜像版本后：
+#### 方式三：脚本节点更新
 
 ```bash
-docker compose pull && docker compose up -d
+curl -fsSL http://<面板IP>:<面板端口>/node-install/script -o install.sh && chmod +x install.sh && ./install.sh
 ```
 
-#### 脚本部署更新
-
-重新运行安装脚本，选择「更新」：
-
-```bash
-curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && chmod +x install.sh && ./install.sh
-```
-
-脚本会自动从面板下载最新二进制文件并重启服务，配置文件保持不变。
+选择「更新」，脚本自动从面板下载最新二进制并重启。
 
 ---
 
-## 更新日志
+## 环境变量
 
-### v1.9.4
+### 面板端（`.env`）
 
-- **面板一键自更新**：Dashboard 新增「一键更新」按钮，后端通过 Docker Socket API 创建临时 updater 容器执行 `docker compose pull && up -d`，自动拉取新镜像并重建容器
-- **节点一键更新**：节点管理页面新增「更新节点」按钮，从面板下载最新二进制替换并重启节点服务
-- **Xray 入站自定义入口域名**：入站新增 `customEntry` 字段，订阅链接使用自定义域名替代节点 IP
-- **节点二进制持久化**：Docker 节点启动时恢复持久化的自定义 gost/xray 二进制版本
-- **修复 Shadowsocks 客户端添加失败**：cipher method 为空导致添加失败
-- **修复侧边栏导航断连**：改用 Link 组件避免断连时 URL 变为 localhost
-- **修复编辑 Xray 客户端 UUID/密码不生效**
-- **修复节点安装二进制文件名**：`gost-node-{arch}` → `gost-{arch}`
-- **订阅链接管理员可见全部客户端**
+| 变量 | 必填 | 默认值 | 说明 |
+|------|------|--------|------|
+| `DB_NAME` | 是 | - | MySQL 数据库名 |
+| `DB_USER` | 是 | - | MySQL 用户名 |
+| `DB_PASSWORD` | 是 | - | MySQL 密码（同时用于 root） |
+| `JWT_SECRET` | 是 | - | JWT 签名密钥，不设置则每次重启失效 |
+| `PANEL_PORT` | 否 | `6366` | 面板访问端口 |
+| `ENABLE_IPV6` | 否 | `false` | 启用 Docker 网络 IPv6 |
+| `ALLOWED_ORIGINS` | 否 | `*` | CORS 允许的域名（逗号分隔） |
 
-### v1.9.3
+### 节点端
 
-- **修复 Xray 热加载 JSON 格式**：`xray api adi`/`adu` 命令要求 `{"inbounds": [...]}` 包装格式，之前传递裸入站对象导致 "no valid inbound found" 错误
-- **修复 GOST 转发热更新失效**：`handleUpdateForwarder` 缺少 `preprocessDurationFields` 调用，`failTimeout: "600s"` 无法反序列化为 `time.Duration`，导致热更新始终失败并 fallback 到全量重建（断开连接）
+| 变量 | 必填 | 说明 |
+|------|------|------|
+| `PANEL_ADDR` | 是 | 面板地址，如 `http://1.2.3.4:6366` |
+| `SECRET` | 是 | 节点通信密钥，面板添加节点时自动生成 |
 
-### v1.9.2
+---
 
-- **深度代码审计修复**：累计修复 25+ 个 bug，覆盖 GOST 转发、Xray 热加载、用户权限、定时任务等模块
-- **Xray CLI 命令语法修复**：修复 `rmi`/`adi`/`adu`/`rmu` 四个命令的参数格式错误，添加旧版本（< v25.7.26）fallback 机制
-- **多 IP 转发全面修复**：修复 8 处多 IP 转发（逗号分隔 ListenIp）未使用 MultiIP 变体的问题，涉及删除、暂停、reconcile、定时任务等
-- **管理员操作修复**：管理员编辑转发不再要求 UserTunnel 存在；编辑转发使用 DB 记录的 userId 而非客户端传值
-- **用户禁用立即生效**：禁用用户时立即暂停所有活跃转发并禁用 Xray 客户端；禁用隧道权限时立即暂停对应转发
-- **删除操作级联清理**：删除用户级联清理 Xray 客户端并热移除；删除节点级联清理 XrayInbound/XrayClient/XrayTlsCert/UserNode
-- **Xray 流量重置恢复**：手动重置和定时重置流量后，因流量超限被禁用的客户端自动重新启用
-- **Xray 入站编辑修复**：编辑已禁用的入站不再尝试热移除（避免报错）
-- **WebSocket 并发安全**：Admin WebSocket 广播添加 per-connection 互斥锁，防止并发写入 panic
-- **强制删除修复**：ForceDeleteForward 现在会 best-effort 清理 GOST 服务
-- **流量检查修复**：用户权限检查正确比较实际流量使用量与限额
-- **安全修复**：`/flow/debug` 端点移至认证路由组，需要管理员权限
+## 常见问题
 
-### v1.9.1
+### 面板启动后无法访问
 
-- **修复面板更新后转发异常**：Reconcile 不再将转发状态设为异常，瞬时超时不破坏 DB 状态
-- **修复流量超限暂停错误**：`pauseForwardServices` 之前用错误的 serviceName 导致只暂停了触发的转发，其他转发 DB 显示暂停但实际仍在运行；同时补充多 IP 暂停支持
-- **Xray 客户端超限立即切断**：流量超限时同时调用 `XrayRemoveClient` 热移除，不再等到下次节点重连
-- **Xray 配置文件并发写入加锁**：防止并发 Hot* 调用竞争导致配置变更丢失
-- **转发配额检查修复**：编辑转发更换隧道时，用户总转发数检查排除当前转发，满额用户可正常切换隧道
-- **Admin 操作隧道权限检查**：管理员编辑转发时若用户隧道权限不存在，返回错误而非用错误的 serviceName 留下孤儿服务
+```bash
+# 检查容器状态
+docker compose ps
 
-### v1.9.0
+# 查看后端日志
+docker logs go-backend
 
-- **GOST 转发热更新**：编辑转发仅修改目标地址/策略时，通过 `UpdateForwarder` 热替换 handler hop 节点列表，现有连接不中断；端口/IP 变化仍走 `UpdateService` 重建 listener（仅影响该转发）
-- **Xray 完全热加载**：新增/删除/修改入站和客户端均通过 Xray gRPC API（`adi`/`rmi`/`adu`/`rmu`）热操作，不再重启 Xray 进程。仅节点上线全量对账时使用 `ApplyConfig`
-- **监控实时速度**：监控页通过 WebSocket 接收节点系统信息，实时计算并显示每个节点的上传/下载速度和累积流量
+# 确认端口监听
+ss -tlnp | grep 6366
+```
 
-### v1.8.17
+常见原因：
+- 防火墙未放行端口
+- `.env` 文件配置错误
+- MySQL 未就绪（等待健康检查通过）
 
-- **修复编辑转发端口占用**：GOST 节点 `updateServices` 改为先关闭所有旧服务再创建新服务，避免端口未释放导致 `bind: address already in use`，并增加重试机制
-- **修复仪表板流量趋势图**：流量数据源从 `statistics_flow` 改为 `statistics_forward_flow`（与监控页一致），使用累积快照增量计算，修复按小时字符串分组导致多天数据混合的问题
+### 节点连接不上面板
 
-### v1.8.16
+1. 确认面板地址和端口可从节点服务器访问：`curl http://<面板IP>:<端口>/flow/test`
+2. 确认节点密钥正确
+3. 检查节点日志：`docker logs gost-node` 或 `journalctl -u gost`
 
-- **修复多行输入回车**：节点入口 IP 和转发目标地址的多行输入框支持正常回车换行
+### 面板自更新失败
 
-### v1.8.15
+```bash
+# 查看更新容器日志
+docker logs flux-updater
+```
 
-- **状态监控显示网卡信息**：监控页节点卡片中展示各网卡名称及 IP 地址
-- **出口地址支持指定 IP**：转发出口从仅支持网卡名改为同时支持指定具体 IP 出口，GOST 自动绑定对应网卡
-- **目标地址多行输入**：转发目标地址改为多行文本框，每行一个 `ip:port`，列表页同步换行展示，支持回车换行
-- **表单标签优化**：入口/出口下拉框标签改为「监听地址」和「出口地址」，更准确反映功能
+如果容器不存在，检查 Docker Socket 挂载是否正确（`docker-compose.yml` 中 backend 需要挂载 `/var/run/docker.sock`）。
 
-### v1.8.14
+### 节点重连后转发/Xray 中断
 
-### v1.8.13
+正常情况下不会中断。面板使用 Add-first + 热更新策略：
+- GOST：先尝试 AddService，已存在则用 UpdateForwarder 热更新
+- Xray：先尝试热添加 inbound，如果 Xray 未运行则用 ApplyConfig 启动
 
-- **节点多入口 IP 支持**：节点新增 `entryIps` 字段，支持配置多个入口 IP，创建转发/入站时从下拉框选择
-- **网卡自动探测**：节点代理每 2 秒上报物理网卡信息（名称 + IP 列表），面板端缓存并展示在创建表单中
-- **入口/出口网卡选择**：转发创建表单新增入口网卡和出口网卡下拉框，自动列出节点可用网卡及 IP，支持自定义输入
-- **负载策略与灾备切换**：转发创建表单新增负载策略选择（轮询/随机/灾备切换/哈希），`fifo` 策略配合 `maxFails=1, failTimeout=600s` 实现自动灾备切换
-- **多 IP 监听**：单条转发支持同时监听多个 IP，每个 IP 生成独立的 GOST 服务组
-- **Docker 虚拟网卡过滤**：节点网卡探测自动过滤 Docker/K8s 虚拟网卡（docker0、veth、br-、cni、flannel、kube-、cali、virbr），避免下拉框污染
-- **Xray 入站监听地址下拉**：入站创建表单的监听地址改为下拉框，自动展示所选节点的网卡 IP
-- **Reconcile 修复**：reconcile 同步时正确应用转发自定义 `listenIp`，多 IP 暂停使用 `PauseServiceMultiIP`
-- **多 IP 每行显示**：节点入口 IP 列表在表格和表单中改为每行一个 IP，更直观
-- **迁移脚本精简**：`panel_install.sh` 迁移 SQL 从 660 行精简到 56 行，建表和加列交由 GORM AutoMigrate 自动处理
+如遇异常，在节点管理页面点击「同步配置」手动触发全量对账。
 
-### v1.8.11
+### 修改管理员密码
 
-- **Xray 流量解析器修复**：`xray api statsquery` 输出 JSON 格式，旧解析器用 text-proto 正则匹配，导致解析结果永远为空
-- **IPv6 双栈监听**：GOST/Xray 默认监听地址从 `0.0.0.0` 改为 `::`，同时监听 IPv4 + IPv6
-- **GOST IPv6 监听格式修复**：监听地址为 IPv6 时自动加括号 `[::]:port`
+```bash
+# 查看初始密码
+docker logs go-backend 2>&1 | grep "密码"
+```
 
-### v1.8.10
-
-- **Xray 用户流量统计修复**：`statsUserUplink/statsUserDownlink` 属于 `policy.levels` 而非 `policy.system`，放错位置导致 Xray 忽略该配置，用户流量统计始终为空
-
-### v1.8.9
-
-- **GOST 流量统计根因修复**：`tunnel.Flow` 未设置时为 0，导致 `流量 × 0 = 0` 全部归零。`Flow <= 0` 时使用默认值
-- **Xray 流量统计根因修复**：Xray policy 缺少 `statsUserUplink/statsUserDownlink`，`-pattern user` 查询永远为空
-- **流量诊断端点**：新增 `/flow/debug` 接口，返回节点验证、流量 Top5、gorm.Expr SQL 验证
-
-### v1.8.8
-
-- **GOST 流量统计修复**：`observeStats` 在 observer 未注册时直接 return，导致流量上报完全不执行。解耦流量上报与 observer
-- **Xray 流量统计修复**：`StartXrayTrafficReporter` 因 xrayManager 未初始化而跳过启动，改用懒初始化确保上报器启动
-- **流量写入 DB 修复**：`DB.Raw()` 在 GORM v2 下无法作为 SQL 表达式用于 UpdateColumns，全部替换为 `gorm.Expr()`
-- **Xray 同步失败 DB 回退**：创建/更新/删除/启用/禁用入站及客户端操作，同步失败时自动回退 DB 变更
-- **操作加载状态**：入站创建/编辑显示"同步中..."，删除/启用/禁用按钮显示加载动画并禁止重复操作
-
-### v1.8.7
-
-- **Xray 配置同步自动回退**：节点端 ApplyConfig 新增备份→验证→回退机制，写入新配置后等待 2 秒验证 Xray 进程存活，失败自动恢复旧配置
-- **同步错误前端上报**：Xray 入站/客户端的创建、更新、删除、启用、禁用操作，同步失败时前端 toast 显示警告信息，DB 操作不受影响
-- **限速规则绑定隧道**：限速创建表单新增隧道选择器，限速列表新增隧道列
-- **Xray 流量统计修复**：实现 CLI 方式查询 Xray 流量统计，启动流量上报定时器
-- **GOST 流量上报修复**：修复 observer 失败时跳过流量上报的问题
-- **新建入站嗅探默认关闭**：新建入站时嗅探默认关闭，与实际使用习惯一致
-- **多项 Bug 修复**：UpdateXrayClient 零 NodeId 同步、SpeedLimitDto TunnelId 校验、syncXrayNodeConfig nodeId 守卫、reconcile 客户端合并
-
-### v1.8.6
-
-- **Xray 版本下拉选择**：切换 Xray 版本从手动输入改为下拉选择，后端从 GitHub Releases 获取可用版本列表
-- **转发延迟显示**：转发管理表格新增延迟列，显示每条转发的最新延迟，颜色标识延迟等级
-- **自动刷新**：转发管理和节点管理页面每 30 秒自动刷新数据
-- **监控重命名**：侧边栏「监控」更名为「状态监控」
-
-### v1.8.5
-
-- **入站客户端合并**：入站管理与客户端管理合并为 3x-ui 风格单页面，展开入站行即可管理客户端
-- **入站表单改造**：协议设置、传输层、安全层表单全面优化
-- **修改密码修复**：修复修改密码始终失败的问题
-- **Xray 版本远程切换**：节点管理页面新增版本切换按钮，远程升级/降级 Xray 版本
-- **默认 Xray 版本更新**：Docker 镜像默认 Xray 从 1.8.74 更新为 25.1.30
-
-### v1.7.1
-
-- **延迟图表改造**：转发延迟从 Table + 展开行内图表改为完整图表视图，支持多条转发同时对比
-- **时间范围选择**：支持 1小时 / 6小时 / 24小时 / 7天 时间范围切换
-- **转发筛选**：下拉面板多选转发，按需显示关注的转发延迟曲线
-- **统计摘要**：图表下方以卡片展示各转发的最近延迟、平均延迟和成功率
-
-### v1.7.0
-
-- **系统配置分组**：配置页面按「基本信息」「订阅与通知」「安全与监控」分组展示，每项附带说明文字
-- **配置控件优化**：布尔配置改用 Switch 开关，数字输入带单位标注，Telegram Token 密码掩码
-- **延迟监控**：新增延迟监控功能，支持自定义检测间隔和数据保留天数
-
-### v1.6.6
-
-- **节点版本提示修复**：节点版本高于面板时不再误报「需更新」
-- **节点入口IP恢复**：节点管理页面恢复入口IP列和表单字段
-- **隧道转发校验**：隧道转发禁止入口和出口选同一节点
-- **转发诊断结果弹窗**：诊断从 toast 改为弹窗，展示链路连通性、延迟、丢包率
-
-### v1.6.5
-
-- **节点 Docker 启动修复**：gost 二进制移至 `/usr/local/bin/gost`，修复 `~/.flux:/etc/gost` 卷挂载覆盖二进制导致 `not found` 的问题
-
-### v1.6.4
-
-- **客户端链接导出**：复制链接按钮现在能正确生成包含完整传输层和安全层参数的协议链接（WS/gRPC/TLS/Reality 等）
-- **二维码弹窗**：客户端操作栏新增 QR 按钮，手机扫码直接导入
-- **链接生成修复**：VMess/VLESS/Trojan/Shadowsocks 链接不再硬编码 `type=tcp`，完整包含 stream/security 配置
-- **隧道协议默认值修正**：端口转发默认 `tcp+udp`，隧道转发默认 `tls`，切换类型时自动重置
-
-### v1.6.1
-
-- **入站 UI 改造**：入站配置从原始 JSON 文本框改为结构化表单，支持协议/传输层/安全层/嗅探分区配置，可切换高级模式直接编辑 JSON
-- **传输层配置**：支持 TCP / WebSocket / gRPC / HTTPUpgrade / xHTTP / mKCP 全部传输协议的可视化配置
-- **安全层配置**：支持 None / TLS / Reality 安全模式配置，TLS 支持 ALPN / Fingerprint / SNI 等参数，Reality 支持前端生成 X25519 密钥对和 ShortId
-- **嗅探配置**：支持 HTTP / TLS / QUIC / FakeDNS 嗅探目标、metadataOnly 和 routeOnly 开关
-- **客户端扩展**：新增 IP 连接数限制、流量自动重置周期（天）、Telegram ID 绑定、订阅 ID 字段
-- **流量自动重置**：后台定时任务每小时检查客户端重置周期，到期自动清零上下行流量
-- **ACME 证书自动申请**：集成 Let's Encrypt，支持 DNS-01 验证（Cloudflare），一键签发 TLS 证书并自动部署到节点
-- **证书自动续签**：后台每日检查即将到期（< 30 天）的 ACME 证书并自动续签
-- **证书手动续签**：证书列表新增手动触发续签按钮，支持即时续签
-- **证书 UI 改造**：创建证书支持「手动上传」和「ACME 自动申请」两种模式切换，列表显示证书来源、上次续签时间和续签错误信息
-
-### v1.5.5
-
-- **用户权限系统**：新增 GOST 转发/Xray 代理功能级权限开关，可按用户独立控制
-- **节点权限控制**：支持为用户分配可访问的节点列表，未分配则允许全部（向后兼容）
-- **用户管理 UI**：用户创建/编辑对话框新增权限开关和节点多选列表
-- **侧边栏权限过滤**：非管理员用户仅显示已授权的功能分类
-- **DTO 绑定修复**：修复全局 `binding:"required"` 导致大部分创建/更新操作返回「参数错误」的问题
-- **前端参数修复**：修复隧道类型、Xray 客户端 UUID、证书自动续签等前后端字段不匹配问题
-
-### v1.5.4
-
-- **节点密钥可见**：编辑节点时显示通信密钥（只读），方便查看和复制，与安装命令保持一致
-- **节点列表返回密钥**：后端节点列表 API 重新包含 secret 字段，配合前端编辑对话框显示
-
-### v1.5.3
-
-- **统一版本管理**：CI `VERSION` 为唯一真值，通过 ldflags 注入 Go 二进制；前端侧边栏动态显示版本号；节点版本由 ldflags 注入替代硬编码
-- **仪表板增强**：管理员视图新增流量趋势图（24h）、节点概览表、用户流量排行（Top 5）；普通用户视图新增个人流量趋势图和套餐信息展示
-- **暗黑模式**：支持系统/手动切换暗黑模式，刷新后保持选择
-- **自动更新检测**：面板自动检查 GitHub Release 最新版本，仪表板顶部显示更新通知横幅；节点管理页版本列显示「需更新」标记
-
-### v1.5.2
-
-- **修复健康检查 404**：`/flow/test` 新增 GET 方法，修复 docker-compose 健康检查失败导致前端无法启动
-- **修复 ViteConfig 迁移报错**：指定 `varchar(200)` 类型，避免 GORM 映射为 longtext 导致 MySQL 唯一索引冲突
-- **CI 构建优化**：Go 二进制改为宿主机原生交叉编译，Docker 只做 COPY；Next.js 原生构建后打包 nginx；全面启用 GitHub Actions 层缓存，总构建时间从 ~22min 降至 ~5min
-
-### v1.5.1
-
-- **WebSocket 节点认证**：节点 WebSocket 连接在升级前校验 secret，支持 `id+secret` 和仅 `secret` 两种认证模式（向后兼容旧节点）
-- **JWT 时序安全**：JWT 签名比较改用 `hmac.Equal` 防止时序侧信道攻击；JWT 有效期从 90 天缩短至 7 天
-- **登录/验证码限流**：新增独立的 per-IP 速率限制 — 登录 10 次/分钟、验证码 20 次/分钟
-- **SSRF 防护**：转发规则创建/更新时校验目标地址，拦截内网 IP 和域名解析到私有地址的请求
-- **Xray 接口权限**：`/xray/inbound/list`、`/xray/client/list`、`/xray/cert/list` 新增管理员权限校验
-- **公开配置过滤**：未认证请求仅能获取 `captcha_enabled`、`app_name` 等公开配置项
-- **验证码校验修复**：登录接口现在正确调用 `captchaStore.Verify()` 校验验证码
-- **API 响应脱敏**：节点列表隐藏 secret、证书列表隐藏私钥、用户列表隐藏密码哈希
-- **密码强度校验**：创建/修改用户密码时要求最少 8 位，修改密码需确认密码一致性
-- **路径遍历防护**：节点安装脚本的架构参数使用白名单校验（仅允许 amd64/arm64/arm）
-- **UUID/密码生成安全**：所有随机数生成（UUID、密码、token）改用 `crypto/rand`，失败时优雅降级而非 panic
-- **转发 userId 覆盖**：非管理员创建/更新转发规则时强制绑定当前用户 ID，防止越权操作
-
-### v1.5.0
-
-- **[High] WebSocket JWT 认证**：管理端 WebSocket 连接需要有效的 JWT 令牌，支持 `Sec-WebSocket-Protocol` 传递 token（避免 URL 泄露）
-- **[Medium] 密码存储升级**：从 MD5+固定 salt 升级为 bcrypt，现有用户登录时自动透明迁移
-- **[Medium] 默认管理员密码自动重置**：首次启动检测到默认密码时，自动生成随机密码并打印到日志
-- **[Medium] JWT 默认密钥自动替换**：未设置 `JWT_SECRET` 时，自动生成随机密钥（重启失效，强制用户设置持久密钥）
-- **[Medium] Xray 订阅短期 token**：订阅 URL 使用独立的 24 小时有效期 token，登录 JWT 不再能直接访问订阅接口
-- **[Medium] Flow 上报 secret 支持 Header**：节点流量上报优先使用 `X-Node-Secret` 请求头，同时兼容 query 参数；新增 10MB 请求体大小限制
-- **[Medium] CORS 可配置**：新增 `ALLOWED_ORIGINS` 环境变量，支持配置允许的跨域来源，未设置时保持允许所有
-- **[Low] 节点 secret 改用 crypto/rand**：节点密钥生成从可预测的 `md5(time)` 改为密码学安全的随机数
-
-### v1.4.7
-
-- 后端从 Spring Boot (Java) 完全重写为 Go (Gin + GORM)，启动速度和资源占用大幅优化
-- 新增 Xray 管理功能：入站配置、客户端管理、TLS 证书、订阅链接
-- 新增 Next.js 前端
-- 移除 Java/Maven 依赖，Docker 镜像体积大幅减小
-- 所有 API 保持 100% 向后兼容
-
-### v1.4.6
-
-- 面板地址配置自动获取当前浏览器地址（含协议），首次部署无需手动填写
-- 面板地址支持 `https://` 前缀，配合 HTTPS 部署时节点自动使用加密连接
-- 更新面板地址配置描述，移除不必要的 CDN 限制
-
-### v1.4.5
-
-- 前端/后端合并为单一端口（`PANEL_PORT`，默认 6366），通过 Nginx 反向代理转发后端请求
-- 节点端支持 HTTPS 面板地址（`use_tls` 自动检测）
-- CI/CD 新增 `gost-node` 和 `gost-binary` Docker 镜像自动构建推送
-- Docker 镜像仓库迁移至 `0xnetuser/`
-- 节点端 `tcpkill` 替换为 `ss -K`（iproute2），解决 Alpine 不再提供 dsniff 的问题
-- 后端启动时自动建表（`CREATE TABLE IF NOT EXISTS`），无需依赖 MySQL 首次初始化
-- 修复 vite-frontend `npm install` 依赖冲突
-- 移除 docker-compose 固定子网配置，避免网络地址冲突
-- 更新所有仓库引用至 `0xNetuser/flux-panel`
-
-### v1.4.3
-
-- 增加节点端 Docker 部署支持（`docker-compose-node.yml`）
-- 安装脚本和二进制由面板自托管，节点部署无需访问 GitHub
-- 重写 README 部署文档
-
-### v1.4.2
-
-- 增加稳定版 ARM64 架构支持
-- 修复面板显示屏蔽协议状态不一致问题
-- 添加版本管理
-
-### v1.4.1
-
-- 添加屏蔽协议配置到面板
-- 修复屏蔽协议引发的 UDP 不通问题
-- 随机构造自签证书信息
+登录后在右上角用户菜单中「修改密码」。
 
 ---
 
@@ -499,17 +486,25 @@ curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && c
 
 使用本项目所带来的任何风险均由使用者自行承担，包括但不限于：
 
-- 配置不当或使用错误导致的服务异常或不可用；
-- 使用本项目引发的网络攻击、封禁、滥用等行为；
-- 服务器因使用本项目被入侵、渗透、滥用导致的数据泄露、资源消耗或损失；
-- 因违反当地法律法规所产生的任何法律责任。
+- 配置不当或使用错误导致的服务异常或不可用
+- 使用本项目引发的网络攻击、封禁、滥用等行为
+- 服务器因使用本项目被入侵、渗透、滥用导致的数据泄露、资源消耗或损失
+- 因违反当地法律法规所产生的任何法律责任
 
-本项目为开源的流量转发工具，仅限合法、合规用途。
-使用者必须确保其使用行为符合所在国家或地区的法律法规。
+本项目为开源的流量转发工具，仅限合法、合规用途。使用者必须确保其使用行为符合所在国家或地区的法律法规。
 
 **作者不对因使用本项目导致的任何法律责任、经济损失或其他后果承担责任。**
-**禁止将本项目用于任何违法或未经授权的行为，包括但不限于网络攻击、数据窃取、非法访问等。**
+
+**禁止将本项目用于任何违法或未经授权的行为。**
 
 如不同意上述条款，请立即停止使用本项目。
+
+---
+
+## License
+
+[Apache License 2.0](LICENSE)
+
+---
 
 [![Star History Chart](https://api.star-history.com/svg?repos=0xNetuser/flux-panel&type=Date)](https://www.star-history.com/#0xNetuser/flux-panel&Date)

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
@@ -84,7 +85,9 @@ function SidebarContent({ pathname, isAdmin, gostEnabled, xrayEnabled, onNavigat
                   {item.section}
                 </p>
               )}
-              <button
+              <Link
+                href={item.path}
+                prefetch={false}
                 onClick={() => onNavigate(item.path)}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors ${
                   isActive
@@ -94,7 +97,7 @@ function SidebarContent({ pathname, isAdmin, gostEnabled, xrayEnabled, onNavigat
               >
                 {item.icon}
                 <span>{item.label}</span>
-              </button>
+              </Link>
             </div>
           );
         })}
@@ -136,10 +139,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     );
   }
 
-  const handleNavigate = (path: string) => {
-    if (pathname !== path) {
-      router.push(path);
-    }
+  const handleNavigate = (_path: string) => {
     setSheetOpen(false);
   };
 

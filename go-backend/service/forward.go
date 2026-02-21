@@ -1032,6 +1032,17 @@ func createGostServices(forward *model.Forward, tunnel *model.Tunnel, limiter *i
 }
 
 func updateGostServices(forward *model.Forward, tunnel *model.Tunnel, limiter *int, inNode *model.Node, outNode *model.Node, serviceName string) string {
+	errStr := syncGostServices(forward, tunnel, limiter, inNode, outNode, serviceName)
+	if errStr != "" {
+		updateForwardStatusToError(forward.ID)
+	}
+	return errStr
+}
+
+// syncGostServices sends GOST service configurations to nodes.
+// Returns error message on failure, empty string on success.
+// Does NOT change forward status in DB — callers decide whether to set error status.
+func syncGostServices(forward *model.Forward, tunnel *model.Tunnel, limiter *int, inNode *model.Node, outNode *model.Node, serviceName string) string {
 	if tunnel.Type == tunnelTypeTunnelForward {
 		// Update chain
 		chainRemoteAddr := formatRemoteAddr(tunnel.OutIp, forward.OutPort)
@@ -1040,7 +1051,6 @@ func updateGostServices(forward *model.Forward, tunnel *model.Tunnel, limiter *i
 			chainResult = pkg.AddChains(inNode.ID, serviceName, chainRemoteAddr, tunnel.Protocol, tunnel.InterfaceName)
 		}
 		if !isGostSuccess(chainResult) {
-			updateForwardStatusToError(forward.ID)
 			return chainResult.Msg
 		}
 
@@ -1050,7 +1060,6 @@ func updateGostServices(forward *model.Forward, tunnel *model.Tunnel, limiter *i
 			remoteResult = pkg.AddRemoteService(outNode.ID, serviceName, forward.OutPort, forward.RemoteAddr, tunnel.Protocol, forward.Strategy, forward.InterfaceName)
 		}
 		if !isGostSuccess(remoteResult) {
-			updateForwardStatusToError(forward.ID)
 			return remoteResult.Msg
 		}
 	}
@@ -1066,7 +1075,6 @@ func updateGostServices(forward *model.Forward, tunnel *model.Tunnel, limiter *i
 		serviceResult = pkg.AddService(inNode.ID, serviceName, forward.InPort, limiter, forward.RemoteAddr, tunnel.Type, tunnel, forward.Strategy, interfaceName)
 	}
 	if !isGostSuccess(serviceResult) {
-		updateForwardStatusToError(forward.ID)
 		return serviceResult.Msg
 	}
 

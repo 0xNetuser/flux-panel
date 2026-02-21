@@ -136,7 +136,11 @@ func reconcileForwards(nodeId int64, result *ReconcileResult) {
 				limiter = &v
 			}
 
-			errStr := updateGostServices(&fwd, &fwdTunnel, limiter, inNode, outNode, serviceName)
+			// Use syncGostServices (not updateGostServices) to avoid setting
+			// forward status to error during reconcile. Reconcile is a best-effort
+			// sync — transient failures (timeout, node not ready) should not
+			// destructively change DB status.
+			errStr := syncGostServices(&fwd, &fwdTunnel, limiter, inNode, outNode, serviceName)
 			if errStr != "" {
 				result.Errors = append(result.Errors, fmt.Sprintf("转发 %d: %s", fwd.ID, errStr))
 			}

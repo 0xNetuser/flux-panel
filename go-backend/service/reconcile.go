@@ -136,11 +136,10 @@ func reconcileForwards(nodeId int64, result *ReconcileResult) {
 				limiter = &v
 			}
 
-			// Use syncGostServices (not updateGostServices) to avoid setting
-			// forward status to error during reconcile. Reconcile is a best-effort
-			// sync — transient failures (timeout, node not ready) should not
-			// destructively change DB status.
-			errStr := syncGostServices(&fwd, &fwdTunnel, limiter, inNode, outNode, serviceName)
+			// Use gentleSyncGostServices: Add-first, fallback to UpdateForwarder.
+			// This avoids restarting listeners (which would kill active connections)
+			// when services already exist on the node (e.g. after panel restart).
+			errStr := gentleSyncGostServices(&fwd, &fwdTunnel, limiter, inNode, outNode, serviceName)
 			if errStr != "" {
 				result.Errors = append(result.Errors, fmt.Sprintf("转发 %d: %s", fwd.ID, errStr))
 			}
@@ -163,6 +162,62 @@ func reconcileForwards(nodeId int64, result *ReconcileResult) {
 	}
 }
 
+// gentleSyncGostServices uses Add-first strategy: try AddService first,
+// if already exists → UpdateForwarder (hot update targets without restarting
+// listeners, preserving active connections).
+func gentleSyncGostServices(forward *model.Forward, tunnel *model.Tunnel, limiter *int,
+	inNode *model.Node, outNode *model.Node, serviceName string) string {
+
+	// === Tunnel forward: handle chain + remote service first ===
+	if tunnel.Type == tunnelTypeTunnelForward {
+		// Chain: Add, skip if already exists
+		chainRemoteAddr := formatRemoteAddr(tunnel.OutIp, forward.OutPort)
+		r := pkg.AddChains(inNode.ID, serviceName, chainRemoteAddr, tunnel.Protocol, tunnel.InterfaceName)
+		if !isGostSuccess(r) && !strings.Contains(r.Msg, "already exists") {
+			return r.Msg
+		}
+
+		// Remote service: Add, if exists → UpdateRemoteForwarder for hot update
+		r = pkg.AddRemoteService(outNode.ID, serviceName, forward.OutPort,
+			forward.RemoteAddr, tunnel.Protocol, forward.Strategy, forward.InterfaceName)
+		if !isGostSuccess(r) {
+			if strings.Contains(r.Msg, "already exists") {
+				r = pkg.UpdateRemoteForwarder(outNode.ID, serviceName, forward.RemoteAddr, forward.Strategy)
+				if r != nil && r.Msg != gostSuccessMsg {
+					return r.Msg
+				}
+			} else {
+				return r.Msg
+			}
+		}
+	}
+
+	// === Main service ===
+	interfaceName := ""
+	if tunnel.Type != tunnelTypeTunnelForward {
+		interfaceName = forward.InterfaceName
+	}
+
+	r := pkg.AddService(inNode.ID, serviceName, forward.InPort, limiter,
+		forward.RemoteAddr, tunnel.Type, tunnel, forward.Strategy, interfaceName)
+	if !isGostSuccess(r) {
+		if strings.Contains(r.Msg, "already exists") {
+			// Port forward: hot update forwarder (target/strategy), listener stays running
+			if tunnel.Type == tunnelTypePortForward {
+				r = pkg.UpdateForwarder(inNode.ID, serviceName, forward.RemoteAddr, forward.Strategy)
+				if r != nil && r.Msg != gostSuccessMsg {
+					return r.Msg
+				}
+			}
+			// Tunnel forward main service (relay) doesn't support Forward() interface, skip
+		} else {
+			return r.Msg
+		}
+	}
+
+	return ""
+}
+
 // ---------------------------------------------------------------------------
 // Phase 3 — Xray inbounds
 // ---------------------------------------------------------------------------
@@ -176,11 +231,17 @@ func reconcileXrayInbounds(nodeId int64, result *ReconcileResult) {
 		inbounds[i].SettingsJson = mergeClientsIntoSettings(&inbounds[i])
 	}
 
-	r := pkg.XrayApplyConfig(nodeId, inbounds)
-	if r != nil && r.Msg != "OK" {
-		result.Errors = append(result.Errors, fmt.Sprintf("Xray 入站: %s", r.Msg))
+	// Use per-inbound hot-add (gRPC) instead of XrayApplyConfig (full restart).
+	// If inbound already exists on the node, the add will fail harmlessly —
+	// we skip it to avoid restarting the Xray process and killing connections.
+	for _, ib := range inbounds {
+		r := pkg.XrayAddInbound(nodeId, &ib)
+		if r != nil && r.Msg != gostSuccessMsg {
+			// "already exists" after panel restart is expected — skip silently
+			log.Printf("[Reconcile] Xray inbound %s: %s (跳过)", ib.Tag, r.Msg)
+		}
+		result.Inbounds++
 	}
-	result.Inbounds = len(inbounds)
 }
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.9.5 — 修复 Reconcile 导致节点转发/Xray 中断
+
+### Bug Fixes
+
+- **面板重启不再中断节点连接**：Reconcile（节点重连后的配置对账）从破坏性的 Update/ApplyConfig 改为 Add-first + 热更新策略
+  - **GOST 转发**：先尝试 `AddService`，服务已存在时改用 `UpdateForwarder` 热更新目标地址，listener 不重启，现有连接不中断
+  - **GOST 隧道转发**：Chain 幂等添加，Remote Service 已存在时用 `UpdateRemoteForwarder` 热更新
+  - **Xray 入站**：从 `XrayApplyConfig`（重启 Xray 进程）改为逐个 `XrayAddInbound`（gRPC 热添加），已存在的入站跳过，进程不重启
+
+### Changed Files
+
+- `go-backend/service/reconcile.go` — 新增 `gentleSyncGostServices` 替换 `syncGostServices`；`reconcileXrayInbounds` 改用逐个热添加
+
+---
+
 ## v1.9.4 — 面板一键自更新 + 节点更新 + 多项修复
 
 ### Features

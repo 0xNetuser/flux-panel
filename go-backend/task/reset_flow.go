@@ -5,6 +5,7 @@ import (
 	"flux-panel/go-backend/pkg"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -121,7 +122,11 @@ func pauseSingleForward(db *gorm.DB, fwd *model.Forward) {
 
 	serviceName := fmt.Sprintf("%d_%d_%d", fwd.ID, fwd.UserId, ut.ID)
 
-	pkg.PauseService(inNode.ID, serviceName)
+	if fwd.ListenIp != "" && strings.Contains(fwd.ListenIp, ",") {
+		pkg.PauseServiceMultiIP(inNode.ID, serviceName, fwd.ListenIp)
+	} else {
+		pkg.PauseService(inNode.ID, serviceName)
+	}
 	if tunnel.Type == 2 {
 		var outNode model.Node
 		if err := db.First(&outNode, tunnel.OutNodeId).Error; err == nil {

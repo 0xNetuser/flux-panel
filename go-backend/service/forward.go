@@ -609,6 +609,16 @@ func ForceDeleteForward(id int64) dto.R {
 		return dto.Err("端口转发不存在")
 	}
 
+	// Best-effort cleanup of GOST services (don't fail if cleanup fails)
+	func() {
+		defer func() { recover() }()
+		var tunnel model.Tunnel
+		if err := DB.First(&tunnel, forward.TunnelId).Error; err != nil {
+			return
+		}
+		deleteOldGostServices(&forward, &tunnel)
+	}()
+
 	if err := DB.Delete(&model.Forward{}, id).Error; err != nil {
 		return dto.Err("端口转发强制删除失败")
 	}

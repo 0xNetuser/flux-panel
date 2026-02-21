@@ -373,6 +373,15 @@ func ResetXrayClientTraffic(id int64, userId int64, roleId int) dto.R {
 		"updated_time": time.Now().UnixMilli(),
 	})
 
+	// Re-enable if it was auto-disabled due to traffic limit
+	if client.Enable == 0 && client.TotalTraffic > 0 {
+		DB.Model(&client).Update("enable", 1)
+		var inbound model.XrayInbound
+		if err := DB.First(&inbound, client.InboundId).Error; err == nil {
+			pkg.XrayAddClient(inbound.NodeId, inbound.Tag, client.Email, client.UuidOrPassword, client.Flow, client.AlterId, inbound.Protocol)
+		}
+	}
+
 	return dto.Ok("流量已重置")
 }
 

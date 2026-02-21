@@ -34,7 +34,7 @@ func Setup(r *gin.Engine) {
 	r.GET("/flow/test", handler.FlowTest)
 	r.POST("/flow/test", handler.FlowTest)
 	r.POST("/flow/xray-upload", handler.FlowXrayUpload)
-	r.GET("/flow/debug", handler.FlowDebug)
+	// flow/debug moved to auth group (see below)
 
 	// Node install
 	r.GET("/node-install/script", handler.NodeInstallScript)
@@ -99,6 +99,7 @@ func Setup(r *gin.Engine) {
 		auth.POST("/forward/pause", handler.ForwardPause)
 		auth.POST("/forward/resume", handler.ForwardResume)
 		auth.POST("/forward/diagnose", handler.ForwardDiagnose)
+		auth.GET("/flow/debug", middleware.Admin(), handler.FlowDebug)
 		auth.POST("/forward/update-order", handler.ForwardUpdateOrder)
 
 		// Speed Limit

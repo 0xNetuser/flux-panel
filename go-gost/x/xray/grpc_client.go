@@ -42,14 +42,17 @@ func (c *XrayGrpcClient) AddUser(inboundTag, email, uuidOrPassword, flow, protoc
 		return fmt.Errorf("unsupported protocol: %s", protocol)
 	}
 
-	// adu expects a JSON file in InboundDetourConfig format: {tag, settings: {clients: [...]}}
-	config := map[string]interface{}{
+	// adu expects a full config with "inbounds" array, each inbound has tag + settings with clients
+	inboundCfg := map[string]interface{}{
 		"tag": inboundTag,
 		"settings": map[string]interface{}{
 			"clients": []interface{}{clientObj},
 		},
 	}
-	configData, _ := json.Marshal(config)
+	wrapped := map[string]interface{}{
+		"inbounds": []interface{}{inboundCfg},
+	}
+	configData, _ := json.Marshal(wrapped)
 
 	tmpFile, err := os.CreateTemp("", "xray-adu-*.json")
 	if err != nil {
@@ -82,17 +85,28 @@ func (c *XrayGrpcClient) RemoveUser(inboundTag, email string) error {
 	return nil
 }
 
-// AddInbound adds an inbound to a running Xray instance via gRPC API
+// AddInbound adds an inbound to a running Xray instance via gRPC API.
+// configJSON should be a single inbound object JSON; this method wraps it
+// in {"inbounds": [...]} as required by `xray api adi`.
 func (c *XrayGrpcClient) AddInbound(configJSON string) error {
 	fmt.Printf("📡 Xray gRPC addInbound\n")
 
-	// adi expects a JSON file path as positional argument
+	// xray api adi expects a full config with "inbounds" array
+	var inboundObj interface{}
+	if err := json.Unmarshal([]byte(configJSON), &inboundObj); err != nil {
+		return fmt.Errorf("invalid inbound JSON: %v", err)
+	}
+	wrapped := map[string]interface{}{
+		"inbounds": []interface{}{inboundObj},
+	}
+	wrappedJSON, _ := json.Marshal(wrapped)
+
 	tmpFile, err := os.CreateTemp("", "xray-adi-*.json")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %v", err)
 	}
 	defer os.Remove(tmpFile.Name())
-	tmpFile.WriteString(configJSON)
+	tmpFile.Write(wrappedJSON)
 	tmpFile.Close()
 
 	cmd := exec.Command(c.binaryPath, "api", "adi",

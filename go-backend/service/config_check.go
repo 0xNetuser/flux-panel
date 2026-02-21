@@ -4,6 +4,7 @@ import (
 	"flux-panel/go-backend/dto"
 	"flux-panel/go-backend/model"
 	"flux-panel/go-backend/pkg"
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -39,8 +40,17 @@ func CleanNodeConfigs(nodeIdStr string, gostConfig dto.GostConfigDto) {
 			serviceName := strconv.FormatInt(fwd.ID, 10) + "_" + strconv.FormatInt(fwd.UserId, 10) + "_" + strconv.FormatInt(utId, 10)
 
 			if tunnel.InNodeId == nodeId {
-				validServices[serviceName+"_tcp"] = true
-				validServices[serviceName+"_udp"] = true
+				if fwd.ListenIp != "" && strings.Contains(fwd.ListenIp, ",") {
+					ips := strings.Split(fwd.ListenIp, ",")
+					for i := range ips {
+						suffix := fmt.Sprintf("_%d", i)
+						validServices[serviceName+suffix+"_tcp"] = true
+						validServices[serviceName+suffix+"_udp"] = true
+					}
+				} else {
+					validServices[serviceName+"_tcp"] = true
+					validServices[serviceName+"_udp"] = true
+				}
 				if tunnel.Type == 2 {
 					validChains[serviceName+"_chains"] = true
 				}

@@ -268,9 +268,10 @@ func UpdateForward(d dto.ForwardUpdateDto, userId int64, roleId int) dto.R {
 	}
 
 	// 6. Update forward entity - handle port allocation
+	// Always use the DB owner userId (not client-supplied d.UserId which may be 0 for admin)
 	updatedForward := model.Forward{
 		ID:            d.ID,
-		UserId:        d.UserId,
+		UserId:        existForward.UserId,
 		Name:          d.Name,
 		TunnelId:      d.TunnelId,
 		RemoteAddr:    d.RemoteAddr,
@@ -333,7 +334,15 @@ func UpdateForward(d dto.ForwardUpdateDto, userId int64, roleId int) dto.R {
 
 		gostErr := createGostServices(&updatedForward, &tunnel, limiter, inNode, outNode, serviceName)
 		if gostErr != "" {
-			updateForwardStatusToError(updatedForward.ID)
+			// Save new tunnel/port data to DB so reconcile can recreate on the correct tunnel
+			// (old services are already deleted, so DB must reflect the new target)
+			DB.Model(&model.Forward{}).Where("id = ?", updatedForward.ID).Updates(map[string]interface{}{
+				"tunnel_id": updatedForward.TunnelId,
+				"in_port":   updatedForward.InPort,
+				"out_port":  updatedForward.OutPort,
+				"listen_ip": updatedForward.ListenIp,
+				"status":    forwardStatusError,
+			})
 			return dto.Err("创建新配置失败: " + gostErr)
 		}
 	} else {

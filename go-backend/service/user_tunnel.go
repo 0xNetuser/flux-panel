@@ -5,6 +5,7 @@ import (
 	"flux-panel/go-backend/model"
 	"flux-panel/go-backend/pkg"
 	"fmt"
+	"strings"
 )
 
 func AssignUserTunnel(d dto.UserTunnelDto) dto.R {
@@ -101,7 +102,11 @@ func RemoveUserTunnel(id int64) dto.R {
 
 		inNode := GetNodeById(tunnel.InNodeId)
 		if inNode != nil {
-			pkg.DeleteService(inNode.ID, serviceName)
+			if fwd.ListenIp != "" && strings.Contains(fwd.ListenIp, ",") {
+				pkg.DeleteServiceMultiIP(inNode.ID, serviceName, fwd.ListenIp)
+			} else {
+				pkg.DeleteService(inNode.ID, serviceName)
+			}
 			if tunnel.Type == 2 {
 				pkg.DeleteChains(inNode.ID, serviceName)
 				outNode := GetNodeById(tunnel.OutNodeId)
@@ -158,6 +163,10 @@ func UpdateUserTunnel(d dto.UserTunnelUpdateDto) dto.R {
 							pkg.AddLimiters(inNode.ID, *d.SpeedId, speed)
 						}
 					}
+
+					// Update ut.SpeedId in memory BEFORE rebuilding services,
+					// so updateForwardWithNewSpeed uses the NEW speed
+					ut.SpeedId = d.SpeedId
 
 					// Update all forwards for this user+tunnel to use new speed
 					var forwards []model.Forward

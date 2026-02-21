@@ -625,6 +625,10 @@ func (m *XrayManager) HotAddUser(tag, email, uuidOrPassword, flow, protocol stri
 				clientObj["password"] = uuidOrPassword
 			case "shadowsocks":
 				clientObj["password"] = uuidOrPassword
+				// Xray requires each SS client to have its own method field
+				if ssMethod, ok := settings["method"].(string); ok && ssMethod != "" {
+					clientObj["method"] = ssMethod
+				}
 			}
 			clients = append(clients, clientObj)
 			settings["clients"] = clients
@@ -643,6 +647,34 @@ func (m *XrayManager) HotAddUser(tag, email, uuidOrPassword, flow, protocol stri
 	// Fallback: reload inbound via rmi+adi (works with all Xray versions)
 	fmt.Printf("⚠️ adu command failed (%v), falling back to inbound reload\n", err)
 	if reloadErr := m.reloadInbound(tag); reloadErr != nil {
+		// adi failed after rmi — inbound is down. Revert config and try to restore.
+		fmt.Printf("❌ reloadInbound failed, reverting config and restoring inbound: %v\n", reloadErr)
+		m.updateConfigFile(func(config map[string]interface{}) {
+			inbounds, _ := config["inbounds"].([]interface{})
+			for _, ib := range inbounds {
+				ibMap, ok := ib.(map[string]interface{})
+				if !ok || ibMap["tag"] != tag {
+					continue
+				}
+				settings, _ := ibMap["settings"].(map[string]interface{})
+				if settings == nil {
+					continue
+				}
+				clients, _ := settings["clients"].([]interface{})
+				var filtered []interface{}
+				for _, c := range clients {
+					cMap, ok := c.(map[string]interface{})
+					if ok && cMap["email"] == email {
+						continue
+					}
+					filtered = append(filtered, c)
+				}
+				settings["clients"] = filtered
+				break
+			}
+		})
+		// Try to restore the inbound without the new user (best effort)
+		_ = m.reloadInbound(tag)
 		return fmt.Errorf("hot add user failed: adu: %v, reload: %v", err, reloadErr)
 	}
 
@@ -658,7 +690,8 @@ func (m *XrayManager) HotRemoveUser(tag, email string) error {
 		return fmt.Errorf("Xray is not running")
 	}
 
-	// Update config file first (always, for persistence)
+	// Update config file first (always, for persistence); save removed client for rollback
+	var removedClient interface{}
 	m.updateConfigFile(func(config map[string]interface{}) {
 		inbounds, _ := config["inbounds"].([]interface{})
 		for _, ib := range inbounds {
@@ -675,6 +708,7 @@ func (m *XrayManager) HotRemoveUser(tag, email string) error {
 			for _, c := range clients {
 				cMap, ok := c.(map[string]interface{})
 				if ok && cMap["email"] == email {
+					removedClient = c
 					continue
 				}
 				filtered = append(filtered, c)
@@ -695,6 +729,28 @@ func (m *XrayManager) HotRemoveUser(tag, email string) error {
 	// Fallback: reload inbound via rmi+adi (works with all Xray versions)
 	fmt.Printf("⚠️ rmu command failed (%v), falling back to inbound reload\n", err)
 	if reloadErr := m.reloadInbound(tag); reloadErr != nil {
+		// adi failed after rmi — inbound is down. Revert config and try to restore.
+		fmt.Printf("❌ reloadInbound failed, reverting config and restoring inbound: %v\n", reloadErr)
+		if removedClient != nil {
+			m.updateConfigFile(func(config map[string]interface{}) {
+				inbounds, _ := config["inbounds"].([]interface{})
+				for _, ib := range inbounds {
+					ibMap, ok := ib.(map[string]interface{})
+					if !ok || ibMap["tag"] != tag {
+						continue
+					}
+					settings, _ := ibMap["settings"].(map[string]interface{})
+					if settings == nil {
+						continue
+					}
+					clients, _ := settings["clients"].([]interface{})
+					clients = append(clients, removedClient)
+					settings["clients"] = clients
+					break
+				}
+			})
+			_ = m.reloadInbound(tag) // Best effort restore
+		}
 		return fmt.Errorf("hot remove user failed: rmu: %v, reload: %v", err, reloadErr)
 	}
 
@@ -722,6 +778,24 @@ func (m *XrayManager) reloadInbound(tag string) error {
 		if !ok || ibMap["tag"] != tag {
 			continue
 		}
+
+		// For shadowsocks: ensure each client has the method field (Xray requires it)
+		if ibMap["protocol"] == "shadowsocks" {
+			if settings, ok := ibMap["settings"].(map[string]interface{}); ok {
+				if method, ok := settings["method"].(string); ok && method != "" {
+					if clients, ok := settings["clients"].([]interface{}); ok {
+						for _, c := range clients {
+							if cMap, ok := c.(map[string]interface{}); ok {
+								if _, has := cMap["method"]; !has {
+									cMap["method"] = method
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
 		d, _ := json.Marshal(ibMap)
 		inboundJSON = string(d)
 		break

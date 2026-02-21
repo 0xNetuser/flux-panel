@@ -382,6 +382,9 @@ func mergeClientsIntoSettings(inbound *model.XrayInbound) string {
 		settings = map[string]interface{}{}
 	}
 
+	// Read method for shadowsocks (Xray requires each client to have its own method)
+	ssMethod, _ := settings["method"].(string)
+
 	var clients []model.XrayClient
 	DB.Where("inbound_id = ? AND enable = 1", inbound.ID).Find(&clients)
 
@@ -399,6 +402,9 @@ func mergeClientsIntoSettings(inbound *model.XrayInbound) string {
 			obj["password"] = c.UuidOrPassword
 		case "shadowsocks":
 			obj["password"] = c.UuidOrPassword
+			if ssMethod != "" {
+				obj["method"] = ssMethod
+			}
 		}
 		clientArr = append(clientArr, obj)
 	}

@@ -2,6 +2,7 @@ package service
 
 import (
 	"flux-panel/go-backend/model"
+	"flux-panel/go-backend/pkg"
 	"log"
 	"time"
 )
@@ -67,6 +68,16 @@ func checkClientTrafficReset() {
 				"down_traffic": 0,
 				"updated_time": now,
 			})
+
+			// Re-enable if it was auto-disabled due to traffic limit
+			if client.Enable == 0 && client.TotalTraffic > 0 {
+				DB.Model(&client).Update("enable", 1)
+				var inbound model.XrayInbound
+				if err := DB.First(&inbound, client.InboundId).Error; err == nil {
+					pkg.XrayAddClient(inbound.NodeId, inbound.Tag, client.Email, client.UuidOrPassword, client.Flow, client.AlterId, inbound.Protocol)
+				}
+			}
+
 			resetCount++
 			log.Printf("[XrayScheduler] Reset traffic for client %d (email=%s, cycle=%d days)",
 				client.ID, client.Email, client.Reset)

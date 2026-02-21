@@ -140,6 +140,21 @@ func DeleteNode(id int64) dto.R {
 		return dto.Err("该节点正在被隧道使用，无法删除")
 	}
 
+	// Cascade cleanup: Xray inbounds + their clients (best-effort hot-remove)
+	var inbounds []model.XrayInbound
+	DB.Where("node_id = ?", id).Find(&inbounds)
+	for _, ib := range inbounds {
+		pkg.XrayRemoveInbound(id, ib.Tag)
+		DB.Where("inbound_id = ?", ib.ID).Delete(&model.XrayClient{})
+	}
+	DB.Where("node_id = ?", id).Delete(&model.XrayInbound{})
+
+	// Cascade cleanup: Xray TLS certs
+	DB.Where("node_id = ?", id).Delete(&model.XrayTlsCert{})
+
+	// Cascade cleanup: user_node records
+	DB.Where("node_id = ?", id).Delete(&model.UserNode{})
+
 	DB.Delete(&node)
 	return dto.Ok("节点删除成功")
 }

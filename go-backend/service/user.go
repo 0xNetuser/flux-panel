@@ -305,6 +305,12 @@ func UpdateUser(d dto.UserUpdateDto) dto.R {
 		updates["pwd"] = pkg.HashPassword(d.Pwd)
 	}
 
+	// Pause forwards and disable Xray clients when user is disabled
+	if d.Status != nil && *d.Status == 0 && user.Status == 1 {
+		pauseAllUserForwards(d.ID)
+		disableAllUserXrayClients(d.ID)
+	}
+
 	if err := DB.Model(&model.User{}).Where("id = ?", d.ID).Updates(updates).Error; err != nil {
 		return dto.Err("用户更新失败")
 	}
@@ -655,6 +661,66 @@ func ResetFlow(d dto.ResetFlowDto, flowType int) dto.R {
 // If the user has no user_node records, they are treated as a legacy user
 // and granted access to all nodes.
 // ---------------------------------------------------------------------------
+
+// pauseAllUserForwards pauses all active forwards for a user.
+func pauseAllUserForwards(userId int64) {
+	var forwards []model.Forward
+	DB.Where("user_id = ? AND status = 1", userId).Find(&forwards)
+
+	for _, fwd := range forwards {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("[UpdateUser] 暂停转发 %d 失败: %v", fwd.ID, r)
+				}
+			}()
+
+			var tunnel model.Tunnel
+			if err := DB.First(&tunnel, fwd.TunnelId).Error; err != nil {
+				return
+			}
+			inNode := GetNodeById(tunnel.InNodeId)
+			if inNode == nil {
+				return
+			}
+
+			var ut model.UserTunnel
+			utId := int64(0)
+			if err := DB.Where("user_id = ? AND tunnel_id = ?", userId, tunnel.ID).First(&ut).Error; err == nil {
+				utId = ut.ID
+			}
+			serviceName := fmt.Sprintf("%d_%d_%d", fwd.ID, userId, utId)
+
+			if fwd.ListenIp != "" && strings.Contains(fwd.ListenIp, ",") {
+				pkg.PauseServiceMultiIP(inNode.ID, serviceName, fwd.ListenIp)
+			} else {
+				pkg.PauseService(inNode.ID, serviceName)
+			}
+			if tunnel.Type == 2 {
+				outNode := GetNodeById(tunnel.OutNodeId)
+				if outNode != nil {
+					pkg.PauseRemoteService(outNode.ID, serviceName)
+				}
+			}
+
+			DB.Model(&model.Forward{}).Where("id = ?", fwd.ID).Update("status", 0)
+		}()
+	}
+}
+
+// disableAllUserXrayClients disables all enabled Xray clients for a user.
+func disableAllUserXrayClients(userId int64) {
+	var clients []model.XrayClient
+	DB.Where("user_id = ? AND enable = 1", userId).Find(&clients)
+
+	for _, client := range clients {
+		var inbound model.XrayInbound
+		if err := DB.First(&inbound, client.InboundId).Error; err == nil {
+			pkg.XrayRemoveClient(inbound.NodeId, inbound.Tag, client.Email)
+		}
+		DB.Model(&client).Update("enable", 0)
+	}
+}
 
 func UserHasNodeAccess(userId, nodeId int64) bool {
 	var total int64

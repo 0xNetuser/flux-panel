@@ -5,6 +5,7 @@ import (
 	"flux-panel/go-backend/model"
 	"flux-panel/go-backend/pkg"
 	"fmt"
+	"log"
 	"strings"
 )
 
@@ -179,11 +180,56 @@ func UpdateUserTunnel(d dto.UserTunnelUpdateDto) dto.R {
 		}
 	}
 
+	// Pause active forwards when status is set to 0
+	if d.Status != nil && *d.Status == 0 {
+		var forwards []model.Forward
+		DB.Where("user_id = ? AND tunnel_id = ? AND status = 1", ut.UserId, ut.TunnelId).Find(&forwards)
+		if len(forwards) > 0 {
+			var tunnel model.Tunnel
+			if err := DB.First(&tunnel, ut.TunnelId).Error; err == nil {
+				for _, fwd := range forwards {
+					func() {
+						defer func() {
+							if r := recover(); r != nil {
+								log.Printf("[UpdateUserTunnel] 暂停转发 %d 失败: %v", fwd.ID, r)
+							}
+						}()
+						pauseForwardForDisable(&fwd, &tunnel, &ut)
+					}()
+				}
+			}
+		}
+	}
+
 	if len(updates) > 0 {
 		DB.Model(&ut).Updates(updates)
 	}
 
 	return dto.Ok("更新成功")
+}
+
+// pauseForwardForDisable pauses a forward's GOST services when user/tunnel is disabled.
+func pauseForwardForDisable(fwd *model.Forward, tunnel *model.Tunnel, ut *model.UserTunnel) {
+	inNode := GetNodeById(tunnel.InNodeId)
+	if inNode == nil {
+		return
+	}
+
+	serviceName := fmt.Sprintf("%d_%d_%d", fwd.ID, fwd.UserId, ut.ID)
+
+	if fwd.ListenIp != "" && strings.Contains(fwd.ListenIp, ",") {
+		pkg.PauseServiceMultiIP(inNode.ID, serviceName, fwd.ListenIp)
+	} else {
+		pkg.PauseService(inNode.ID, serviceName)
+	}
+	if tunnel.Type == 2 {
+		outNode := GetNodeById(tunnel.OutNodeId)
+		if outNode != nil {
+			pkg.PauseRemoteService(outNode.ID, serviceName)
+		}
+	}
+
+	DB.Model(&model.Forward{}).Where("id = ?", fwd.ID).Update("status", 0)
 }
 
 func updateForwardWithNewSpeed(fwd model.Forward, tunnel model.Tunnel, ut *model.UserTunnel) {

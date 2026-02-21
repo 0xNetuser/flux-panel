@@ -261,6 +261,11 @@ func UpdateXrayInbound(d dto.XrayInboundUpdateDto, userId int64, roleId int) dto
 	// Reload the updated inbound from DB
 	DB.First(&existing, d.ID)
 
+	// Skip hot operations for disabled inbounds (not running in Xray)
+	if oldInbound.Enable == 0 {
+		return dto.Ok("更新成功")
+	}
+
 	// Hot update: remove old inbound + add updated inbound (no Xray restart needed)
 	removeResult := pkg.XrayRemoveInbound(existing.NodeId, oldInbound.Tag)
 	if removeResult != nil && removeResult.Msg != "OK" {

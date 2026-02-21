@@ -1,6 +1,6 @@
 # Changelog
 
-## v1.9.10 — 删除无用字段 + 修复节点更新 text file busy
+## v1.9.10 — 清理无用字段和配置 + 修复节点更新 text file busy
 
 ### Bug Fixes
 
@@ -9,6 +9,7 @@
 ### Changed
 
 - **删除 Xray 客户端 tgId/subId 字段**：这两个字段从未被实际使用（仅存储，无任何读取逻辑），从 model、DTO、service、前端表单中全部移除，启动时自动 DROP 对应数据库列
+- **清理未使用的系统配置项**：移除 `sub_domain`（订阅域名）、`tg_bot_token`（TG Bot Token）、`tg_admin_id`（TG 管理员ID）、`reg_enable`（开放注册）四个从未被后端消费的配置项，启动时自动从数据库清除
 
 ### Changed Files
 
@@ -16,9 +17,10 @@
 - `go-backend/model/xray_client.go` — 移除 TgId、SubId 字段
 - `go-backend/dto/xray.go` — 移除 XrayClientDto/XrayClientUpdateDto 中的 tgId、subId
 - `go-backend/service/xray_client.go` — 移除 tgId 赋值、subId 生成逻辑、更新逻辑
-- `go-backend/main.go` — 启动时 DROP tg_id、sub_id 列
+- `go-backend/main.go` — 启动时 DROP tg_id、sub_id 列；knownKeys 移除四个无用配置项
 - `nextjs-frontend/app/(auth)/xray/client/page.tsx` — 移除表单中 Telegram ID 和订阅 ID 字段
 - `nextjs-frontend/app/(auth)/xray/inbound/page.tsx` — 移除客户端表单中 Telegram ID 和订阅 ID 字段
+- `nextjs-frontend/app/(auth)/config/page.tsx` — 移除四个无用配置项的字段定义和分组
 
 ---
 

@@ -24,19 +24,14 @@ const configFields: Record<string, ConfigFieldDef> = {
   site_name: { label: '站点名称', description: '站点名称', type: 'text' },
   site_desc: { label: '站点描述', description: '站点描述信息', type: 'text' },
   panel_addr: { label: '面板地址', description: '面板对外访问地址，用于生成节点安装命令，例如 http://your-domain.com:8080', type: 'text' },
-  sub_domain: { label: '订阅域名', description: '订阅链接使用的域名', type: 'text' },
-  tg_bot_token: { label: 'Telegram Bot Token', description: 'Telegram Bot 的 API Token，用于接收通知', type: 'password' },
-  tg_admin_id: { label: 'Telegram 管理员ID', description: '接收通知的 Telegram 用户 ID', type: 'text' },
-  reg_enable: { label: '开放注册', description: '开启后允许新用户自行注册', type: 'switch' },
   captcha_enabled: { label: '验证码开关', description: '开启后登录和注册页面需要完成验证码', type: 'switch' },
   monitor_interval: { label: '延迟监控频率', description: '延迟监控的检测间隔，最小 10 秒', type: 'number', suffix: '秒' },
   monitor_retention_days: { label: '监控数据保留天数', description: '监控数据（延迟、流量快照）保留的天数', type: 'number', suffix: '天' },
 };
 
 const groups: { title: string; keys: string[] }[] = [
-  { title: '基本信息', keys: ['app_name', 'site_name', 'site_desc'] },
-  { title: '订阅与通知', keys: ['panel_addr', 'sub_domain', 'tg_bot_token', 'tg_admin_id'] },
-  { title: '安全与监控', keys: ['reg_enable', 'captcha_enabled', 'monitor_interval', 'monitor_retention_days'] },
+  { title: '基本信息', keys: ['app_name', 'site_name', 'site_desc', 'panel_addr'] },
+  { title: '安全与监控', keys: ['captcha_enabled', 'monitor_interval', 'monitor_retention_days'] },
 ];
 
 function getFieldDef(key: string): ConfigFieldDef {

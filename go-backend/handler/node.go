@@ -99,5 +99,13 @@ func NodeUpdateBinary(c *gin.Context) {
 	clientOrigin := scheme + "://" + c.Request.Host
 	panelAddr := service.GetPanelAddress(clientOrigin)
 	result := pkg.NodeUpdateBinary(d.ID, panelAddr)
+	if result == nil || result.Msg != "OK" {
+		msg := "节点更新失败"
+		if result != nil {
+			msg = result.Msg
+		}
+		c.JSON(http.StatusOK, dto.Err(msg))
+		return
+	}
 	c.JSON(http.StatusOK, dto.Ok(result))
 }

@@ -6,6 +6,7 @@ import (
 	"flux-panel/go-backend/dto"
 	"flux-panel/go-backend/model"
 	"flux-panel/go-backend/pkg"
+	"log"
 	"time"
 )
 
@@ -246,10 +247,14 @@ func GenerateDockerInstallCommand(id int64, clientAddr string) dto.R {
 func GetPanelAddress(clientAddr string) string {
 	var cfg model.ViteConfig
 	if err := DB.Where("name = ?", "panel_addr").First(&cfg).Error; err == nil && cfg.Value != "" {
+		log.Printf("[GetPanelAddress] 使用数据库配置: %s", cfg.Value)
 		return cfg.Value
 	}
 	if clientAddr != "" {
+		log.Printf("[GetPanelAddress] 数据库无 panel_addr，使用 clientAddr: %s", clientAddr)
 		return clientAddr
 	}
-	return fmt.Sprintf("http://127.0.0.1:%d", config.Cfg.Port)
+	addr := fmt.Sprintf("http://127.0.0.1:%d", config.Cfg.Port)
+	log.Printf("[GetPanelAddress] fallback: %s", addr)
+	return addr
 }

@@ -255,20 +255,21 @@ func reconcileXrayInbounds(nodeId int64, result *ReconcileResult) {
 	// Strategy: try hot-add first inbound via gRPC. If it fails with a
 	// connection/dial error, Xray isn't running → fall back to ApplyConfig.
 	// If it succeeds or returns "already exists", Xray is running → continue hot-add.
+	// IMPORTANT: only fall back to ApplyConfig for clear "not running" signals.
+	// Broad matches like "failed" or "超时" would cause false positives and
+	// unnecessarily restart Xray (breaking active connections).
 	firstResult := pkg.XrayAddInbound(nodeId, &inbounds[0])
 	firstMsg := ""
 	if firstResult != nil {
 		firstMsg = firstResult.Msg
 	}
 
-	needApplyConfig := firstResult == nil ||
-		strings.Contains(firstMsg, "dial") ||
-		strings.Contains(firstMsg, "connection refused") ||
-		strings.Contains(firstMsg, "failed") ||
+	xrayNotRunning := firstResult == nil ||
 		strings.Contains(firstMsg, "not running") ||
-		strings.Contains(firstMsg, "超时")
+		strings.Contains(firstMsg, "connection refused") ||
+		(strings.Contains(firstMsg, "dial") && strings.Contains(firstMsg, "10085"))
 
-	if needApplyConfig {
+	if xrayNotRunning {
 		// Xray not running — use ApplyConfig to write config and start the process
 		log.Printf("[Reconcile] 节点 %d Xray 未运行 (%s)，使用 ApplyConfig 启动", nodeId, firstMsg)
 		r := pkg.XrayApplyConfig(nodeId, inbounds)

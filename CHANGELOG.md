@@ -1,10 +1,11 @@
 # Changelog
 
-## v1.9.10 — 清理无用字段和配置 + 修复节点更新 text file busy
+## v1.9.11 — 清理无用字段和配置 + 修复节点更新 + 修复面板自更新
 
 ### Bug Fixes
 
 - **修复节点自更新 "text file busy"**：Linux 不允许覆盖正在运行的二进制文件，改为先 `os.Remove` 旧文件再写入新文件，避免报错；失败时自动从备份恢复
+- **修复面板一键更新 "No such image"**：创建更新容器前先自动 pull `docker:cli` 镜像，避免宿主机未预拉取时 404 报错
 
 ### Changed
 
@@ -21,6 +22,7 @@
 - `nextjs-frontend/app/(auth)/xray/client/page.tsx` — 移除表单中 Telegram ID 和订阅 ID 字段
 - `nextjs-frontend/app/(auth)/xray/inbound/page.tsx` — 移除客户端表单中 Telegram ID 和订阅 ID 字段
 - `nextjs-frontend/app/(auth)/config/page.tsx` — 移除四个无用配置项的字段定义和分组
+- `go-backend/service/update.go` — 自动 pull docker:cli 镜像后再创建更新容器
 
 ---
 

@@ -1,14 +1,23 @@
 # Changelog
 
-## v1.9.6 — 系统配置检查更新 + 登录页去品牌化 + Reconcile 修复
+## v1.9.7 — 系统配置检查更新 + 登录页去品牌化 + 多项修复
 
 ### Features
 
 - **系统配置手动检查更新**：系统配置页新增「版本更新」卡片，点击「检查更新」按钮直接查询 GitHub（绕过 1 小时缓存），显示当前版本和最新版本
 - **登录页去品牌化**：移除 "Flux Panel" 和 "GOST + Xray 管理面板" 标识，伪装为中性登录页
 
+### Bug Fixes
+
+- **Reconcile 不再中断节点连接**：面板重启后 reconcile 改用 Add-first + 热更新策略，GOST listener 不重启，Xray 进程不重启
+- **节点更新失败正确返回错误**：`NodeUpdateBinary` 节点返回失败时前端现在能看到实际错误信息，而非误报"成功"
+- **GetPanelAddress 添加日志**：记录面板地址来源（数据库配置 / 请求 Host / fallback），便于排查节点下载失败问题
+
 ### Changed Files
 
+- `go-backend/service/reconcile.go` — 新增 `gentleSyncGostServices`；`reconcileXrayInbounds` 改用逐个热添加
+- `go-backend/handler/node.go` — `NodeUpdateBinary` 检查节点返回，失败时返回 `dto.Err`
+- `go-backend/service/node.go` — `GetPanelAddress` 添加来源日志
 - `go-backend/service/update.go` — 新增 `ForceCheckUpdate` 绕过缓存
 - `go-backend/handler/system.go` — 新增 `ForceCheckUpdate` handler
 - `go-backend/router/router.go` — 新增 `POST /system/force-check-update` 路由

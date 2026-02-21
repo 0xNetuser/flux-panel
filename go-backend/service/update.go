@@ -234,8 +234,7 @@ func SelfUpdate() dto.R {
 		"Image": updaterImage,
 		"Cmd":   []string{"sh", "-c", fmt.Sprintf("sleep 3 && cd /compose && docker compose -p %s pull && docker compose -p %s up -d", projectName, projectName)},
 		"HostConfig": map[string]interface{}{
-			"Binds":      []string{"/var/run/docker.sock:/var/run/docker.sock", hostDir + ":/compose"},
-			"AutoRemove": true,
+			"Binds": []string{"/var/run/docker.sock:/var/run/docker.sock", hostDir + ":/compose"},
 		},
 	}
 

@@ -32,6 +32,7 @@ func getNodeLock(nodeId int64) *sync.Mutex {
 
 // ReconcileNode synchronises panel DB state to a node in 4 phases:
 // 1. Limiters  2. GOST forwards  3. Xray inbounds  4. Xray certificates
+// Phases are skipped when the node has no relevant config (no forwards → skip 1+2, no inbounds → skip 4).
 func ReconcileNode(nodeId int64) ReconcileResult {
 	result := ReconcileResult{NodeId: nodeId}
 	start := time.Now()
@@ -45,17 +46,30 @@ func ReconcileNode(nodeId int64) ReconcileResult {
 
 	log.Printf("[Reconcile] 开始同步节点 %d 配置", nodeId)
 
-	// Phase 1: Limiters
-	reconcileLimiters(nodeId, &result)
+	// Check if node has any forwards (determines whether GOST phases are needed)
+	var forwardCount int64
+	DB.Model(&model.Forward{}).
+		Joins("JOIN tunnel ON tunnel.id = forward.tunnel_id").
+		Where("tunnel.in_node_id = ? OR tunnel.out_node_id = ?", nodeId, nodeId).
+		Count(&forwardCount)
 
-	// Phase 2: GOST forwards
-	reconcileForwards(nodeId, &result)
+	if forwardCount > 0 {
+		// Phase 1: Limiters (only needed when there are GOST services)
+		reconcileLimiters(nodeId, &result)
 
-	// Phase 3: Xray inbounds
+		// Phase 2: GOST forwards
+		reconcileForwards(nodeId, &result)
+	} else {
+		log.Printf("[Reconcile] 节点 %d 无转发规则，跳过 GOST 相关同步", nodeId)
+	}
+
+	// Phase 3: Xray inbounds (handles stop if no inbounds)
 	reconcileXrayInbounds(nodeId, &result)
 
-	// Phase 4: Xray certificates
-	reconcileXrayCerts(nodeId, &result)
+	// Phase 4: Xray certificates (only needed when there are inbounds)
+	if result.Inbounds > 0 {
+		reconcileXrayCerts(nodeId, &result)
+	}
 
 	result.Duration = time.Since(start).Milliseconds()
 	log.Printf("[Reconcile] 节点 %d 同步完成: 限速器=%d 转发=%d 入站=%d 证书=%d 耗时=%dms 错误=%d",
@@ -227,6 +241,9 @@ func reconcileXrayInbounds(nodeId int64, result *ReconcileResult) {
 	DB.Where("node_id = ? AND enable = 1", nodeId).Find(&inbounds)
 
 	if len(inbounds) == 0 {
+		// No inbounds — stop Xray if it's running (e.g. stale from before inbounds were deleted)
+		log.Printf("[Reconcile] 节点 %d 无启用的 Xray 入站，停止 Xray", nodeId)
+		pkg.XrayStop(nodeId)
 		return
 	}
 

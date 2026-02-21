@@ -54,7 +54,7 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 
 ```bash
 # 下载 docker-compose 配置文件
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.9.1/docker-compose.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.9.2/docker-compose.yml -o docker-compose.yml
 ```
 
 **2. 创建环境变量文件**
@@ -121,7 +121,7 @@ docker compose up -d
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.9.1
+  0xnetuser/gost-node:1.9.2
 ```
 
 也可以使用 docker-compose，参考项目中的 `docker-compose-node.yml`：
@@ -129,7 +129,7 @@ docker run -d --network=host --restart=unless-stopped --name gost-node \
 ```yaml
 services:
   gost-node:
-    image: 0xnetuser/gost-node:1.9.1
+    image: 0xnetuser/gost-node:1.9.2
     container_name: gost-node
     network_mode: host
     restart: unless-stopped
@@ -178,7 +178,7 @@ curl -L https://raw.githubusercontent.com/0xNetuser/flux-panel/refs/heads/main/p
 
 ```bash
 # 下载最新 docker-compose 配置（覆盖旧文件）
-curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.9.1/docker-compose.yml -o docker-compose.yml
+curl -L https://github.com/0xNetuser/flux-panel/releases/download/1.9.2/docker-compose.yml -o docker-compose.yml
 
 # 拉取最新镜像并重启
 docker compose pull && docker compose up -d
@@ -200,7 +200,7 @@ docker stop gost-node && docker rm gost-node
 docker run -d --network=host --restart=unless-stopped --name gost-node \
   -e PANEL_ADDR=http://<面板IP>:<面板端口> \
   -e SECRET=<节点密钥> \
-  0xnetuser/gost-node:1.9.1
+  0xnetuser/gost-node:1.9.2
 ```
 
 如果使用 docker-compose 部署，更新 `docker-compose-node.yml` 中的镜像版本后：
@@ -222,6 +222,21 @@ curl -fL http://<面板IP>:<面板端口>/node-install/script -o install.sh && c
 ---
 
 ## 更新日志
+
+### v1.9.2
+
+- **深度代码审计修复**：累计修复 25+ 个 bug，覆盖 GOST 转发、Xray 热加载、用户权限、定时任务等模块
+- **Xray CLI 命令语法修复**：修复 `rmi`/`adi`/`adu`/`rmu` 四个命令的参数格式错误，添加旧版本（< v25.7.26）fallback 机制
+- **多 IP 转发全面修复**：修复 8 处多 IP 转发（逗号分隔 ListenIp）未使用 MultiIP 变体的问题，涉及删除、暂停、reconcile、定时任务等
+- **管理员操作修复**：管理员编辑转发不再要求 UserTunnel 存在；编辑转发使用 DB 记录的 userId 而非客户端传值
+- **用户禁用立即生效**：禁用用户时立即暂停所有活跃转发并禁用 Xray 客户端；禁用隧道权限时立即暂停对应转发
+- **删除操作级联清理**：删除用户级联清理 Xray 客户端并热移除；删除节点级联清理 XrayInbound/XrayClient/XrayTlsCert/UserNode
+- **Xray 流量重置恢复**：手动重置和定时重置流量后，因流量超限被禁用的客户端自动重新启用
+- **Xray 入站编辑修复**：编辑已禁用的入站不再尝试热移除（避免报错）
+- **WebSocket 并发安全**：Admin WebSocket 广播添加 per-connection 互斥锁，防止并发写入 panic
+- **强制删除修复**：ForceDeleteForward 现在会 best-effort 清理 GOST 服务
+- **流量检查修复**：用户权限检查正确比较实际流量使用量与限额
+- **安全修复**：`/flow/debug` 端点移至认证路由组，需要管理员权限
 
 ### v1.9.1
 

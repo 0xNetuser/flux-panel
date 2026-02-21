@@ -1,5 +1,23 @@
 # Changelog
 
+## v1.9.6 — 系统配置检查更新 + 登录页去品牌化 + Reconcile 修复
+
+### Features
+
+- **系统配置手动检查更新**：系统配置页新增「版本更新」卡片，点击「检查更新」按钮直接查询 GitHub（绕过 1 小时缓存），显示当前版本和最新版本
+- **登录页去品牌化**：移除 "Flux Panel" 和 "GOST + Xray 管理面板" 标识，伪装为中性登录页
+
+### Changed Files
+
+- `go-backend/service/update.go` — 新增 `ForceCheckUpdate` 绕过缓存
+- `go-backend/handler/system.go` — 新增 `ForceCheckUpdate` handler
+- `go-backend/router/router.go` — 新增 `POST /system/force-check-update` 路由
+- `nextjs-frontend/lib/api/system.ts` — 新增 `forceCheckUpdate` API
+- `nextjs-frontend/app/(auth)/config/page.tsx` — 新增版本更新卡片
+- `nextjs-frontend/app/page.tsx` — 登录页去品牌化
+
+---
+
 ## v1.9.5 — 修复 Reconcile 导致节点转发/Xray 中断
 
 ### Bug Fixes

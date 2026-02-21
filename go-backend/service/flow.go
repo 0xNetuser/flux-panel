@@ -142,9 +142,15 @@ func ProcessXrayFlowUpload(rawData, secret string) string {
 		if xrayClient.TotalTraffic > 0 {
 			var updated model.XrayClient
 			DB.First(&updated, xrayClient.ID)
-			if updated.UpTraffic+updated.DownTraffic >= xrayClient.TotalTraffic {
+			if updated.UpTraffic+updated.DownTraffic >= xrayClient.TotalTraffic && updated.Enable == 1 {
 				DB.Model(&updated).Update("enable", 0)
 				log.Printf("Xray 客户端 %s 流量超限，已禁用", client.Email)
+
+				// Hot-remove from Xray so the client is cut off immediately
+				var inbound model.XrayInbound
+				if err := DB.First(&inbound, xrayClient.InboundId).Error; err == nil {
+					pkg.XrayRemoveClient(inbound.NodeId, inbound.Tag, xrayClient.Email)
+				}
 			}
 		}
 	}
@@ -286,17 +292,31 @@ func pauseSpecificForward(tunnelId int64, serviceName, userId string) {
 	pauseForwardServices(forwards, serviceName)
 }
 
-func pauseForwardServices(forwards []model.Forward, serviceName string) {
+func pauseForwardServices(forwards []model.Forward, triggerServiceName string) {
 	for _, fwd := range forwards {
+		if fwd.Status == forwardStatusPaused {
+			continue
+		}
+
 		var tunnel model.Tunnel
 		if err := DB.First(&tunnel, fwd.TunnelId).Error; err != nil {
 			continue
 		}
-		pkg.PauseService(tunnel.InNodeId, serviceName)
-		if tunnel.Type == 2 {
-			pkg.PauseRemoteService(tunnel.OutNodeId, serviceName)
+
+		// Build the correct service name for THIS forward (not the trigger's name)
+		userTunnel := getUserTunnel(fwd.UserId, fwd.TunnelId)
+		svcName := buildServiceName(fwd.ID, fwd.UserId, userTunnel)
+
+		// Handle multi-IP configurations
+		if fwd.ListenIp != "" && strings.Contains(fwd.ListenIp, ",") {
+			pkg.PauseServiceMultiIP(tunnel.InNodeId, svcName, fwd.ListenIp)
+		} else {
+			pkg.PauseService(tunnel.InNodeId, svcName)
 		}
-		DB.Model(&fwd).Update("status", 0)
+		if tunnel.Type == 2 {
+			pkg.PauseRemoteService(tunnel.OutNodeId, svcName)
+		}
+		DB.Model(&fwd).Update("status", forwardStatusPaused)
 	}
 }
 

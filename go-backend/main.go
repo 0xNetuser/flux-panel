@@ -252,6 +252,18 @@ func ensureDefaultConfig(db *gorm.DB) {
 			})
 		}
 	}
+
+	// Clean up legacy config keys not used by current codebase
+	knownKeys := []string{
+		"app_name", "site_name", "site_desc",
+		"panel_addr", "sub_domain", "tg_bot_token", "tg_admin_id",
+		"reg_enable", "captcha_enabled",
+		"monitor_interval", "monitor_retention_days",
+	}
+	result := db.Where("name NOT IN ?", knownKeys).Delete(&model.ViteConfig{})
+	if result.RowsAffected > 0 {
+		log.Printf("已清理 %d 条遗留配置", result.RowsAffected)
+	}
 }
 
 func generateRandomPassword(length int) string {

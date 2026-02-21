@@ -142,15 +142,21 @@ export default function ConfigPage() {
     setLoading(true);
     const res = await getConfigs();
     if (res.code === 0 && res.data) {
+      let configMap: Record<string, string> = {};
       if (Array.isArray(res.data)) {
-        const configMap: Record<string, string> = {};
         res.data.forEach((item: any) => {
           configMap[item.name || item.key] = item.value || '';
         });
-        setConfigs(configMap);
       } else if (typeof res.data === 'object') {
-        setConfigs(res.data as Record<string, string>);
+        configMap = { ...(res.data as Record<string, string>) };
       }
+      // Ensure all defined config fields exist so they are always visible
+      for (const key of Object.keys(configFields)) {
+        if (!(key in configMap)) {
+          configMap[key] = '';
+        }
+      }
+      setConfigs(configMap);
     }
     setLoading(false);
   }, []);

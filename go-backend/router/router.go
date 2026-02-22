@@ -39,6 +39,7 @@ func Setup(r *gin.Engine) {
 	// Node install
 	r.GET("/node-install/script", handler.NodeInstallScript)
 	r.GET("/node-install/binary/:arch", handler.NodeInstallBinary)
+	r.GET("/node-install/xray/:arch", handler.NodeInstallXray)
 
 	// Xray subscription (token in path)
 	r.GET("/api/v1/xray/sub/:token", handler.XraySubscription)

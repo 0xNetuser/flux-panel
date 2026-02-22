@@ -1,5 +1,25 @@
 FROM alpine:latest
+
+ARG XRAY_VERSION=25.1.30
+
+RUN apk add --no-cache wget unzip
+
+# Copy gost binaries
 COPY gost-amd64 /binaries/gost-amd64
 COPY gost-arm64 /binaries/gost-arm64
 RUN chmod +x /binaries/gost-amd64 /binaries/gost-arm64
+
+# Download Xray binaries
+RUN wget -q "https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/Xray-linux-64.zip" -O /tmp/xray-amd64.zip && \
+    unzip -qo /tmp/xray-amd64.zip xray -d /tmp && \
+    mv /tmp/xray /binaries/xray-amd64 && \
+    chmod +x /binaries/xray-amd64 && \
+    rm -f /tmp/xray-amd64.zip
+
+RUN wget -q "https://github.com/XTLS/Xray-core/releases/download/v${XRAY_VERSION}/Xray-linux-arm64-v8a.zip" -O /tmp/xray-arm64.zip && \
+    unzip -qo /tmp/xray-arm64.zip xray -d /tmp && \
+    mv /tmp/xray /binaries/xray-arm64 && \
+    chmod +x /binaries/xray-arm64 && \
+    rm -f /tmp/xray-arm64.zip
+
 CMD ["sh", "-c", "cp /binaries/* /data/node/ && ls -la /data/node/ && echo 'Node binaries ready'"]

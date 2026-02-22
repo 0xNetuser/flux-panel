@@ -16,6 +16,7 @@ import { switchXrayVersion, getXrayVersions } from '@/lib/api/xray-node';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getVersion } from '@/lib/api/system';
 import { useAuth } from '@/lib/hooks/use-auth';
+import { useTranslation } from '@/lib/i18n';
 
 function compareVersions(a: string, b: string): number {
   const pa = a.split('.').map(Number);
@@ -30,6 +31,7 @@ function compareVersions(a: string, b: string): number {
 
 export default function NodePage() {
   const { isAdmin } = useAuth();
+  const { t } = useTranslation();
   const [nodes, setNodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -83,7 +85,7 @@ export default function NodePage() {
 
   const handleSubmit = async () => {
     if (!form.name || !form.serverIp) {
-      toast.error('请填写必要字段');
+      toast.error(t('common.fillRequired'));
       return;
     }
     const data: any = {
@@ -103,7 +105,7 @@ export default function NodePage() {
     }
 
     if (res.code === 0) {
-      toast.success(editingNode ? '更新成功' : '创建成功');
+      toast.success(editingNode ? t('common.updateSuccess') : t('common.createSuccess'));
       setDialogOpen(false);
       loadData();
     } else {
@@ -112,16 +114,16 @@ export default function NodePage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('确定删除此节点? 相关隧道和转发将受影响。')) return;
+    if (!confirm(t('node.confirmDeleteNode'))) return;
     const res = await deleteNode(id);
-    if (res.code === 0) { toast.success('删除成功'); loadData(); }
+    if (res.code === 0) { toast.success(t('common.deleteSuccess')); loadData(); }
     else toast.error(res.msg);
   };
 
   const handleInstallCommand = async (id: number) => {
     const res = await getNodeInstallCommand(id);
     if (res.code === 0) {
-      setCommandTitle('安装命令');
+      setCommandTitle(t('node.installCommand'));
       setCommandContent(res.data || '');
       setCommandDialog(true);
     } else {
@@ -132,7 +134,7 @@ export default function NodePage() {
   const handleDockerCommand = async (id: number) => {
     const res = await getNodeDockerCommand(id);
     if (res.code === 0) {
-      setCommandTitle('Docker 命令');
+      setCommandTitle(t('node.dockerCommand'));
       setCommandContent(res.data || '');
       setCommandDialog(true);
     } else {
@@ -173,17 +175,17 @@ export default function NodePage() {
 
   const handleXrayVersionSubmit = async () => {
     if (!xrayTargetVersion.trim()) {
-      toast.error('请选择目标版本');
+      toast.error(t('node.selectTargetVersion'));
       return;
     }
     setXraySwitching(true);
     try {
       const res = await switchXrayVersion(xrayVersionNode.id, xrayTargetVersion.trim());
       if (res.code === 0) {
-        toast.success('版本切换已开始，请稍候刷新查看');
+        toast.success(t('node.versionSwitchStarted'));
         setXrayVersionDialog(false);
       } else {
-        toast.error(res.msg || '切换失败');
+        toast.error(res.msg || t('node.switchFailed'));
       }
     } finally {
       setXraySwitching(false);
@@ -196,9 +198,9 @@ export default function NodePage() {
       const res = await reconcileNode(id);
       if (res.code === 0) {
         const d = res.data;
-        toast.success(`同步完成: 限速器=${d.limiters} 转发=${d.forwards} 入站=${d.inbounds} 证书=${d.certs} 耗时=${d.duration}ms`);
+        toast.success(t('node.syncResult', { limiters: d.limiters, forwards: d.forwards, inbounds: d.inbounds, certs: d.certs, duration: d.duration }));
         if (d.errors && d.errors.length > 0) {
-          toast.warning(`${d.errors.length} 个错误: ${d.errors[0]}`);
+          toast.warning(t('node.syncErrors', { count: d.errors.length, first: d.errors[0] }));
         }
       } else {
         toast.error(res.msg);
@@ -209,14 +211,14 @@ export default function NodePage() {
   };
 
   const handleUpdateBinary = async (node: any) => {
-    if (!confirm(`确定更新节点 "${node.name}" 的二进制文件？节点将自动下载新版本并重启。`)) return;
+    if (!confirm(t('node.confirmUpdateBinary', { name: node.name }))) return;
     setUpdatingId(node.id);
     try {
       const res = await updateNodeBinary(node.id);
       if (res.code === 0) {
-        toast.success('更新指令已发送，节点将自动下载并重启');
+        toast.success(t('node.updateBinarySent'));
       } else {
-        toast.error(res.msg || '更新失败');
+        toast.error(res.msg || t('common.networkError'));
       }
     } finally {
       setUpdatingId(null);
@@ -225,7 +227,7 @@ export default function NodePage() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    toast.success('已复制到剪贴板');
+    toast.success(t('common.copySuccess'));
   };
 
   const formatUptime = (seconds: number) => {
@@ -233,9 +235,9 @@ export default function NodePage() {
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
-    if (days > 0) return `${days}天${hours}时${mins}分`;
-    if (hours > 0) return `${hours}时${mins}分`;
-    return `${mins}分`;
+    if (days > 0) return `${days}${t('node.days')}${hours}${t('node.hours')}${mins}${t('node.minutes')}`;
+    if (hours > 0) return `${hours}${t('node.hours')}${mins}${t('node.minutes')}`;
+    return `${mins}${t('node.minutes')}`;
   };
 
   if (!isAdmin) {
@@ -249,8 +251,8 @@ export default function NodePage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">节点管理</h2>
-        <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />创建节点</Button>
+        <h2 className="text-2xl font-bold">{t('node.title')}</h2>
+        <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />{t('node.createNode')}</Button>
       </div>
 
       <Card>
@@ -258,22 +260,22 @@ export default function NodePage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>名称</TableHead>
-                <TableHead>入口IP</TableHead>
-                <TableHead>服务器IP</TableHead>
-                <TableHead>端口范围</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead>版本</TableHead>
-                <TableHead>CPU / 内存</TableHead>
-                <TableHead>运行时间</TableHead>
-                <TableHead>操作</TableHead>
+                <TableHead>{t('node.name')}</TableHead>
+                <TableHead>{t('node.entryIp')}</TableHead>
+                <TableHead>{t('node.serverIp')}</TableHead>
+                <TableHead>{t('node.portRange')}</TableHead>
+                <TableHead>{t('node.status')}</TableHead>
+                <TableHead>{t('node.version')}</TableHead>
+                <TableHead>{t('node.cpuMem')}</TableHead>
+                <TableHead>{t('node.uptime')}</TableHead>
+                <TableHead>{t('node.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8">加载中...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center py-8">{t('common.loading')}</TableCell></TableRow>
               ) : nodes.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">{t('common.noData')}</TableCell></TableRow>
               ) : (
                 nodes.map((n) => (
                   <TableRow key={n.id}>
@@ -283,7 +285,7 @@ export default function NodePage() {
                     <TableCell>{n.portSta} - {n.portEnd}</TableCell>
                     <TableCell>
                       <Badge variant={n.status === 1 ? 'default' : 'destructive'}>
-                        {n.status === 1 ? '在线' : '离线'}
+                        {n.status === 1 ? t('common.online') : t('common.offline')}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm">
@@ -301,7 +303,7 @@ export default function NodePage() {
                           ) : (
                             <Download className="mr-1 h-3 w-3" />
                           )}
-                          {updatingId === n.id ? '更新中' : '更新'}
+                          {updatingId === n.id ? t('node.updatingBinary') : t('node.updateBinary')}
                         </Button>
                       )}
                     </TableCell>
@@ -314,19 +316,19 @@ export default function NodePage() {
                         <Button variant="ghost" size="icon" onClick={() => handleEdit(n)} title="编辑">
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => setIfaceNode(n)} title="网卡信息" disabled={!n.interfaces?.length}>
+                        <Button variant="ghost" size="icon" onClick={() => setIfaceNode(n)} title={t('node.nicInfo')} disabled={!n.interfaces?.length}>
                           <Network className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleXrayVersionSwitch(n)} title="Xray 版本切换">
+                        <Button variant="ghost" size="icon" onClick={() => handleXrayVersionSwitch(n)} title={t('node.xrayVersionTitle')}>
                           <ArrowUpDown className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleReconcile(n.id)} disabled={reconcilingId === n.id} title="同步配置">
+                        <Button variant="ghost" size="icon" onClick={() => handleReconcile(n.id)} disabled={reconcilingId === n.id} title={t('node.syncConfig')}>
                           <RefreshCw className={`h-4 w-4 ${reconcilingId === n.id ? 'animate-spin' : ''}`} />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleInstallCommand(n.id)} title="安装命令">
+                        <Button variant="ghost" size="icon" onClick={() => handleInstallCommand(n.id)} title={t('node.installCommand')}>
                           <Terminal className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDockerCommand(n.id)} title="Docker命令">
+                        <Button variant="ghost" size="icon" onClick={() => handleDockerCommand(n.id)} title={t('node.dockerCommand')}>
                           <Container className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleDelete(n.id)} className="text-destructive" title="删除">
@@ -346,15 +348,15 @@ export default function NodePage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingNode ? '编辑节点' : '创建节点'}</DialogTitle>
+            <DialogTitle>{editingNode ? t('node.editNode') : t('node.createNodeTitle')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>名称</Label>
-              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="节点名称" />
+              <Label>{t('node.name')}</Label>
+              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder={t('node.nodeName')} />
             </div>
             <div className="space-y-2">
-              <Label>入口IP列表</Label>
+              <Label>{t('node.entryIpList')}</Label>
               <Textarea
                 value={form.entryIps}
                 onChange={e => setForm(p => ({ ...p, entryIps: e.target.value }))}
@@ -362,30 +364,30 @@ export default function NodePage() {
                 rows={3}
                 className="font-mono text-sm"
               />
-              <p className="text-xs text-muted-foreground">面向用户展示的入口IP，每行一个</p>
+              <p className="text-xs text-muted-foreground">{t('node.entryIpDesc')}</p>
             </div>
             <div className="space-y-2">
-              <Label>服务器IP</Label>
-              <Input value={form.serverIp} onChange={e => setForm(p => ({ ...p, serverIp: e.target.value }))} placeholder="面板与节点通信的IP" />
+              <Label>{t('node.serverIpLabel')}</Label>
+              <Input value={form.serverIp} onChange={e => setForm(p => ({ ...p, serverIp: e.target.value }))} placeholder={t('node.serverIpPlaceholder')} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>起始端口</Label>
+                <Label>{t('node.startPort')}</Label>
                 <Input value={form.portSta} onChange={e => setForm(p => ({ ...p, portSta: e.target.value }))} placeholder="10000" autoComplete="off" />
               </div>
               <div className="space-y-2">
-                <Label>结束端口</Label>
+                <Label>{t('node.endPort')}</Label>
                 <Input value={form.portEnd} onChange={e => setForm(p => ({ ...p, portEnd: e.target.value }))} placeholder="60000" autoComplete="off" />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>通信密钥</Label>
+              <Label>{t('node.commSecret')}</Label>
               <div className="relative">
                 <Input
                   type={showSecret ? 'text' : 'password'}
                   value={form.secret}
                   onChange={e => setForm(p => ({ ...p, secret: e.target.value }))}
-                  placeholder="留空自动生成"
+                  placeholder={t('node.secretAutoGenerate')}
                   readOnly={!!editingNode}
                   className={editingNode ? 'bg-muted' : ''}
                   autoComplete="off"
@@ -399,12 +401,12 @@ export default function NodePage() {
                   {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
-              {editingNode && <p className="text-xs text-muted-foreground">密钥不可修改</p>}
+              {editingNode && <p className="text-xs text-muted-foreground">{t('node.secretReadonly')}</p>}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSubmit}>{editingNode ? '更新' : '创建'}</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleSubmit}>{editingNode ? t('common.update') : t('common.create')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -413,36 +415,36 @@ export default function NodePage() {
       <Dialog open={xrayVersionDialog} onOpenChange={setXrayVersionDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>切换 Xray 版本 — {xrayVersionNode?.name}</DialogTitle>
+            <DialogTitle>{t('node.xrayVersionTitle')} — {xrayVersionNode?.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>当前版本</Label>
-              <p className="text-sm text-muted-foreground">{xrayVersionNode?.xrayVersion || '未知'}</p>
+              <Label>{t('node.currentVersion')}</Label>
+              <p className="text-sm text-muted-foreground">{xrayVersionNode?.xrayVersion || t('node.unknown')}</p>
             </div>
             <div className="space-y-2">
-              <Label>目标版本</Label>
+              <Label>{t('node.targetVersion')}</Label>
               {xrayVersionsFailed ? (
                 <>
                   <Input
                     value={xrayTargetVersion}
                     onChange={e => setXrayTargetVersion(e.target.value)}
-                    placeholder="例如: 25.1.30"
+                    placeholder={t('node.versionInputPlaceholder')}
                   />
-                  <p className="text-xs text-muted-foreground">获取版本列表失败，请手动输入版本号</p>
+                  <p className="text-xs text-muted-foreground">{t('node.versionListFailed')}</p>
                 </>
               ) : (
                 <Select value={xrayTargetVersion} onValueChange={setXrayTargetVersion} disabled={xrayVersionsLoading}>
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder={xrayVersionsLoading ? '加载中...' : '选择版本'} />
+                    <SelectValue placeholder={xrayVersionsLoading ? t('node.loadingVersions') : t('node.selectVersion')} />
                   </SelectTrigger>
                   <SelectContent>
                     {xrayVersionsLoading ? (
-                      <SelectItem value="_loading" disabled>加载中...</SelectItem>
+                      <SelectItem value="_loading" disabled>{t('node.loadingVersions')}</SelectItem>
                     ) : (
                       xrayVersions.map((v) => (
                         <SelectItem key={v.version} value={v.version}>
-                          {v.version}{xrayVersionNode?.xrayVersion === v.version ? ' (当前)' : ''}
+                          {v.version}{xrayVersionNode?.xrayVersion === v.version ? ` (${t('node.current')})` : ''}
                           {v.publishedAt && <span className="text-muted-foreground ml-2 text-xs">{v.publishedAt.slice(0, 10)}</span>}
                         </SelectItem>
                       ))
@@ -453,9 +455,9 @@ export default function NodePage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setXrayVersionDialog(false)}>取消</Button>
+            <Button variant="outline" onClick={() => setXrayVersionDialog(false)}>{t('common.cancel')}</Button>
             <Button onClick={handleXrayVersionSubmit} disabled={xraySwitching}>
-              {xraySwitching ? '切换中...' : '切换'}
+              {xraySwitching ? t('node.switching') : t('node.switchVersion')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -465,7 +467,7 @@ export default function NodePage() {
       <Dialog open={!!ifaceNode} onOpenChange={() => setIfaceNode(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>网卡信息 — {ifaceNode?.name}</DialogTitle>
+            <DialogTitle>{t('node.nicInfo')} — {ifaceNode?.name}</DialogTitle>
           </DialogHeader>
           {ifaceNode?.interfaces?.length ? (
             <div className="space-y-3">
@@ -481,10 +483,10 @@ export default function NodePage() {
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">节点离线或无网卡数据</p>
+            <p className="text-sm text-muted-foreground">{t('node.nodeOfflineOrNoData')}</p>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIfaceNode(null)}>关闭</Button>
+            <Button variant="outline" onClick={() => setIfaceNode(null)}>{t('common.cancel')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -505,11 +507,11 @@ export default function NodePage() {
               className="absolute top-2 right-2"
               onClick={() => copyToClipboard(commandContent)}
             >
-              <Copy className="mr-2 h-3 w-3" />复制
+              <Copy className="mr-2 h-3 w-3" />{t('common.copy')}
             </Button>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setCommandDialog(false)}>关闭</Button>
+            <Button variant="outline" onClick={() => setCommandDialog(false)}>{t('common.cancel')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

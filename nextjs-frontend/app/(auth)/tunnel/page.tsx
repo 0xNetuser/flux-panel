@@ -19,9 +19,11 @@ import {
 import { getNodeList } from '@/lib/api/node';
 import { getAllUsers } from '@/lib/api/user';
 import { useAuth } from '@/lib/hooks/use-auth';
+import { useTranslation } from '@/lib/i18n';
 
 export default function TunnelPage() {
   const { isAdmin } = useAuth();
+  const { t } = useTranslation();
   const [tunnels, setTunnels] = useState<any[]>([]);
   const [nodes, setNodes] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -50,7 +52,7 @@ export default function TunnelPage() {
         if (userRes.code === 0) setUsers(userRes.data || []);
       }
     } catch {
-      toast.error('加载数据失败');
+      toast.error(t('common.loadFailed'));
     }
     setLoading(false);
   }, [isAdmin]);
@@ -88,12 +90,12 @@ export default function TunnelPage() {
 
   const handleSubmit = async () => {
     if (!form.name || !form.inNodeId || !form.outNodeId) {
-      toast.error('请填写必要字段');
+      toast.error(t('common.fillRequired'));
       return;
     }
     const typeInt = form.type === 'tunnel' ? 2 : (typeof form.type === 'number' ? form.type : 1);
     if (typeInt === 2 && form.inNodeId === form.outNodeId) {
-      toast.error('隧道转发的入口节点和出口节点不能相同');
+      toast.error(t('tunnel.sameNodeError'));
       return;
     }
     const data: any = {
@@ -115,7 +117,7 @@ export default function TunnelPage() {
     }
 
     if (res.code === 0) {
-      toast.success(editingTunnel ? '更新成功' : '创建成功');
+      toast.success(editingTunnel ? t('common.updateSuccess') : t('common.createSuccess'));
       setDialogOpen(false);
       loadData();
     } else {
@@ -124,15 +126,15 @@ export default function TunnelPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('确定删除此隧道?')) return;
+    if (!confirm(t('tunnel.confirmDelete'))) return;
     const res = await deleteTunnel(id);
-    if (res.code === 0) { toast.success('删除成功'); loadData(); }
+    if (res.code === 0) { toast.success(t('common.deleteSuccess')); loadData(); }
     else toast.error(res.msg);
   };
 
   const handleAssign = async () => {
     if (!assignForm.userId || !assignForm.tunnelId) {
-      toast.error('请选择用户和隧道');
+      toast.error(t('tunnel.selectUserAndTunnel'));
       return;
     }
     const res = await assignUserTunnel({
@@ -140,7 +142,7 @@ export default function TunnelPage() {
       tunnelId: parseInt(assignForm.tunnelId),
     });
     if (res.code === 0) {
-      toast.success('分配成功');
+      toast.success(t('tunnel.assignSuccess'));
       setAssignDialogOpen(false);
       setAssignForm({ userId: '', tunnelId: '' });
       loadUserTunnels();
@@ -150,21 +152,21 @@ export default function TunnelPage() {
   };
 
   const handleRemoveUserTunnel = async (userId: number, tunnelId: number) => {
-    if (!confirm('确定移除此用户的隧道权限?')) return;
+    if (!confirm(t('tunnel.removeConfirm'))) return;
     const res = await removeUserTunnel({ userId, tunnelId });
-    if (res.code === 0) { toast.success('移除成功'); loadUserTunnels(); }
+    if (res.code === 0) { toast.success(t('tunnel.removeSuccess')); loadUserTunnels(); }
     else toast.error(res.msg);
   };
 
   const getNodeName = (nodeId: number) => {
     const node = nodes.find((n: any) => n.id === nodeId);
-    return node ? node.name : `节点#${nodeId}`;
+    return node ? node.name : `${t('tunnel.nodePrefix')}${nodeId}`;
   };
 
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">无权限访问</p>
+        <p className="text-muted-foreground">{t('common.noPermission')}</p>
       </div>
     );
   }
@@ -172,39 +174,39 @@ export default function TunnelPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">隧道管理</h2>
+        <h2 className="text-2xl font-bold">{t('tunnel.title')}</h2>
       </div>
 
       <Tabs defaultValue="tunnels">
         <TabsList>
-          <TabsTrigger value="tunnels">隧道列表</TabsTrigger>
-          <TabsTrigger value="assign">用户分配</TabsTrigger>
+          <TabsTrigger value="tunnels">{t('tunnel.tunnelList')}</TabsTrigger>
+          <TabsTrigger value="assign">{t('tunnel.userAssign')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="tunnels" className="space-y-4">
           <div className="flex justify-end">
-            <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />创建隧道</Button>
+            <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />{t('tunnel.createTunnel')}</Button>
           </div>
           <Card>
             <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>名称</TableHead>
-                    <TableHead>入口节点</TableHead>
-                    <TableHead>出口节点</TableHead>
-                    <TableHead>类型</TableHead>
-                    <TableHead>协议</TableHead>
-                    <TableHead>端口范围</TableHead>
-                    <TableHead>状态</TableHead>
-                    <TableHead>操作</TableHead>
+                    <TableHead>{t('tunnel.name')}</TableHead>
+                    <TableHead>{t('tunnel.entryNode')}</TableHead>
+                    <TableHead>{t('tunnel.exitNode')}</TableHead>
+                    <TableHead>{t('tunnel.type')}</TableHead>
+                    <TableHead>{t('tunnel.protocol')}</TableHead>
+                    <TableHead>{t('tunnel.portRange')}</TableHead>
+                    <TableHead>{t('tunnel.status')}</TableHead>
+                    <TableHead>{t('tunnel.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
-                    <TableRow><TableCell colSpan={8} className="text-center py-8">加载中...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-center py-8">{t('common.loading')}</TableCell></TableRow>
                   ) : tunnels.length === 0 ? (
-                    <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">{t('common.noData')}</TableCell></TableRow>
                   ) : (
                     tunnels.map((t) => (
                       <TableRow key={t.id}>
@@ -213,7 +215,7 @@ export default function TunnelPage() {
                         <TableCell>{getNodeName(t.outNodeId)}</TableCell>
                         <TableCell>
                           <Badge variant="outline">
-                            {t.type === 1 ? '端口转发' : '隧道转发'}
+                            {t.type === 1 ? t('tunnel.portForward') : t('tunnel.tunnelForward')}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -222,7 +224,7 @@ export default function TunnelPage() {
                         <TableCell>{t.portSta} - {t.portEnd}</TableCell>
                         <TableCell>
                           <Badge variant={t.status === 1 ? 'default' : 'secondary'}>
-                            {t.status === 1 ? '正常' : '停用'}
+                            {t.status === 1 ? t('tunnel.normal') : t('tunnel.stopped')}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -247,7 +249,7 @@ export default function TunnelPage() {
         <TabsContent value="assign" className="space-y-4">
           <div className="flex justify-end">
             <Button onClick={() => setAssignDialogOpen(true)}>
-              <UserPlus className="mr-2 h-4 w-4" />分配隧道
+              <UserPlus className="mr-2 h-4 w-4" />{t('tunnel.assignBtn')}
             </Button>
           </div>
           <Card>
@@ -255,16 +257,16 @@ export default function TunnelPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>用户</TableHead>
-                    <TableHead>隧道</TableHead>
-                    <TableHead>操作</TableHead>
+                    <TableHead>{t('tunnel.user')}</TableHead>
+                    <TableHead>{t('tunnel.selectTunnel')}</TableHead>
+                    <TableHead>{t('tunnel.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {userTunnelLoading ? (
-                    <TableRow><TableCell colSpan={3} className="text-center py-8">加载中...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={3} className="text-center py-8">{t('common.loading')}</TableCell></TableRow>
                   ) : userTunnels.length === 0 ? (
-                    <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">暂无分配</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={3} className="text-center py-8 text-muted-foreground">{t('tunnel.noAssign')}</TableCell></TableRow>
                   ) : (
                     userTunnels.map((ut: any, idx: number) => (
                       <TableRow key={idx}>
@@ -289,18 +291,18 @@ export default function TunnelPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editingTunnel ? '编辑隧道' : '创建隧道'}</DialogTitle>
+            <DialogTitle>{editingTunnel ? t('tunnel.editTunnel') : t('tunnel.createTunnel')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>名称</Label>
-              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="隧道名称" />
+              <Label>{t('tunnel.name')}</Label>
+              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder={t('tunnel.tunnelName')} />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>入口节点</Label>
+                <Label>{t('tunnel.entryNode')}</Label>
                 <Select value={form.inNodeId} onValueChange={v => setForm(p => ({ ...p, inNodeId: v, ...(p.type === 'port' ? { outNodeId: v } : {}) }))}>
-                  <SelectTrigger><SelectValue placeholder="选择入口节点" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('tunnel.selectEntryNode')} /></SelectTrigger>
                   <SelectContent>
                     {nodes.map((n: any) => (
                       <SelectItem key={n.id} value={n.id.toString()}>{n.name}</SelectItem>
@@ -309,9 +311,9 @@ export default function TunnelPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>出口节点{form.type === 'port' ? ' (同入口)' : ''}</Label>
+                <Label>{form.type === 'port' ? t('tunnel.exitNodeSameEntry') : t('tunnel.exitNode')}</Label>
                 <Select value={form.outNodeId} onValueChange={v => setForm(p => ({ ...p, outNodeId: v }))} disabled={form.type === 'port'}>
-                  <SelectTrigger><SelectValue placeholder="选择出口节点" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('tunnel.selectExitNode')} /></SelectTrigger>
                   <SelectContent>
                     {nodes.map((n: any) => (
                       <SelectItem key={n.id} value={n.id.toString()}>{n.name}</SelectItem>
@@ -322,17 +324,17 @@ export default function TunnelPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>类型</Label>
+                <Label>{t('tunnel.type')}</Label>
                 <Select value={form.type} onValueChange={v => setForm(p => ({ ...p, type: v, protocol: v === 'port' ? 'tcp+udp' : 'tls', ...(v === 'port' ? { outNodeId: p.inNodeId } : {}) }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="port">端口转发</SelectItem>
-                    <SelectItem value="tunnel">隧道转发</SelectItem>
+                    <SelectItem value="port">{t('tunnel.portForward')}</SelectItem>
+                    <SelectItem value="tunnel">{t('tunnel.tunnelForward')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>协议</Label>
+                <Label>{t('tunnel.protocol')}</Label>
                 {form.type === 'port' ? (
                   <Input value="TCP+UDP" disabled className="bg-muted" />
                 ) : (
@@ -355,22 +357,22 @@ export default function TunnelPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>起始端口</Label>
+                <Label>{t('tunnel.startPort')}</Label>
                 <Input value={form.portSta} onChange={e => setForm(p => ({ ...p, portSta: e.target.value }))} placeholder="10000" />
               </div>
               <div className="space-y-2">
-                <Label>结束端口</Label>
+                <Label>{t('tunnel.endPort')}</Label>
                 <Input value={form.portEnd} onChange={e => setForm(p => ({ ...p, portEnd: e.target.value }))} placeholder="60000" />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>网卡名称 (可选)</Label>
+              <Label>{t('tunnel.nicName')}</Label>
               <Input value={form.interfaceName} onChange={e => setForm(p => ({ ...p, interfaceName: e.target.value }))} placeholder="eth0" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSubmit}>{editingTunnel ? '更新' : '创建'}</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleSubmit}>{editingTunnel ? t('common.update') : t('common.create')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -379,13 +381,13 @@ export default function TunnelPage() {
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>分配隧道给用户</DialogTitle>
+            <DialogTitle>{t('tunnel.assignTunnel')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>用户</Label>
+              <Label>{t('tunnel.user')}</Label>
               <Select value={assignForm.userId} onValueChange={v => setAssignForm(p => ({ ...p, userId: v }))}>
-                <SelectTrigger><SelectValue placeholder="选择用户" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('tunnel.selectUser')} /></SelectTrigger>
                 <SelectContent>
                   {users.map((u: any) => (
                     <SelectItem key={u.id} value={u.id.toString()}>{u.user}</SelectItem>
@@ -394,9 +396,9 @@ export default function TunnelPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>隧道</Label>
+              <Label>{t('tunnel.selectTunnel')}</Label>
               <Select value={assignForm.tunnelId} onValueChange={v => setAssignForm(p => ({ ...p, tunnelId: v }))}>
-                <SelectTrigger><SelectValue placeholder="选择隧道" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('tunnel.selectTunnel')} /></SelectTrigger>
                 <SelectContent>
                   {tunnels.map((t: any) => (
                     <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>
@@ -406,8 +408,8 @@ export default function TunnelPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>取消</Button>
-            <Button onClick={handleAssign}>分配</Button>
+            <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleAssign}>{t('tunnel.assign')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

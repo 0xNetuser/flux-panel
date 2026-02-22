@@ -10,9 +10,11 @@ import { Copy, RefreshCw, Rss, Link2, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { getSubscriptionToken, getSubscriptionLinks } from '@/lib/api/xray-subscription';
 import { useAuth } from '@/lib/hooks/use-auth';
+import { useTranslation } from '@/lib/i18n';
 
 export default function XraySubscriptionPage() {
   const { isAdmin, xrayEnabled } = useAuth();
+  const { t } = useTranslation();
   const [token, setToken] = useState('');
   const [subUrl, setSubUrl] = useState('');
   const [links, setLinks] = useState<any[]>([]);
@@ -45,7 +47,7 @@ export default function XraySubscriptionPage() {
 
   const copyToClipboard = (text: string, label?: string) => {
     navigator.clipboard.writeText(text);
-    toast.success(`${label || '内容'}已复制到剪贴板`);
+    toast.success(t('xraySub.copied', { label: label || t('common.copySuccess') }));
   };
 
   const getProtocolIcon = (protocol: string) => {
@@ -71,7 +73,7 @@ export default function XraySubscriptionPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">加载中...</p>
+        <p className="text-muted-foreground">{t('common.loading')}</p>
       </div>
     );
   }
@@ -79,7 +81,7 @@ export default function XraySubscriptionPage() {
   if (!isAdmin && !xrayEnabled) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">你没有 Xray 代理权限，请联系管理员</p>
+        <p className="text-muted-foreground">{t('xraySub.noPermission')}</p>
       </div>
     );
   }
@@ -87,9 +89,9 @@ export default function XraySubscriptionPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">订阅管理</h2>
+        <h2 className="text-2xl font-bold">{t('xraySub.title')}</h2>
         <Button variant="outline" onClick={loadData}>
-          <RefreshCw className="mr-2 h-4 w-4" />刷新
+          <RefreshCw className="mr-2 h-4 w-4" />{t('xraySub.refresh')}
         </Button>
       </div>
 
@@ -97,21 +99,21 @@ export default function XraySubscriptionPage() {
       <Card>
         <CardHeader className="flex flex-row items-center gap-3 pb-2">
           <Rss className="h-5 w-5 text-primary" />
-          <CardTitle className="text-lg">订阅地址</CardTitle>
+          <CardTitle className="text-lg">{t('xraySub.subAddress')}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            将以下订阅地址添加到你的代理客户端中 (如 V2rayN, Clash, Shadowrocket 等)
+            {t('xraySub.subAddressDescription')}
           </p>
           {subUrl ? (
             <div className="flex gap-2">
               <Input value={subUrl} readOnly className="font-mono text-sm" />
-              <Button onClick={() => copyToClipboard(subUrl, '订阅地址')}>
-                <Copy className="mr-2 h-4 w-4" />复制
+              <Button onClick={() => copyToClipboard(subUrl, t('xraySub.subAddrCopied'))}>
+                <Copy className="mr-2 h-4 w-4" />{t('xraySub.copySubAddr')}
               </Button>
             </div>
           ) : (
-            <p className="text-muted-foreground text-sm">暂无订阅地址，请联系管理员</p>
+            <p className="text-muted-foreground text-sm">{t('xraySub.noSubAddress')}</p>
           )}
           {token && (
             <div className="text-xs text-muted-foreground">
@@ -126,16 +128,16 @@ export default function XraySubscriptionPage() {
         <Card>
           <CardHeader className="flex flex-row items-center gap-3 pb-2">
             <Link2 className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">协议链接</CardTitle>
+            <CardTitle className="text-lg">{t('xraySub.protocolLinks')}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>协议</TableHead>
-                  <TableHead>名称</TableHead>
-                  <TableHead>地址</TableHead>
-                  <TableHead>操作</TableHead>
+                  <TableHead>{t('xraySub.protocolCol')}</TableHead>
+                  <TableHead>{t('xraySub.nameCol')}</TableHead>
+                  <TableHead>{t('xraySub.addressCol')}</TableHead>
+                  <TableHead>{t('xraySub.actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -157,8 +159,8 @@ export default function XraySubscriptionPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => copyToClipboard(link.link || link.url || '', '链接')}
-                          title="复制链接"
+                          onClick={() => copyToClipboard(link.link || link.url || '', t('xraySub.copyLink'))}
+                          title={t('xraySub.copyLink')}
                         >
                           <Copy className="h-4 w-4" />
                         </Button>
@@ -175,7 +177,7 @@ export default function XraySubscriptionPage() {
       {links.length === 0 && (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
-            暂无协议链接。请确保管理员已为您分配客户端。
+            {t('xraySub.noProtocolLinks')}
           </CardContent>
         </Card>
       )}

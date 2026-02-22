@@ -28,9 +28,11 @@ import { getAllUsers } from '@/lib/api/user';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { randomUUID } from '@/lib/utils/random';
 import InboundDialog from './_components/inbound-dialog';
+import { useTranslation } from '@/lib/i18n';
 
 export default function XrayInboundPage() {
   const { isAdmin, xrayEnabled } = useAuth();
+  const { t } = useTranslation();
   const [inbounds, setInbounds] = useState<any[]>([]);
   const [nodes, setNodes] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -162,7 +164,7 @@ export default function XrayInboundPage() {
       }
 
       if (res.code === 0) {
-        toast.success(data.id ? '更新成功' : '创建成功');
+        toast.success(data.id ? t('common.updateSuccess') : t('common.createSuccess'));
         if (res.msg && res.msg !== '操作成功') {
           toast.warning(res.msg);
         }
@@ -177,12 +179,12 @@ export default function XrayInboundPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('确定删除此入站? 相关客户端也将被删除。')) return;
+    if (!confirm(t('xrayInbound.confirmDeleteInbound'))) return;
     setOperatingIds(prev => new Set(prev).add(id));
     try {
       const res = await deleteXrayInbound(id);
       if (res.code === 0) {
-        toast.success('删除成功');
+        toast.success(t('common.deleteSuccess'));
         loadData();
       } else {
         toast.error(res.msg);
@@ -199,7 +201,7 @@ export default function XrayInboundPage() {
         ? await disableXrayInbound(inbound.id)
         : await enableXrayInbound(inbound.id);
       if (res.code === 0) {
-        toast.success(inbound.enable ? '已禁用' : '已启用');
+        toast.success(inbound.enable ? t('xrayInbound.disabledStatus') : t('xrayInbound.enabledStatus'));
         loadData();
       } else {
         toast.error(res.msg);
@@ -253,7 +255,7 @@ export default function XrayInboundPage() {
 
   const handleClientSubmit = async () => {
     if (!clientInboundId || !clientForm.uuid) {
-      toast.error('请填写UUID');
+      toast.error(t('xrayInbound.fillUuid'));
       return;
     }
 
@@ -279,7 +281,7 @@ export default function XrayInboundPage() {
     }
 
     if (res.code === 0) {
-      toast.success(editingClient ? '更新成功' : '创建成功');
+      toast.success(editingClient ? t('common.updateSuccess') : t('common.createSuccess'));
       setClientDialogOpen(false);
       loadClients(clientInboundId);
       loadData(); // refresh client counts
@@ -289,10 +291,10 @@ export default function XrayInboundPage() {
   };
 
   const handleClientDelete = async (id: number, inboundId: number) => {
-    if (!confirm('确定删除此客户端?')) return;
+    if (!confirm(t('xrayInbound.confirmDeleteClient'))) return;
     const res = await deleteXrayClient(id);
     if (res.code === 0) {
-      toast.success('删除成功');
+      toast.success(t('common.deleteSuccess'));
       loadClients(inboundId);
       loadData();
     } else {
@@ -301,10 +303,10 @@ export default function XrayInboundPage() {
   };
 
   const handleResetTraffic = async (id: number, inboundId: number) => {
-    if (!confirm('确定重置此客户端的流量?')) return;
+    if (!confirm(t('xrayInbound.confirmResetTraffic'))) return;
     const res = await resetXrayClientTraffic(id);
     if (res.code === 0) {
-      toast.success('流量已重置');
+      toast.success(t('xrayInbound.trafficReset'));
       loadClients(inboundId);
     } else {
       toast.error(res.msg);
@@ -316,12 +318,12 @@ export default function XrayInboundPage() {
       const res = await getXrayClientLink(id);
       if (res.code === 0 && res.data?.link) {
         await navigator.clipboard.writeText(res.data.link);
-        toast.success('链接已复制到剪贴板');
+        toast.success(t('xrayInbound.linkCopied'));
       } else {
-        toast.error(res.msg || '无可用链接');
+        toast.error(res.msg || t('xrayInbound.noLink'));
       }
     } catch {
-      toast.error('获取链接失败');
+      toast.error(t('xrayInbound.linkFailed'));
     }
   };
 
@@ -333,17 +335,17 @@ export default function XrayInboundPage() {
         setQrRemark(res.data.remark || '');
         setQrDialogOpen(true);
       } else {
-        toast.error(res.msg || '无可用链接');
+        toast.error(res.msg || t('xrayInbound.noLink'));
       }
     } catch {
-      toast.error('获取链接失败');
+      toast.error(t('xrayInbound.linkFailed'));
     }
   };
 
   if (!isAdmin && !xrayEnabled) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">无权限访问</p>
+        <p className="text-muted-foreground">{t('xrayInbound.noPermission')}</p>
       </div>
     );
   }
@@ -358,8 +360,8 @@ export default function XrayInboundPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">入站管理</h2>
-        <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />创建入站</Button>
+        <h2 className="text-2xl font-bold">{t('xrayInbound.title')}</h2>
+        <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />{t('xrayInbound.createInbound')}</Button>
       </div>
 
       <Card>
@@ -368,21 +370,21 @@ export default function XrayInboundPage() {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-8"></TableHead>
-                <TableHead>备注</TableHead>
-                <TableHead>协议</TableHead>
-                <TableHead>传输/安全</TableHead>
-                <TableHead>监听地址</TableHead>
-                <TableHead>节点</TableHead>
-                <TableHead>客户端数</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead>操作</TableHead>
+                <TableHead>{t('xrayInbound.remark')}</TableHead>
+                <TableHead>{t('xrayInbound.protocol')}</TableHead>
+                <TableHead>{t('xrayInbound.transportSecurity')}</TableHead>
+                <TableHead>{t('xrayInbound.listenAddr')}</TableHead>
+                <TableHead>{t('xrayInbound.node')}</TableHead>
+                <TableHead>{t('xrayInbound.clientCount')}</TableHead>
+                <TableHead>{t('xrayInbound.status')}</TableHead>
+                <TableHead>{t('xrayInbound.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8">加载中...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center py-8">{t('common.loading')}</TableCell></TableRow>
               ) : inbounds.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
+                <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">{t('common.noData')}</TableCell></TableRow>
               ) : (
                 inbounds.map((ib) => (
                   <Fragment key={ib.id}>
@@ -405,18 +407,18 @@ export default function XrayInboundPage() {
                       <TableCell>{ib.clientCount ?? ib.clients ?? 0}</TableCell>
                       <TableCell>
                         <Badge variant={ib.enable ? 'default' : 'secondary'}>
-                          {ib.enable ? '启用' : '禁用'}
+                          {ib.enable ? t('xrayInbound.enabledStatus') : t('xrayInbound.disabledStatus')}
                         </Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" onClick={() => handleEdit(ib)} title="编辑" disabled={operatingIds.has(ib.id)}>
+                          <Button variant="ghost" size="icon" onClick={() => handleEdit(ib)} title={t('xrayInbound.actions')} disabled={operatingIds.has(ib.id)}>
                             <Edit2 className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleToggleEnable(ib)} title={ib.enable ? '禁用' : '启用'} disabled={operatingIds.has(ib.id)}>
+                          <Button variant="ghost" size="icon" onClick={() => handleToggleEnable(ib)} title={ib.enable ? t('xrayInbound.disabledStatus') : t('xrayInbound.enabledStatus')} disabled={operatingIds.has(ib.id)}>
                             {operatingIds.has(ib.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : ib.enable ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(ib.id)} className="text-destructive" title="删除" disabled={operatingIds.has(ib.id)}>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(ib.id)} className="text-destructive" title={t('xrayInbound.actions')} disabled={operatingIds.has(ib.id)}>
                             {operatingIds.has(ib.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                           </Button>
                         </div>
@@ -429,32 +431,32 @@ export default function XrayInboundPage() {
                         <TableCell colSpan={9} className="p-0 bg-muted/30">
                           <div className="p-4">
                             <div className="flex items-center justify-between mb-3">
-                              <h4 className="text-sm font-semibold">客户端列表</h4>
+                              <h4 className="text-sm font-semibold">{t('xrayInbound.clientList')}</h4>
                               <Button size="sm" onClick={() => handleClientCreate(ib.id)}>
-                                <Plus className="mr-1 h-3 w-3" />添加客户端
+                                <Plus className="mr-1 h-3 w-3" />{t('xrayInbound.addClient')}
                               </Button>
                             </div>
                             {clientsLoading[ib.id] ? (
                               <div className="flex items-center justify-center py-4 text-muted-foreground text-sm">
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />加载中...
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />{t('common.loading')}
                               </div>
                             ) : (clients[ib.id] || []).length === 0 ? (
-                              <p className="text-center py-4 text-muted-foreground text-sm">暂无客户端</p>
+                              <p className="text-center py-4 text-muted-foreground text-sm">{t('xrayInbound.noClients')}</p>
                             ) : (
                               <div className="rounded border overflow-hidden">
                                 <Table>
                                   <TableHeader>
                                     <TableRow>
-                                      <TableHead className="text-xs">Email</TableHead>
-                                      {isAdmin && <TableHead className="text-xs">用户</TableHead>}
-                                      <TableHead className="text-xs">UUID/密码</TableHead>
-                                      <TableHead className="text-xs">Flow</TableHead>
-                                      <TableHead className="text-xs">上传/下载</TableHead>
-                                      <TableHead className="text-xs">流量限制</TableHead>
-                                      <TableHead className="text-xs">IP 限制</TableHead>
-                                      <TableHead className="text-xs">到期时间</TableHead>
-                                      <TableHead className="text-xs">状态</TableHead>
-                                      <TableHead className="text-xs">操作</TableHead>
+                                      <TableHead className="text-xs">{t('xrayInbound.email')}</TableHead>
+                                      {isAdmin && <TableHead className="text-xs">{t('xrayInbound.user')}</TableHead>}
+                                      <TableHead className="text-xs">{t('xrayInbound.uuidPassword')}</TableHead>
+                                      <TableHead className="text-xs">{t('xrayInbound.flowLabel')}</TableHead>
+                                      <TableHead className="text-xs">{t('xrayInbound.uploadDownload')}</TableHead>
+                                      <TableHead className="text-xs">{t('xrayInbound.trafficLimit')}</TableHead>
+                                      <TableHead className="text-xs">{t('xrayInbound.ipLimit')}</TableHead>
+                                      <TableHead className="text-xs">{t('xrayInbound.expireTime')}</TableHead>
+                                      <TableHead className="text-xs">{t('xrayInbound.clientStatus')}</TableHead>
+                                      <TableHead className="text-xs">{t('xrayInbound.actions')}</TableHead>
                                     </TableRow>
                                   </TableHeader>
                                   <TableBody>
@@ -475,40 +477,40 @@ export default function XrayInboundPage() {
                                             {formatBytes(c.upTraffic || c.up || 0)} / {formatBytes(c.downTraffic || c.down || 0)}
                                           </TableCell>
                                           <TableCell className="text-xs">
-                                            {c.totalTraffic ? formatBytes(c.totalTraffic) : '无限'}
+                                            {c.totalTraffic ? formatBytes(c.totalTraffic) : t('common.unlimited')}
                                           </TableCell>
                                           <TableCell className="text-xs">
-                                            {c.limitIp ? c.limitIp : '无限'}
+                                            {c.limitIp ? c.limitIp : t('common.unlimited')}
                                           </TableCell>
                                           <TableCell className="text-xs">
-                                            {c.expTime ? new Date(c.expTime).toLocaleDateString() : '永不'}
+                                            {c.expTime ? new Date(c.expTime).toLocaleDateString() : t('common.neverExpire')}
                                           </TableCell>
                                           <TableCell>
                                             {isExpired ? (
-                                              <Badge variant="destructive" className="text-xs">已过期</Badge>
+                                              <Badge variant="destructive" className="text-xs">{t('xrayInbound.expired')}</Badge>
                                             ) : isOverTraffic ? (
-                                              <Badge variant="destructive" className="text-xs">超限</Badge>
+                                              <Badge variant="destructive" className="text-xs">{t('xrayInbound.overLimit')}</Badge>
                                             ) : c.enable === 0 ? (
-                                              <Badge variant="secondary" className="text-xs">禁用</Badge>
+                                              <Badge variant="secondary" className="text-xs">{t('xrayInbound.disabledStatus')}</Badge>
                                             ) : (
-                                              <Badge variant="default" className="text-xs">启用</Badge>
+                                              <Badge variant="default" className="text-xs">{t('xrayInbound.enabledStatus')}</Badge>
                                             )}
                                           </TableCell>
                                           <TableCell>
                                             <div className="flex gap-0.5">
-                                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleClientEdit(c)} title="编辑">
+                                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleClientEdit(c)} title={t('xrayInbound.actions')}>
                                                 <Edit2 className="h-3 w-3" />
                                               </Button>
-                                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleResetTraffic(c.id, ib.id)} title="重置流量">
+                                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleResetTraffic(c.id, ib.id)} title={t('xrayInbound.trafficReset')}>
                                                 <RotateCcw className="h-3 w-3" />
                                               </Button>
-                                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCopyLink(c.id)} title="复制链接">
+                                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleCopyLink(c.id)} title={t('xrayInbound.copyLink')}>
                                                 <Copy className="h-3 w-3" />
                                               </Button>
-                                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleShowQR(c.id)} title="二维码">
+                                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleShowQR(c.id)} title={t('xrayInbound.qrCode')}>
                                                 <QrCode className="h-3 w-3" />
                                               </Button>
-                                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleClientDelete(c.id, ib.id)} title="删除">
+                                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleClientDelete(c.id, ib.id)} title={t('xrayInbound.actions')}>
                                                 <Trash2 className="h-3 w-3" />
                                               </Button>
                                             </div>
@@ -546,7 +548,7 @@ export default function XrayInboundPage() {
       <Dialog open={qrDialogOpen} onOpenChange={setQrDialogOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>{qrRemark || '二维码'}</DialogTitle>
+            <DialogTitle>{qrRemark || t('xrayInbound.qrCode')}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col items-center gap-4">
             <QRCodeSVG value={qrLink} size={256} />
@@ -559,10 +561,10 @@ export default function XrayInboundPage() {
               className="w-full"
               onClick={() => {
                 navigator.clipboard.writeText(qrLink);
-                toast.success('链接已复制到剪贴板');
+                toast.success(t('xrayInbound.linkCopied'));
               }}
             >
-              <Copy className="mr-2 h-4 w-4" />复制链接
+              <Copy className="mr-2 h-4 w-4" />{t('xrayInbound.copyLink')}
             </Button>
           </div>
         </DialogContent>
@@ -572,17 +574,17 @@ export default function XrayInboundPage() {
       <Dialog open={clientDialogOpen} onOpenChange={setClientDialogOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingClient ? '编辑客户端' : '创建客户端'}</DialogTitle>
+            <DialogTitle>{editingClient ? t('xrayInbound.editClient') : t('xrayInbound.createClient')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {isAdmin && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>用户 (可选)</Label>
+                  <Label>{t('xrayInbound.userOptional')}</Label>
                   <Select value={clientForm.userId} onValueChange={v => setClientForm(p => ({ ...p, userId: v }))}>
-                    <SelectTrigger><SelectValue placeholder="选择用户" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t('xrayInbound.selectUser')} /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="0">不绑定</SelectItem>
+                      <SelectItem value="0">{t('xrayInbound.noBind')}</SelectItem>
                       {users.map((u: any) => (
                         <SelectItem key={u.id} value={u.id.toString()}>{u.user}</SelectItem>
                       ))}
@@ -590,16 +592,16 @@ export default function XrayInboundPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Email</Label>
+                  <Label>{t('xrayInbound.email')}</Label>
                   <Input value={clientForm.email} onChange={e => setClientForm(p => ({ ...p, email: e.target.value }))} placeholder="client@example.com" />
                 </div>
               </div>
             )}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>UUID / 密码</Label>
+                <Label>{t('xrayInbound.uuidLabel')}</Label>
                 <Button type="button" variant="ghost" size="sm" onClick={() => setClientForm(p => ({ ...p, uuid: randomUUID() }))}>
-                  <RefreshCw className="mr-1 h-3 w-3" />生成
+                  <RefreshCw className="mr-1 h-3 w-3" />{t('xrayInbound.generate')}
                 </Button>
               </div>
               <Input value={clientForm.uuid} onChange={e => setClientForm(p => ({ ...p, uuid: e.target.value }))} placeholder="UUID" className="font-mono text-sm" />
@@ -609,9 +611,9 @@ export default function XrayInboundPage() {
                 <div className="space-y-2">
                   <Label>Flow</Label>
                   <Select value={clientForm.flow || '_none'} onValueChange={v => setClientForm(p => ({ ...p, flow: v === '_none' ? '' : v }))}>
-                    <SelectTrigger><SelectValue placeholder="选择 Flow" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t('xrayInbound.selectFlow')} /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="_none">无</SelectItem>
+                      <SelectItem value="_none">{t('xrayInbound.none')}</SelectItem>
                       <SelectItem value="xtls-rprx-vision">xtls-rprx-vision</SelectItem>
                       <SelectItem value="xtls-rprx-vision-udp443">xtls-rprx-vision-udp443</SelectItem>
                     </SelectContent>
@@ -625,28 +627,28 @@ export default function XrayInboundPage() {
               )}
               {isVMessClient ? (
                 <div className="space-y-2">
-                  <Label>AlterID</Label>
+                  <Label>{t('xrayInbound.alterId')}</Label>
                   <Input type="number" value={clientForm.alterId} onChange={e => setClientForm(p => ({ ...p, alterId: e.target.value }))} placeholder="0" />
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <Label>AlterID</Label>
+                  <Label>{t('xrayInbound.alterId')}</Label>
                   <Input type="number" value={clientForm.alterId} onChange={e => setClientForm(p => ({ ...p, alterId: e.target.value }))} placeholder="0" />
                 </div>
               )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>流量限制 (GB)</Label>
+                <Label>{t('xrayInbound.trafficLimitGb')}</Label>
                 <Input
                   type="number"
                   value={clientForm.totalTraffic}
                   onChange={e => setClientForm(p => ({ ...p, totalTraffic: e.target.value }))}
-                  placeholder="0 = 无限"
+                  placeholder={t('xrayInbound.noReset')}
                 />
               </div>
               <div className="space-y-2">
-                <Label>到期时间</Label>
+                <Label>{t('xrayInbound.expireTime')}</Label>
                 <Input
                   type="datetime-local"
                   value={clientForm.expTime}
@@ -656,7 +658,7 @@ export default function XrayInboundPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>IP 限制</Label>
+                <Label>{t('xrayInbound.ipLimit')}</Label>
                 <Input
                   type="number"
                   value={clientForm.limitIp}
@@ -665,23 +667,23 @@ export default function XrayInboundPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>流量重置周期 (天)</Label>
+                <Label>{t('xrayInbound.resetCycleDays')}</Label>
                 <Input
                   type="number"
                   value={clientForm.reset}
                   onChange={e => setClientForm(p => ({ ...p, reset: e.target.value }))}
-                  placeholder="0 = 不重置"
+                  placeholder={t('xrayInbound.noReset')}
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>备注</Label>
-              <Input value={clientForm.remark} onChange={e => setClientForm(p => ({ ...p, remark: e.target.value }))} placeholder="备注" />
+              <Label>{t('xrayInbound.remark')}</Label>
+              <Input value={clientForm.remark} onChange={e => setClientForm(p => ({ ...p, remark: e.target.value }))} placeholder={t('xrayInbound.remark')} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setClientDialogOpen(false)}>取消</Button>
-            <Button onClick={handleClientSubmit}>{editingClient ? '更新' : '创建'}</Button>
+            <Button variant="outline" onClick={() => setClientDialogOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleClientSubmit}>{editingClient ? t('common.confirm') : t('common.confirm')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

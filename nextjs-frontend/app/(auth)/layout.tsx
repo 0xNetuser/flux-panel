@@ -17,40 +17,44 @@ import {
 import { useAuth, logout } from '@/lib/hooks/use-auth';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { LanguageSwitcher } from '@/components/language-switcher';
+import { useTranslation } from '@/lib/i18n';
 import { getVersion } from '@/lib/api/system';
 
 interface NavItem {
   path: string;
-  label: string;
+  labelKey: string;
   icon: React.ReactNode;
   adminOnly?: boolean;
   section?: string;
+  sectionKey?: string;
 }
 
 const navItems: NavItem[] = [
-  { path: '/dashboard', label: '仪表板', icon: <LayoutDashboard className="h-4 w-4" /> },
+  { path: '/dashboard', labelKey: 'nav.dashboard', icon: <LayoutDashboard className="h-4 w-4" /> },
   // GOST
-  { path: '/forward', label: '转发管理', icon: <ArrowRightLeft className="h-4 w-4" />, section: 'GOST' },
-  { path: '/tunnel', label: '隧道管理', icon: <Link2 className="h-4 w-4" />, adminOnly: true, section: 'GOST' },
-  { path: '/limit', label: '限速规则', icon: <Clock className="h-4 w-4" />, adminOnly: true, section: 'GOST' },
+  { path: '/forward', labelKey: 'nav.forward', icon: <ArrowRightLeft className="h-4 w-4" />, section: 'GOST', sectionKey: 'GOST' },
+  { path: '/tunnel', labelKey: 'nav.tunnel', icon: <Link2 className="h-4 w-4" />, adminOnly: true, section: 'GOST', sectionKey: 'GOST' },
+  { path: '/limit', labelKey: 'nav.limit', icon: <Clock className="h-4 w-4" />, adminOnly: true, section: 'GOST', sectionKey: 'GOST' },
   // Xray
-  { path: '/xray/inbound', label: '入站管理', icon: <Inbox className="h-4 w-4" />, section: 'Xray' },
-  { path: '/xray/certificate', label: '证书管理', icon: <Award className="h-4 w-4" />, section: 'Xray' },
-  { path: '/xray/subscription', label: '订阅管理', icon: <Rss className="h-4 w-4" />, section: 'Xray' },
+  { path: '/xray/inbound', labelKey: 'nav.xrayInbound', icon: <Inbox className="h-4 w-4" />, section: 'Xray', sectionKey: 'Xray' },
+  { path: '/xray/certificate', labelKey: 'nav.xrayCert', icon: <Award className="h-4 w-4" />, section: 'Xray', sectionKey: 'Xray' },
+  { path: '/xray/subscription', labelKey: 'nav.xraySub', icon: <Rss className="h-4 w-4" />, section: 'Xray', sectionKey: 'Xray' },
   // System
-  { path: '/node', label: '节点管理', icon: <Server className="h-4 w-4" />, adminOnly: true, section: '系统' },
-  { path: '/user', label: '用户管理', icon: <Users className="h-4 w-4" />, adminOnly: true, section: '系统' },
-  { path: '/monitor', label: '状态监控', icon: <Activity className="h-4 w-4" />, adminOnly: true, section: '系统' },
-  { path: '/config', label: '系统配置', icon: <Settings className="h-4 w-4" />, adminOnly: true, section: '系统' },
+  { path: '/node', labelKey: 'nav.node', icon: <Server className="h-4 w-4" />, adminOnly: true, section: 'system', sectionKey: 'nav.system' },
+  { path: '/user', labelKey: 'nav.user', icon: <Users className="h-4 w-4" />, adminOnly: true, section: 'system', sectionKey: 'nav.system' },
+  { path: '/monitor', labelKey: 'nav.monitor', icon: <Activity className="h-4 w-4" />, adminOnly: true, section: 'system', sectionKey: 'nav.system' },
+  { path: '/config', labelKey: 'nav.config', icon: <Settings className="h-4 w-4" />, adminOnly: true, section: 'system', sectionKey: 'nav.system' },
 ];
 
-function SidebarContent({ pathname, isAdmin, gostEnabled, xrayEnabled, onNavigate, version }: {
+function SidebarContent({ pathname, isAdmin, gostEnabled, xrayEnabled, onNavigate, version, t }: {
   pathname: string;
   isAdmin: boolean;
   gostEnabled: boolean;
   xrayEnabled: boolean;
   onNavigate: (path: string) => void;
   version: string;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   const filtered = navItems.filter(item => {
     if (item.adminOnly && !isAdmin) return false;
@@ -77,12 +81,13 @@ function SidebarContent({ pathname, isAdmin, gostEnabled, xrayEnabled, onNavigat
           const showSection = item.section && item.section !== lastSection;
           if (item.section) lastSection = item.section;
           const isActive = pathname === item.path;
+          const sectionLabel = item.sectionKey?.startsWith('nav.') ? t(item.sectionKey) : item.sectionKey;
 
           return (
             <div key={item.path}>
               {showSection && (
                 <p className="px-3 pt-4 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  {item.section}
+                  {sectionLabel}
                 </p>
               )}
               <Link
@@ -96,7 +101,7 @@ function SidebarContent({ pathname, isAdmin, gostEnabled, xrayEnabled, onNavigat
                 }`}
               >
                 {item.icon}
-                <span>{item.label}</span>
+                <span>{t(item.labelKey)}</span>
               </Link>
             </div>
           );
@@ -118,6 +123,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const { isAuthenticated, isAdmin, username, gostEnabled, xrayEnabled, loading } = useAuth();
   const isMobile = useIsMobile();
+  const { t } = useTranslation();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [panelVersion, setPanelVersion] = useState('');
 
@@ -134,7 +140,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   if (loading || !isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">加载中...</p>
+        <p className="text-muted-foreground">{t('common.loading')}</p>
       </div>
     );
   }
@@ -148,7 +154,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       {/* Desktop sidebar */}
       {!isMobile && (
         <aside className="w-64 border-r bg-card flex-shrink-0">
-          <SidebarContent pathname={pathname} isAdmin={isAdmin} gostEnabled={gostEnabled} xrayEnabled={xrayEnabled} onNavigate={handleNavigate} version={panelVersion} />
+          <SidebarContent pathname={pathname} isAdmin={isAdmin} gostEnabled={gostEnabled} xrayEnabled={xrayEnabled} onNavigate={handleNavigate} version={panelVersion} t={t} />
         </aside>
       )}
 
@@ -165,12 +171,13 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
                   </Button>
                 </SheetTrigger>
                 <SheetContent side="left" className="w-64 p-0">
-                  <SidebarContent pathname={pathname} isAdmin={isAdmin} gostEnabled={gostEnabled} xrayEnabled={xrayEnabled} onNavigate={handleNavigate} version={panelVersion} />
+                  <SidebarContent pathname={pathname} isAdmin={isAdmin} gostEnabled={gostEnabled} xrayEnabled={xrayEnabled} onNavigate={handleNavigate} version={panelVersion} t={t} />
                 </SheetContent>
               </Sheet>
             )}
           </div>
           <div className="flex items-center gap-1">
+            <LanguageSwitcher />
             <ThemeToggle />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -182,11 +189,11 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => router.push('/change-password')}>
                 <KeyRound className="mr-2 h-4 w-4" />
-                修改密码
+                {t('nav.changePassword')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={logout} className="text-destructive">
                 <LogOut className="mr-2 h-4 w-4" />
-                退出登录
+                {t('nav.logout')}
               </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

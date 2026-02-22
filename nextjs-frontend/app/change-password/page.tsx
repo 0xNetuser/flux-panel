@@ -10,9 +10,11 @@ import { KeyRound, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { updatePassword } from '@/lib/api/auth';
 import { logout } from '@/lib/hooks/use-auth';
+import { useTranslation } from '@/lib/i18n';
 
 export default function ChangePasswordPage() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [form, setForm] = useState({
     newUsername: '',
     currentPassword: '',
@@ -25,17 +27,17 @@ export default function ChangePasswordPage() {
     e.preventDefault();
 
     if (!form.currentPassword || !form.newPassword) {
-      toast.error('请填写当前密码和新密码');
+      toast.error(t('changePassword.fillRequired'));
       return;
     }
 
     if (form.newPassword !== form.confirmPassword) {
-      toast.error('两次输入的新密码不一致');
+      toast.error(t('changePassword.passwordMismatch'));
       return;
     }
 
     if (form.newPassword.length < 6) {
-      toast.error('新密码长度不能少于6位');
+      toast.error(t('changePassword.passwordTooShort'));
       return;
     }
 
@@ -51,15 +53,15 @@ export default function ChangePasswordPage() {
 
       const res = await updatePassword(data);
       if (res.code === 0) {
-        toast.success('密码修改成功，请重新登录');
+        toast.success(t('changePassword.success'));
         setTimeout(() => {
           logout();
         }, 1000);
       } else {
-        toast.error(res.msg || '修改失败');
+        toast.error(res.msg || t('changePassword.failed'));
       }
     } catch {
-      toast.error('网络请求失败');
+      toast.error(t('common.networkError'));
     } finally {
       setLoading(false);
     }
@@ -72,59 +74,59 @@ export default function ChangePasswordPage() {
           <div className="flex justify-center mb-2">
             <KeyRound className="h-8 w-8 text-primary" />
           </div>
-          <CardTitle className="text-2xl">修改密码</CardTitle>
-          <CardDescription>修改完成后需要重新登录</CardDescription>
+          <CardTitle className="text-2xl">{t('changePassword.title')}</CardTitle>
+          <CardDescription>{t('changePassword.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="newUsername">新用户名 (可选)</Label>
+              <Label htmlFor="newUsername">{t('changePassword.newUsername')}</Label>
               <Input
                 id="newUsername"
                 value={form.newUsername}
                 onChange={e => setForm(p => ({ ...p, newUsername: e.target.value }))}
-                placeholder="留空则不修改用户名"
+                placeholder={t('changePassword.leaveBlankUsername')}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="currentPassword">当前密码</Label>
+              <Label htmlFor="currentPassword">{t('changePassword.currentPassword')}</Label>
               <Input
                 id="currentPassword"
                 type="password"
                 value={form.currentPassword}
                 onChange={e => setForm(p => ({ ...p, currentPassword: e.target.value }))}
-                placeholder="请输入当前密码"
+                placeholder={t('changePassword.enterCurrentPassword')}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="newPassword">新密码</Label>
+              <Label htmlFor="newPassword">{t('changePassword.newPassword')}</Label>
               <Input
                 id="newPassword"
                 type="password"
                 value={form.newPassword}
                 onChange={e => setForm(p => ({ ...p, newPassword: e.target.value }))}
-                placeholder="请输入新密码"
+                placeholder={t('changePassword.enterNewPassword')}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">确认新密码</Label>
+              <Label htmlFor="confirmPassword">{t('changePassword.confirmPassword')}</Label>
               <Input
                 id="confirmPassword"
                 type="password"
                 value={form.confirmPassword}
                 onChange={e => setForm(p => ({ ...p, confirmPassword: e.target.value }))}
-                placeholder="再次输入新密码"
+                placeholder={t('changePassword.reenterNewPassword')}
                 required
               />
             </div>
             <div className="flex gap-2">
               <Button type="button" variant="outline" className="flex-1" onClick={() => router.back()}>
-                <ArrowLeft className="mr-2 h-4 w-4" />返回
+                <ArrowLeft className="mr-2 h-4 w-4" />{t('changePassword.back')}
               </Button>
               <Button type="submit" className="flex-1" disabled={loading}>
-                {loading ? '提交中...' : '确认修改'}
+                {loading ? t('changePassword.submitting') : t('changePassword.confirm')}
               </Button>
             </div>
           </form>

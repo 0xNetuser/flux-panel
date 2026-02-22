@@ -13,9 +13,11 @@ import { toast } from 'sonner';
 import { getSpeedLimitList, createSpeedLimit, updateSpeedLimit, deleteSpeedLimit } from '@/lib/api/config';
 import { getTunnelList } from '@/lib/api/tunnel';
 import { useAuth } from '@/lib/hooks/use-auth';
+import { useTranslation } from '@/lib/i18n';
 
 export default function LimitPage() {
   const { isAdmin } = useAuth();
+  const { t } = useTranslation();
   const [limits, setLimits] = useState<any[]>([]);
   const [tunnels, setTunnels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,11 +56,11 @@ export default function LimitPage() {
 
   const handleSubmit = async () => {
     if (!form.name || !form.speed) {
-      toast.error('请填写名称和限速值');
+      toast.error(t('limit.fillNameAndSpeed'));
       return;
     }
     if (!editingLimit && !form.tunnelId) {
-      toast.error('请选择隧道');
+      toast.error(t('limit.selectTunnelRequired'));
       return;
     }
     const data: any = {
@@ -77,7 +79,7 @@ export default function LimitPage() {
     }
 
     if (res.code === 0) {
-      toast.success(editingLimit ? '更新成功' : '创建成功');
+      toast.success(editingLimit ? t('common.updateSuccess') : t('common.createSuccess'));
       setDialogOpen(false);
       loadData();
     } else {
@@ -86,9 +88,9 @@ export default function LimitPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('确定删除此限速规则?')) return;
+    if (!confirm(t('limit.confirmDelete'))) return;
     const res = await deleteSpeedLimit(id);
-    if (res.code === 0) { toast.success('删除成功'); loadData(); }
+    if (res.code === 0) { toast.success(t('common.deleteSuccess')); loadData(); }
     else toast.error(res.msg);
   };
 
@@ -103,8 +105,8 @@ export default function LimitPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">限速规则</h2>
-        <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />创建规则</Button>
+        <h2 className="text-2xl font-bold">{t('limit.title')}</h2>
+        <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />{t('limit.createRule')}</Button>
       </div>
 
       <Card>
@@ -112,17 +114,17 @@ export default function LimitPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>名称</TableHead>
-                <TableHead>速度 (Mbps)</TableHead>
-                <TableHead>隧道</TableHead>
-                <TableHead>操作</TableHead>
+                <TableHead>{t('limit.name')}</TableHead>
+                <TableHead>{t('limit.speedMbps')}</TableHead>
+                <TableHead>{t('limit.tunnel')}</TableHead>
+                <TableHead>{t('limit.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={4} className="text-center py-8">加载中...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center py-8">{t('common.loading')}</TableCell></TableRow>
               ) : limits.length === 0 ? (
-                <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">{t('common.noData')}</TableCell></TableRow>
               ) : (
                 limits.map((l) => (
                   <TableRow key={l.id}>
@@ -151,14 +153,14 @@ export default function LimitPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingLimit ? '编辑限速规则' : '创建限速规则'}</DialogTitle>
+            <DialogTitle>{editingLimit ? t('limit.editRule') : t('limit.createRuleTitle')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             {!editingLimit && (
               <div className="space-y-2">
-                <Label>隧道</Label>
+                <Label>{t('limit.tunnel')}</Label>
                 <Select value={form.tunnelId} onValueChange={v => setForm(p => ({ ...p, tunnelId: v }))}>
-                  <SelectTrigger><SelectValue placeholder="选择隧道" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('limit.selectTunnel')} /></SelectTrigger>
                   <SelectContent>
                     {tunnels.map((t: any) => (
                       <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>
@@ -168,22 +170,22 @@ export default function LimitPage() {
               </div>
             )}
             <div className="space-y-2">
-              <Label>规则名称</Label>
-              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="例: 50M限速" />
+              <Label>{t('limit.name')}</Label>
+              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder={t('limit.ruleNamePlaceholder')} />
             </div>
             <div className="space-y-2">
-              <Label>限速 (Mbps)</Label>
+              <Label>{t('limit.speedLimit')}</Label>
               <Input
                 type="number"
                 value={form.speed}
                 onChange={e => setForm(p => ({ ...p, speed: e.target.value }))}
-                placeholder="例: 50"
+                placeholder={t('limit.speedPlaceholder')}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSubmit}>{editingLimit ? '更新' : '创建'}</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleSubmit}>{editingLimit ? t('common.update') : t('common.create')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

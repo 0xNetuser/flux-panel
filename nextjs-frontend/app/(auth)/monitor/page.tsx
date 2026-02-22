@@ -10,6 +10,7 @@ import { Server, Cpu, HardDrive, Network, RefreshCw, Filter } from 'lucide-react
 import { useAuth } from '@/lib/hooks/use-auth';
 import { getNodeHealth, getLatencyHistory, getTrafficOverview } from '@/lib/api/monitor';
 import { post } from '@/lib/api/client';
+import { useTranslation } from '@/lib/i18n';
 import {
   AreaChart, Area, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
@@ -80,6 +81,7 @@ interface LatencyRecord {
 
 export default function MonitorPage() {
   const { isAdmin } = useAuth();
+  const { t } = useTranslation();
   const [nodes, setNodes] = useState<NodeHealth[]>([]);
   const [forwards, setForwards] = useState<ForwardItem[]>([]);
   const [trafficData, setTrafficData] = useState<any[]>([]);
@@ -302,16 +304,16 @@ export default function MonitorPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">状态监控</h2>
+        <h2 className="text-2xl font-bold">{t('monitor.title')}</h2>
         <Button variant="outline" size="sm" onClick={loadData} disabled={refreshing}>
           <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-          刷新
+          {t('monitor.refresh')}
         </Button>
       </div>
 
       {/* Node Health Cards */}
       <div>
-        <h3 className="text-lg font-semibold mb-3">节点状态</h3>
+        <h3 className="text-lg font-semibold mb-3">{t('monitor.nodeStatus')}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {nodes.map((node) => (
             <Card key={node.id}>
@@ -322,7 +324,7 @@ export default function MonitorPage() {
                     {node.name}
                   </CardTitle>
                   <Badge variant={node.online ? 'default' : 'secondary'}>
-                    {node.online ? '在线' : '离线'}
+                    {node.online ? t('common.online') : t('common.offline')}
                   </Badge>
                 </div>
               </CardHeader>
@@ -335,27 +337,27 @@ export default function MonitorPage() {
                       <span>{node.cpuUsage?.toFixed(1)}%</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1"><HardDrive className="h-3 w-3" />内存</span>
+                      <span className="flex items-center gap-1"><HardDrive className="h-3 w-3" />{t('monitor.memory')}</span>
                       <span>{node.memUsage?.toFixed(1)}%</span>
                     </div>
                     {node.uptime !== undefined && (
                       <div className="flex items-center justify-between">
-                        <span>运行时间</span>
+                        <span>{t('monitor.uptime')}</span>
                         <span>{formatUptime(node.uptime)}</span>
                       </div>
                     )}
                     <div className="flex items-center justify-between">
                       <span>GOST</span>
-                      <Badge variant="default" className="text-xs">运行中</Badge>
+                      <Badge variant="default" className="text-xs">{t('monitor.running')}</Badge>
                     </div>
                     <div className="flex items-center justify-between">
                       <span>Xray</span>
                       {node.xrayRunning ? (
                         <Badge variant="default" className="text-xs">
-                          {node.xrayVersion?.match(/Xray\s+([\d.]+)/)?.[1] ? `Xray ${node.xrayVersion.match(/Xray\s+([\d.]+)/)![1]}` : (node.xrayVersion || '运行中')}
+                          {node.xrayVersion?.match(/Xray\s+([\d.]+)/)?.[1] ? `Xray ${node.xrayVersion.match(/Xray\s+([\d.]+)/)![1]}` : (node.xrayVersion || t('monitor.running'))}
                         </Badge>
                       ) : (
-                        <Badge variant="secondary" className="text-xs">未运行</Badge>
+                        <Badge variant="secondary" className="text-xs">{t('monitor.notRunning')}</Badge>
                       )}
                     </div>
                     {/* Real-time speed */}
@@ -363,17 +365,17 @@ export default function MonitorPage() {
                       <div className="pt-1 border-t space-y-1">
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-muted-foreground flex items-center gap-1">
-                            <Network className="h-3 w-3" />实时速度
+                            <Network className="h-3 w-3" />{t('monitor.realTimeSpeed')}
                           </span>
                         </div>
                         {nodeSpeeds[node.id] && (
                           <div className="grid grid-cols-2 gap-1 text-xs">
                             <div className="flex items-center gap-1">
-                              <span className="text-green-500">↑</span>
+                              <span className="text-green-500">{t('monitor.upload')}</span>
                               <span>{formatSpeed(nodeSpeeds[node.id].uploadSpeed)}</span>
                             </div>
                             <div className="flex items-center gap-1">
-                              <span className="text-blue-500">↓</span>
+                              <span className="text-blue-500">{t('monitor.download')}</span>
                               <span>{formatSpeed(nodeSpeeds[node.id].downloadSpeed)}</span>
                             </div>
                           </div>
@@ -381,11 +383,11 @@ export default function MonitorPage() {
                         {node.bytesTransmitted !== undefined && node.bytesReceived !== undefined && (
                           <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
                             <div className="flex items-center gap-1">
-                              <span>↑ 总计</span>
+                              <span>{t('monitor.totalUpload')}</span>
                               <span>{formatBytes(node.bytesTransmitted)}</span>
                             </div>
                             <div className="flex items-center gap-1">
-                              <span>↓ 总计</span>
+                              <span>{t('monitor.totalDownload')}</span>
                               <span>{formatBytes(node.bytesReceived)}</span>
                             </div>
                           </div>
@@ -396,7 +398,7 @@ export default function MonitorPage() {
                       <div className="pt-1 border-t">
                         <div className="flex items-center gap-1 text-muted-foreground mb-1">
                           <Network className="h-3 w-3" />
-                          <span className="text-xs">网卡</span>
+                          <span className="text-xs">{t('monitor.nic')}</span>
                         </div>
                         <div className="space-y-0.5">
                           {node.interfaces.map((iface) => (
@@ -417,7 +419,7 @@ export default function MonitorPage() {
             </Card>
           ))}
           {nodes.length === 0 && !loading && (
-            <p className="text-muted-foreground col-span-full text-center py-8">暂无节点</p>
+            <p className="text-muted-foreground col-span-full text-center py-8">{t('monitor.noNodes')}</p>
           )}
         </div>
       </div>
@@ -426,14 +428,14 @@ export default function MonitorPage() {
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">全局流量统计</CardTitle>
+            <CardTitle className="text-lg">{t('monitor.globalTrafficStats')}</CardTitle>
             <Select value={granularity} onValueChange={(v) => setGranularity(v)}>
               <SelectTrigger className="w-24">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="hour">小时</SelectItem>
-                <SelectItem value="day">天</SelectItem>
+                <SelectItem value="hour">{t('monitor.hour')}</SelectItem>
+                <SelectItem value="day">{t('monitor.day')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -446,12 +448,12 @@ export default function MonitorPage() {
                 <XAxis dataKey="time" fontSize={12} />
                 <YAxis fontSize={12} tickFormatter={(v) => formatBytes(v)} />
                 <Tooltip formatter={(v) => formatBytes(Number(v))} />
-                <Area type="monotone" dataKey="inFlow" name="入站" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
-                <Area type="monotone" dataKey="outFlow" name="出站" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.3} />
+                <Area type="monotone" dataKey="inFlow" name={t('monitor.inbound')} stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
+                <Area type="monotone" dataKey="outFlow" name={t('monitor.outbound')} stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.3} />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="text-center py-12 text-muted-foreground">暂无流量数据</div>
+            <div className="text-center py-12 text-muted-foreground">{t('monitor.noTrafficData')}</div>
           )}
         </CardContent>
       </Card>
@@ -460,25 +462,25 @@ export default function MonitorPage() {
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">转发延迟</CardTitle>
+            <CardTitle className="text-lg">{t('monitor.forwardLatency')}</CardTitle>
             <div className="flex items-center gap-2">
               <Select value={latencyRange} onValueChange={(v) => setLatencyRange(v)}>
                 <SelectTrigger className="w-24">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">1小时</SelectItem>
-                  <SelectItem value="6">6小时</SelectItem>
-                  <SelectItem value="24">24小时</SelectItem>
-                  <SelectItem value="168">7天</SelectItem>
+                  <SelectItem value="1">{t('monitor.hours1')}</SelectItem>
+                  <SelectItem value="6">{t('monitor.hours6')}</SelectItem>
+                  <SelectItem value="24">{t('monitor.hours24')}</SelectItem>
+                  <SelectItem value="168">{t('monitor.days7')}</SelectItem>
                 </SelectContent>
               </Select>
               <div className="relative" ref={filterRef}>
                 <Button variant="outline" size="sm" onClick={() => setFilterOpen(!filterOpen)}>
                   <Filter className="h-4 w-4 mr-1" />
                   {selectedForwards.size === forwards.filter(f => f.status === 1).length
-                    ? '全部转发'
-                    : `已选 ${selectedForwards.size} 项`}
+                    ? t('monitor.allForwards')
+                    : t('monitor.selected', { count: selectedForwards.size })}
                 </Button>
                 {filterOpen && (
                   <div className="absolute right-0 top-full mt-1 z-50 bg-popover border rounded-md shadow-md p-3 min-w-[200px]">
@@ -499,7 +501,7 @@ export default function MonitorPage() {
                       </label>
                     ))}
                     {forwards.filter(f => f.status === 1).length === 0 && (
-                      <p className="text-sm text-muted-foreground">暂无运行中的转发</p>
+                      <p className="text-sm text-muted-foreground">{t('monitor.noRunningForwards')}</p>
                     )}
                   </div>
                 )}
@@ -509,9 +511,9 @@ export default function MonitorPage() {
         </CardHeader>
         <CardContent>
           {forwards.filter(f => f.status === 1).length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">暂无运行中的转发</div>
+            <div className="text-center py-12 text-muted-foreground">{t('monitor.noRunningForwards')}</div>
           ) : selectedForwards.size === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">请选择至少一个转发</div>
+            <div className="text-center py-12 text-muted-foreground">{t('monitor.selectAtLeast')}</div>
           ) : latencyChartData.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={350}>
@@ -546,15 +548,15 @@ export default function MonitorPage() {
                       <div key={f.id} className="border rounded-md p-3 space-y-1">
                         <div className="font-medium text-sm truncate">{f.name}</div>
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>最近延迟</span>
-                          <span>{stat ? (stat.last >= 0 ? `${stat.last}ms` : '超时') : '-'}</span>
+                          <span>{t('monitor.latestLatency')}</span>
+                          <span>{stat ? (stat.last >= 0 ? `${stat.last}ms` : t('monitor.timeout')) : '-'}</span>
                         </div>
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>平均延迟</span>
+                          <span>{t('monitor.avgLatency')}</span>
                           <span>{stat ? (stat.avg >= 0 ? `${stat.avg}ms` : '-') : '-'}</span>
                         </div>
                         <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">成功率</span>
+                          <span className="text-muted-foreground">{t('monitor.successRate')}</span>
                           {stat ? (
                             <Badge variant={stat.successRate >= 80 ? 'default' : 'destructive'} className="text-xs">
                               {stat.successRate}%
@@ -569,7 +571,7 @@ export default function MonitorPage() {
               </div>
             </>
           ) : (
-            <div className="text-center py-12 text-muted-foreground">暂无延迟数据</div>
+            <div className="text-center py-12 text-muted-foreground">{t('monitor.noLatencyData')}</div>
           )}
         </CardContent>
       </Card>

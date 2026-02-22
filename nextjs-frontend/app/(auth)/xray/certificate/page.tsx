@@ -17,9 +17,11 @@ import { toast } from 'sonner';
 import { createXrayCert, getXrayCertList, deleteXrayCert, issueXrayCert, renewXrayCert } from '@/lib/api/xray-cert';
 import { getAccessibleNodeList } from '@/lib/api/node';
 import { useAuth } from '@/lib/hooks/use-auth';
+import { useTranslation } from '@/lib/i18n';
 
 export default function XrayCertificatePage() {
   const { isAdmin, xrayEnabled } = useAuth();
+  const { t } = useTranslation();
   const [certs, setCerts] = useState<any[]>([]);
   const [nodes, setNodes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,17 +63,17 @@ export default function XrayCertificatePage() {
 
   const handleSubmit = async () => {
     if (!form.nodeId || !form.domain) {
-      toast.error('请填写节点和域名');
+      toast.error(t('xrayCert.fillNodeAndDomain'));
       return;
     }
 
     if (certMode === 'acme') {
       if (!form.acmeEmail) {
-        toast.error('请填写 ACME Email');
+        toast.error(t('xrayCert.fillAcmeEmail'));
         return;
       }
       if (form.challengeType === 'dns01' && !form.dnsApiToken) {
-        toast.error('请填写 DNS API Token');
+        toast.error(t('xrayCert.fillDnsApiToken'));
         return;
       }
 
@@ -95,10 +97,10 @@ export default function XrayCertificatePage() {
       // Issue the certificate immediately
       const certId = createRes.data?.id;
       if (certId) {
-        toast.info('正在申请证书...');
+        toast.info(t('xrayCert.issuingCert'));
         const issueRes = await issueXrayCert(certId);
         if (issueRes.code === 0) {
-          toast.success('证书申请成功');
+          toast.success(t('xrayCert.issueSuccess'));
         } else {
           toast.error('证书创建成功，但申请失败: ' + issueRes.msg);
         }
@@ -119,7 +121,7 @@ export default function XrayCertificatePage() {
 
       const res = await createXrayCert(data);
       if (res.code === 0) {
-        toast.success('创建成功');
+        toast.success(t('common.create'));
         setDialogOpen(false);
         loadData();
       } else {
@@ -129,9 +131,9 @@ export default function XrayCertificatePage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('确定删除此证书?')) return;
+    if (!confirm(t('xrayCert.confirmDelete'))) return;
     const res = await deleteXrayCert(id);
-    if (res.code === 0) { toast.success('删除成功'); loadData(); }
+    if (res.code === 0) { toast.success(t('common.deleteSuccess')); loadData(); }
     else toast.error(res.msg);
   };
 
@@ -139,7 +141,7 @@ export default function XrayCertificatePage() {
     setRenewingId(id);
     const res = await renewXrayCert(id);
     if (res.code === 0) {
-      toast.success('续签成功');
+      toast.success(t('xrayCert.renewSuccess'));
       loadData();
     } else {
       toast.error(res.msg);
@@ -151,7 +153,7 @@ export default function XrayCertificatePage() {
     setIssuingId(id);
     const res = await issueXrayCert(id);
     if (res.code === 0) {
-      toast.success('签发成功');
+      toast.success(t('xrayCert.issueSuccess'));
       loadData();
     } else {
       toast.error(res.msg);
@@ -173,7 +175,7 @@ export default function XrayCertificatePage() {
   if (!isAdmin && !xrayEnabled) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">无权限访问</p>
+        <p className="text-muted-foreground">{t('xrayCert.noPermission')}</p>
       </div>
     );
   }
@@ -181,8 +183,8 @@ export default function XrayCertificatePage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">证书管理</h2>
-        <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />添加证书</Button>
+        <h2 className="text-2xl font-bold">{t('xrayCert.title')}</h2>
+        <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />{t('xrayCert.addCert')}</Button>
       </div>
 
       <Card>
@@ -190,21 +192,21 @@ export default function XrayCertificatePage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>域名</TableHead>
-                <TableHead>节点</TableHead>
-                <TableHead>来源</TableHead>
-                <TableHead>到期时间</TableHead>
-                <TableHead>上次续签</TableHead>
-                <TableHead>自动续签</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead>操作</TableHead>
+                <TableHead>{t('xrayCert.domain')}</TableHead>
+                <TableHead>{t('xrayCert.node')}</TableHead>
+                <TableHead>{t('xrayCert.source')}</TableHead>
+                <TableHead>{t('xrayCert.expireTime')}</TableHead>
+                <TableHead>{t('xrayCert.lastRenew')}</TableHead>
+                <TableHead>{t('xrayCert.autoRenew')}</TableHead>
+                <TableHead>{t('xrayCert.status')}</TableHead>
+                <TableHead>{t('xrayCert.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8">加载中...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8">{t('common.loading')}</TableCell></TableRow>
               ) : certs.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">{t('common.noData')}</TableCell></TableRow>
               ) : (
                 certs.map((cert) => (
                   <TableRow key={cert.id}>
@@ -217,7 +219,7 @@ export default function XrayCertificatePage() {
                     <TableCell>{getNodeName(cert.nodeId)}</TableCell>
                     <TableCell>
                       <Badge variant={cert.acmeEnabled ? 'default' : 'outline'}>
-                        {cert.acmeEnabled ? 'ACME' : '手动'}
+                        {cert.acmeEnabled ? 'ACME' : t('xrayCert.manual')}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-sm">
@@ -228,19 +230,19 @@ export default function XrayCertificatePage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant={cert.autoRenew ? 'default' : 'secondary'}>
-                        {cert.autoRenew ? '是' : '否'}
+                        {cert.autoRenew ? t('common.yes') : t('common.no')}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         {isExpired(cert.expireTime) ? (
-                          <Badge variant="destructive">已过期</Badge>
+                          <Badge variant="destructive">{t('xrayCert.expired')}</Badge>
                         ) : isExpiringSoon(cert.expireTime) ? (
-                          <Badge variant="outline" className="text-yellow-600 border-yellow-600">即将过期</Badge>
+                          <Badge variant="outline" className="text-yellow-600 border-yellow-600">{t('xrayCert.expiringSoon')}</Badge>
                         ) : cert.expireTime ? (
-                          <Badge variant="default">有效</Badge>
+                          <Badge variant="default">{t('xrayCert.valid')}</Badge>
                         ) : (
-                          <Badge variant="secondary">未签发</Badge>
+                          <Badge variant="secondary">{t('xrayCert.notIssued')}</Badge>
                         )}
                         {cert.renewError && (
                           <span className="text-xs text-destructive truncate max-w-32" title={cert.renewError}>
@@ -257,7 +259,7 @@ export default function XrayCertificatePage() {
                             size="icon"
                             onClick={() => handleIssue(cert.id)}
                             disabled={issuingId === cert.id}
-                            title="签发证书"
+                            title={t('xrayCert.issueCert')}
                           >
                             {issuingId === cert.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
                           </Button>
@@ -268,12 +270,12 @@ export default function XrayCertificatePage() {
                             size="icon"
                             onClick={() => handleRenew(cert.id)}
                             disabled={renewingId === cert.id}
-                            title="手动续签"
+                            title={t('xrayCert.renewCert')}
                           >
                             {renewingId === cert.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                           </Button>
                         )}
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(cert.id)} className="text-destructive" title="删除">
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(cert.id)} className="text-destructive" title={t('xrayCert.actions')}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -290,13 +292,13 @@ export default function XrayCertificatePage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>添加证书</DialogTitle>
+            <DialogTitle>{t('xrayCert.addCert')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>节点</Label>
+              <Label>{t('xrayCert.node')}</Label>
               <Select value={form.nodeId} onValueChange={v => setForm(p => ({ ...p, nodeId: v }))}>
-                <SelectTrigger><SelectValue placeholder="选择节点" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('xrayCert.selectNode')} /></SelectTrigger>
                 <SelectContent>
                   {nodes.map((n: any) => (
                     <SelectItem key={n.id} value={n.id.toString()}>{n.name}</SelectItem>
@@ -305,19 +307,19 @@ export default function XrayCertificatePage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>域名</Label>
+              <Label>{t('xrayCert.domain')}</Label>
               <Input value={form.domain} onChange={e => setForm(p => ({ ...p, domain: e.target.value }))} placeholder="example.com" />
             </div>
 
             <Tabs value={certMode} onValueChange={v => setCertMode(v as 'manual' | 'acme')}>
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="manual">手动上传</TabsTrigger>
-                <TabsTrigger value="acme">ACME 自动申请</TabsTrigger>
+                <TabsTrigger value="manual">{t('xrayCert.manualUpload')}</TabsTrigger>
+                <TabsTrigger value="acme">{t('xrayCert.acmeAuto')}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="manual" className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label>公钥 (PEM)</Label>
+                  <Label>{t('xrayCert.publicKeyPem')}</Label>
                   <Textarea
                     value={form.publicKey}
                     onChange={e => setForm(p => ({ ...p, publicKey: e.target.value }))}
@@ -327,7 +329,7 @@ export default function XrayCertificatePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>私钥 (PEM)</Label>
+                  <Label>{t('xrayCert.privateKeyPem')}</Label>
                   <Textarea
                     value={form.privateKey}
                     onChange={e => setForm(p => ({ ...p, privateKey: e.target.value }))}
@@ -337,14 +339,14 @@ export default function XrayCertificatePage() {
                   />
                 </div>
                 <div className="flex items-center justify-between">
-                  <Label>自动续签</Label>
+                  <Label>{t('xrayCert.autoRenew')}</Label>
                   <Switch
                     checked={form.autoRenew}
                     onCheckedChange={v => setForm(p => ({ ...p, autoRenew: v }))}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>到期时间</Label>
+                  <Label>{t('xrayCert.expireTime')}</Label>
                   <Input
                     type="datetime-local"
                     value={form.expireTime}
@@ -355,7 +357,7 @@ export default function XrayCertificatePage() {
 
               <TabsContent value="acme" className="space-y-4 mt-4">
                 <div className="space-y-2">
-                  <Label>Email</Label>
+                  <Label>{t('xrayCert.email')}</Label>
                   <Input
                     value={form.acmeEmail}
                     onChange={e => setForm(p => ({ ...p, acmeEmail: e.target.value }))}
@@ -364,7 +366,7 @@ export default function XrayCertificatePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>验证方式</Label>
+                  <Label>{t('xrayCert.challengeType')}</Label>
                   <Select value={form.challengeType} onValueChange={v => setForm(p => ({ ...p, challengeType: v }))}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -375,7 +377,7 @@ export default function XrayCertificatePage() {
                 {form.challengeType === 'dns01' && (
                   <>
                     <div className="space-y-2">
-                      <Label>DNS Provider</Label>
+                      <Label>{t('xrayCert.dnsProvider')}</Label>
                       <Select value={form.dnsProvider} onValueChange={v => setForm(p => ({ ...p, dnsProvider: v }))}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -384,7 +386,7 @@ export default function XrayCertificatePage() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>API Token</Label>
+                      <Label>{t('xrayCert.apiToken')}</Label>
                       <Input
                         type="password"
                         value={form.dnsApiToken}
@@ -395,14 +397,14 @@ export default function XrayCertificatePage() {
                   </>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  点击创建后将自动通过 Let&apos;s Encrypt 申请证书并部署到节点。证书到期前 30 天会自动续签。
+                  {t('xrayCert.acmeDescription')}
                 </p>
               </TabsContent>
             </Tabs>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSubmit}>创建</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleSubmit}>{t('common.create')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -16,9 +16,11 @@ import { getLatencyHistory } from '@/lib/api/monitor';
 import { userTunnel } from '@/lib/api/tunnel';
 import { getAccessibleNodeList } from '@/lib/api/node';
 import { useAuth } from '@/lib/hooks/use-auth';
+import { useTranslation } from '@/lib/i18n';
 
 export default function ForwardPage() {
   const { isAdmin, gostEnabled } = useAuth();
+  const { t } = useTranslation();
   const [forwards, setForwards] = useState<any[]>([]);
   const [tunnels, setTunnels] = useState<any[]>([]);
   const [nodes, setNodes] = useState<any[]>([]);
@@ -97,7 +99,7 @@ export default function ForwardPage() {
 
   const handleSubmit = async () => {
     if (!form.name || !form.tunnelId || !form.remoteAddr) {
-      toast.error('请填写必要字段');
+      toast.error(t('common.fillRequired'));
       return;
     }
     const data: any = {
@@ -118,7 +120,7 @@ export default function ForwardPage() {
     }
 
     if (res.code === 0) {
-      toast.success(editingForward ? '更新成功' : '创建成功');
+      toast.success(editingForward ? t('common.updateSuccess') : t('common.createSuccess'));
       setDialogOpen(false);
       loadData();
     } else {
@@ -127,21 +129,21 @@ export default function ForwardPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('确定删除此转发?')) return;
+    if (!confirm(t('forward.confirmDelete'))) return;
     const res = await deleteForward(id);
-    if (res.code === 0) { toast.success('删除成功'); loadData(); }
+    if (res.code === 0) { toast.success(t('common.deleteSuccess')); loadData(); }
     else toast.error(res.msg);
   };
 
   const handlePause = async (id: number) => {
     const res = await pauseForwardService(id);
-    if (res.code === 0) { toast.success('已暂停'); loadData(); }
+    if (res.code === 0) { toast.success(t('forward.pauseSuccess')); loadData(); }
     else toast.error(res.msg);
   };
 
   const handleResume = async (id: number) => {
     const res = await resumeForwardService(id);
-    if (res.code === 0) { toast.success('已恢复'); loadData(); }
+    if (res.code === 0) { toast.success(t('forward.resumeSuccess')); loadData(); }
     else toast.error(res.msg);
   };
 
@@ -156,7 +158,7 @@ export default function ForwardPage() {
         toast.error(res.msg);
       }
     } catch {
-      toast.error('诊断请求失败');
+      toast.error(t('forward.diagnoseFailed'));
     } finally {
       setDiagnosing(null);
     }
@@ -173,7 +175,7 @@ export default function ForwardPage() {
   if (!isAdmin && !gostEnabled) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">你没有 GOST 转发权限，请联系管理员</p>
+        <p className="text-muted-foreground">{t('forward.noGostPermission')}</p>
       </div>
     );
   }
@@ -181,8 +183,8 @@ export default function ForwardPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">转发管理</h2>
-        <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />创建转发</Button>
+        <h2 className="text-2xl font-bold">{t('forward.title')}</h2>
+        <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />{t('forward.createForward')}</Button>
       </div>
 
       <Card>
@@ -190,21 +192,21 @@ export default function ForwardPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>名称</TableHead>
-                <TableHead>隧道</TableHead>
-                <TableHead>入口端口</TableHead>
-                <TableHead>目标地址</TableHead>
-                <TableHead>流量</TableHead>
-                <TableHead>延迟</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead>操作</TableHead>
+                <TableHead>{t('forward.name')}</TableHead>
+                <TableHead>{t('forward.tunnel')}</TableHead>
+                <TableHead>{t('forward.entryPort')}</TableHead>
+                <TableHead>{t('forward.targetAddr')}</TableHead>
+                <TableHead>{t('forward.traffic')}</TableHead>
+                <TableHead>{t('forward.latency')}</TableHead>
+                <TableHead>{t('forward.status')}</TableHead>
+                <TableHead>{t('forward.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8">加载中...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8">{t('common.loading')}</TableCell></TableRow>
               ) : forwards.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">{t('common.noData')}</TableCell></TableRow>
               ) : (
                 forwards.map((f) => (
                   <TableRow key={f.id}>
@@ -220,7 +222,7 @@ export default function ForwardPage() {
                             {latencyMap[f.id]!.latency.toFixed(1)}ms
                           </span>
                         ) : (
-                          <span className="text-destructive">超时</span>
+                          <span className="text-destructive">{t('forward.timeout')}</span>
                         )
                       ) : (
                         <span className="text-muted-foreground">-</span>
@@ -228,7 +230,7 @@ export default function ForwardPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant={f.status === 1 ? 'default' : f.status === 0 ? 'secondary' : 'destructive'}>
-                        {f.status === 1 ? '运行中' : f.status === 0 ? '已暂停' : '异常'}
+                        {f.status === 1 ? t('forward.running') : f.status === 0 ? t('forward.paused') : t('forward.error')}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -257,7 +259,7 @@ export default function ForwardPage() {
       <Dialog open={diagnoseDialogOpen} onOpenChange={setDiagnoseDialogOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>诊断结果 — {diagnoseResult?.forwardName}</DialogTitle>
+            <DialogTitle>{t('forward.diagnoseResult')} — {diagnoseResult?.forwardName}</DialogTitle>
           </DialogHeader>
           {diagnoseResult && (
             <div className="space-y-3">
@@ -270,9 +272,9 @@ export default function ForwardPage() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium">{r.description}</span>
                       {r.success ? (
-                        <Badge variant="default" className="gap-1"><CheckCircle2 className="h-3 w-3" />成功</Badge>
+                        <Badge variant="default" className="gap-1"><CheckCircle2 className="h-3 w-3" />{t('forward.success')}</Badge>
                       ) : (
-                        <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" />失败</Badge>
+                        <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" />{t('forward.failed')}</Badge>
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground">
@@ -280,8 +282,8 @@ export default function ForwardPage() {
                     </div>
                     {r.success ? (
                       <div className="text-xs">
-                        延迟: <span className="font-mono">{r.averageTime.toFixed(1)}ms</span>
-                        {r.packetLoss > 0 && <span className="ml-2 text-orange-600">丢包: {r.packetLoss.toFixed(0)}%</span>}
+                        {t('forward.delayMs')} <span className="font-mono">{r.averageTime.toFixed(1)}ms</span>
+                        {r.packetLoss > 0 && <span className="ml-2 text-orange-600">{t('forward.packetLoss')} {r.packetLoss.toFixed(0)}%</span>}
                       </div>
                     ) : (
                       <div className="text-xs text-destructive">{r.message}</div>
@@ -292,7 +294,7 @@ export default function ForwardPage() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDiagnoseDialogOpen(false)}>关闭</Button>
+            <Button variant="outline" onClick={() => setDiagnoseDialogOpen(false)}>{t('common.close')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -300,17 +302,17 @@ export default function ForwardPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingForward ? '编辑转发' : '创建转发'}</DialogTitle>
+            <DialogTitle>{editingForward ? t('forward.editForward') : t('forward.createForward')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>名称</Label>
-              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="转发名称" />
+              <Label>{t('forward.name')}</Label>
+              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder={t('forward.forwardName')} />
             </div>
             <div className="space-y-2">
-              <Label>隧道</Label>
+              <Label>{t('forward.tunnel')}</Label>
               <Select value={form.tunnelId} onValueChange={v => setForm(p => ({ ...p, tunnelId: v }))}>
-                <SelectTrigger><SelectValue placeholder="选择隧道" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('forward.selectTunnel')} /></SelectTrigger>
                 <SelectContent>
                   {tunnels.map((t: any) => (
                     <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>
@@ -319,7 +321,7 @@ export default function ForwardPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>目标地址 <span className="text-muted-foreground font-normal">（多个地址每行一个）</span></Label>
+              <Label>{t('forward.targetAddrMultiple')} <span className="text-muted-foreground font-normal">{t('forward.targetAddrHint')}</span></Label>
               <textarea
                 className="flex min-h-[60px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 font-mono"
                 value={form.remoteAddr}
@@ -346,7 +348,7 @@ export default function ForwardPage() {
                 <>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>监听地址 (可选)</Label>
+                      <Label>{t('forward.listenAddr')}</Label>
                       <Select value={isCustomListenIp ? '__custom__' : (form.listenIp || '::')} onValueChange={v => {
                         if (v === '__custom__') {
                           setForm(p => ({ ...p, listenIp: p.listenIp || '' }));
@@ -354,10 +356,10 @@ export default function ForwardPage() {
                           setForm(p => ({ ...p, listenIp: v }));
                         }
                       }}>
-                        <SelectTrigger><SelectValue placeholder="选择入口" /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t('forward.selectEntry')} /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="::">全部接口 (::)</SelectItem>
-                          <SelectItem value="0.0.0.0">仅IPv4 (0.0.0.0)</SelectItem>
+                          <SelectItem value="::">{t('forward.allInterfaces')}</SelectItem>
+                          <SelectItem value="0.0.0.0">{t('forward.ipv4Only')}</SelectItem>
                           {ifaces.map((iface: any) =>
                             (iface.ips || []).map((ip: string) => (
                               <SelectItem key={`${iface.name}-${ip}`} value={ip}>
@@ -365,20 +367,20 @@ export default function ForwardPage() {
                               </SelectItem>
                             ))
                           )}
-                          <SelectItem value="__custom__">自定义...</SelectItem>
+                          <SelectItem value="__custom__">{t('common.custom')}</SelectItem>
                         </SelectContent>
                       </Select>
                       {isCustomListenIp && (
                         <Input
                           value={form.listenIp}
                           onChange={e => setForm(p => ({ ...p, listenIp: e.target.value }))}
-                          placeholder="IP地址，多个用逗号分隔"
+                          placeholder={t('forward.ipAddrMultiple')}
                           className="mt-1"
                         />
                       )}
                     </div>
                     <div className="space-y-2">
-                      <Label>出口地址 (可选)</Label>
+                      <Label>{t('forward.exitAddr')}</Label>
                       <Select value={isCustomInterface ? '__custom__' : (form.interfaceName || '__none__')} onValueChange={v => {
                         if (v === '__custom__') {
                           setForm(p => ({ ...p, interfaceName: p.interfaceName || '' }));
@@ -388,12 +390,12 @@ export default function ForwardPage() {
                           setForm(p => ({ ...p, interfaceName: v }));
                         }
                       }}>
-                        <SelectTrigger><SelectValue placeholder="默认路由" /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t('forward.defaultRoute')} /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__none__">默认路由</SelectItem>
+                          <SelectItem value="__none__">{t('forward.defaultRoute')}</SelectItem>
                           {ifaces.map((iface: any) => (
                             <SelectItem key={`nic-${iface.name}`} value={iface.name}>
-                              {iface.name} — 全部IP
+                              {iface.name} — {t('forward.allIPs')}
                             </SelectItem>
                           ))}
                           {ifaces.flatMap((iface: any) =>
@@ -403,14 +405,14 @@ export default function ForwardPage() {
                               </SelectItem>
                             ))
                           )}
-                          <SelectItem value="__custom__">自定义...</SelectItem>
+                          <SelectItem value="__custom__">{t('common.custom')}</SelectItem>
                         </SelectContent>
                       </Select>
                       {isCustomInterface && (
                         <Input
                           value={form.interfaceName}
                           onChange={e => setForm(p => ({ ...p, interfaceName: e.target.value }))}
-                          placeholder="网卡名或IP地址，如 eth0 或 1.2.3.4"
+                          placeholder={t('forward.nicOrIp')}
                           className="mt-1"
                         />
                       )}
@@ -418,18 +420,18 @@ export default function ForwardPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>入口端口 (可选)</Label>
-                      <Input value={form.inPort} onChange={e => setForm(p => ({ ...p, inPort: e.target.value }))} placeholder="自动分配" />
+                      <Label>{t('forward.entryPortOptional')}</Label>
+                      <Input value={form.inPort} onChange={e => setForm(p => ({ ...p, inPort: e.target.value }))} placeholder={t('forward.autoAssign')} />
                     </div>
                     <div className="space-y-2">
-                      <Label>负载策略</Label>
+                      <Label>{t('forward.loadStrategy')}</Label>
                       <Select value={form.strategy} onValueChange={v => setForm(p => ({ ...p, strategy: v }))}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="round">轮询 (round)</SelectItem>
-                          <SelectItem value="random">随机 (random)</SelectItem>
-                          <SelectItem value="fifo">灾备切换 (fifo)</SelectItem>
-                          <SelectItem value="hash">哈希 (hash)</SelectItem>
+                          <SelectItem value="round">{t('forward.roundRobin')}</SelectItem>
+                          <SelectItem value="random">{t('forward.random')}</SelectItem>
+                          <SelectItem value="fifo">{t('forward.failover')}</SelectItem>
+                          <SelectItem value="hash">{t('forward.hash')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -439,8 +441,8 @@ export default function ForwardPage() {
             })()}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSubmit}>{editingForward ? '更新' : '创建'}</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleSubmit}>{editingForward ? t('common.update') : t('common.create')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

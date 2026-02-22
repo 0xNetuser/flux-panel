@@ -11,6 +11,7 @@ import { genXrayKey } from '@/lib/api/xray-inbound';
 import { toast } from 'sonner';
 import { randomShortIds, randomRealityTarget } from '@/lib/utils/random';
 import FieldTip from './field-tip';
+import { useTranslation } from '@/lib/i18n';
 
 // ── Types ──
 
@@ -81,6 +82,8 @@ const CIPHER_SUITES = [
 // ── TLS Certificate Editor ──
 
 function CertificateEditor({ certs, onChange }: { certs: TlsCertItem[]; onChange: (c: TlsCertItem[]) => void }) {
+  const { t } = useTranslation();
+
   const addCert = () => {
     onChange([...certs, { useFile: true, certFile: '', keyFile: '', usage: 'encipherment' }]);
   };
@@ -98,13 +101,13 @@ function CertificateEditor({ certs, onChange }: { certs: TlsCertItem[]; onChange
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <Label className="text-xs font-medium">证书</Label>
+        <Label className="text-xs font-medium">{t('security.certificates')}</Label>
         <Button type="button" variant="ghost" size="sm" onClick={addCert}>
-          <Plus className="h-3 w-3 mr-1" />添加证书
+          <Plus className="h-3 w-3 mr-1" />{t('security.addCert')}
         </Button>
       </div>
       {certs.length === 0 && (
-        <p className="text-xs text-muted-foreground">未配置证书</p>
+        <p className="text-xs text-muted-foreground">{t('security.noCert')}</p>
       )}
       {certs.map((cert, i) => (
         <div key={i} className="space-y-2 p-3 border rounded-md relative">
@@ -123,7 +126,7 @@ function CertificateEditor({ certs, onChange }: { certs: TlsCertItem[]; onChange
                 onChange={() => updateCert(i, { useFile: true })}
                 className="accent-primary"
               />
-              文件路径
+              {t('security.filePath')}
             </label>
             <label className="flex items-center gap-1.5 text-xs">
               <input
@@ -132,7 +135,7 @@ function CertificateEditor({ certs, onChange }: { certs: TlsCertItem[]; onChange
                 onChange={() => updateCert(i, { useFile: false })}
                 className="accent-primary"
               />
-              内容
+              {t('security.content')}
             </label>
           </div>
           {cert.useFile ? (
@@ -192,6 +195,7 @@ function CertificateEditor({ certs, onChange }: { certs: TlsCertItem[]; onChange
 // ── Component ──
 
 export default function SecuritySettings({ value, onChange }: Props) {
+  const { t } = useTranslation();
   const update = (patch: Partial<SecurityForm>) => onChange({ ...value, ...patch });
 
   const generateX25519 = async () => {
@@ -202,7 +206,7 @@ export default function SecuritySettings({ value, onChange }: Props) {
         realityPublicKey: res.data.publicKey,
       });
     } else {
-      toast.error(res.msg || '生成密钥对失败');
+      toast.error(res.msg || t('security.generateKeyFailed'));
     }
   };
 
@@ -218,7 +222,7 @@ export default function SecuritySettings({ value, onChange }: Props) {
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label className="inline-flex items-center gap-1">Security (安全层) <FieldTip content="传输层安全类型。TLS 需要域名和证书；Reality 无需域名证书，通过模拟真实网站 TLS 握手来防检测" /></Label>
+        <Label className="inline-flex items-center gap-1">{t('security.security')} <FieldTip content={t('security.securityTooltip')} /></Label>
         <Select value={value.security} onValueChange={v => {
           update({ security: v });
           if (v === 'reality' && !value.realityShortIds) {
@@ -238,12 +242,12 @@ export default function SecuritySettings({ value, onChange }: Props) {
       {value.security === 'tls' && (
         <div className="space-y-3 pl-2 border-l-2 border-muted">
           <div className="space-y-2">
-            <Label className="text-xs inline-flex items-center gap-1">Server Name <FieldTip content="TLS 握手时的 SNI (Server Name Indication)，通常填写证书对应的域名" /></Label>
+            <Label className="text-xs inline-flex items-center gap-1">{t('security.tlsServerName')} <FieldTip content={t('security.tlsServerNameTooltip')} /></Label>
             <Input value={value.tlsServerName ?? ''} onChange={e => update({ tlsServerName: e.target.value })} placeholder="example.com" className="text-sm" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label className="text-xs inline-flex items-center gap-1">Min Version <FieldTip content="允许的最低 TLS 版本，建议不低于 1.2" /></Label>
+              <Label className="text-xs inline-flex items-center gap-1">{t('security.tlsMinVersion')} <FieldTip content={t('security.tlsMinVersionTooltip')} /></Label>
               <Select value={value.tlsMinVersion ?? '1.2'} onValueChange={v => update({ tlsMinVersion: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -255,7 +259,7 @@ export default function SecuritySettings({ value, onChange }: Props) {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs inline-flex items-center gap-1">Max Version <FieldTip content="允许的最高 TLS 版本" /></Label>
+              <Label className="text-xs inline-flex items-center gap-1">{t('security.tlsMaxVersion')} <FieldTip content={t('security.tlsMaxVersionTooltip')} /></Label>
               <Select value={value.tlsMaxVersion ?? '1.3'} onValueChange={v => update({ tlsMaxVersion: v })}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -268,7 +272,7 @@ export default function SecuritySettings({ value, onChange }: Props) {
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="text-xs inline-flex items-center gap-1">ALPN <FieldTip content="TLS 应用层协议协商，指定客户端支持的应用层协议" /></Label>
+            <Label className="text-xs inline-flex items-center gap-1">{t('security.tlsAlpn')} <FieldTip content={t('security.tlsAlpnTooltip')} /></Label>
             <div className="flex gap-4">
               {ALPN_OPTIONS.map(alpn => (
                 <label key={alpn} className="flex items-center gap-1.5 text-xs">
@@ -286,7 +290,7 @@ export default function SecuritySettings({ value, onChange }: Props) {
             </div>
           </div>
           <div className="space-y-2">
-            <Label className="text-xs inline-flex items-center gap-1">Fingerprint <FieldTip content="模拟指定浏览器的 TLS Client Hello 指纹，用于对抗 TLS 指纹检测" /></Label>
+            <Label className="text-xs inline-flex items-center gap-1">{t('security.tlsFingerprint')} <FieldTip content={t('security.tlsFingerprintTooltip')} /></Label>
             <Select value={value.tlsFingerprint ?? 'chrome'} onValueChange={v => update({ tlsFingerprint: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -297,31 +301,31 @@ export default function SecuritySettings({ value, onChange }: Props) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label className="text-xs inline-flex items-center gap-1">Cipher Suites (可选) <FieldTip content="自定义 TLS 加密套件列表，留空使用 Go 默认值" /></Label>
+            <Label className="text-xs inline-flex items-center gap-1">{t('security.tlsCipherSuites')} <FieldTip content={t('security.tlsCipherSuitesTooltip')} /></Label>
             <Input
               value={value.tlsCipherSuites ?? ''}
               onChange={e => update({ tlsCipherSuites: e.target.value })}
-              placeholder="留空使用默认"
+              placeholder={t('security.tlsCipherSuitesPlaceholder')}
               className="text-sm font-mono"
             />
             <p className="text-xs text-muted-foreground">
-              可选值: {CIPHER_SUITES.slice(0, 3).join(', ')}...
+              {t('security.tlsCipherSuitesHint')}: {CIPHER_SUITES.slice(0, 3).join(', ')}...
             </p>
           </div>
           <div className="flex items-center justify-between">
-            <Label className="text-xs inline-flex items-center gap-1">Reject Unknown SNI <FieldTip content="拒绝不在证书 SAN 中的 SNI 请求，可防止主动探测" /></Label>
+            <Label className="text-xs inline-flex items-center gap-1">{t('security.tlsRejectUnknownSni')} <FieldTip content={t('security.tlsRejectUnknownSniTooltip')} /></Label>
             <Switch checked={value.tlsRejectUnknownSni ?? false} onCheckedChange={v => update({ tlsRejectUnknownSni: v })} />
           </div>
           <div className="flex items-center justify-between">
-            <Label className="text-xs inline-flex items-center gap-1">Allow Insecure <FieldTip content="允许不安全的 TLS 连接（如自签证书），不建议在生产环境开启" /></Label>
+            <Label className="text-xs inline-flex items-center gap-1">{t('security.tlsAllowInsecure')} <FieldTip content={t('security.tlsAllowInsecureTooltip')} /></Label>
             <Switch checked={value.tlsAllowInsecure ?? false} onCheckedChange={v => update({ tlsAllowInsecure: v })} />
           </div>
           <div className="flex items-center justify-between">
-            <Label className="text-xs inline-flex items-center gap-1">Disable System Root <FieldTip content="禁用系统自带的 CA 根证书，只信任手动配置的证书" /></Label>
+            <Label className="text-xs inline-flex items-center gap-1">{t('security.tlsDisableSystemRoot')} <FieldTip content={t('security.tlsDisableSystemRootTooltip')} /></Label>
             <Switch checked={value.tlsDisableSystemRoot ?? false} onCheckedChange={v => update({ tlsDisableSystemRoot: v })} />
           </div>
           <div className="flex items-center justify-between">
-            <Label className="text-xs inline-flex items-center gap-1">Session Resumption <FieldTip content="启用 TLS 会话恢复，可加快重复连接的握手速度" /></Label>
+            <Label className="text-xs inline-flex items-center gap-1">{t('security.tlsSessionResumption')} <FieldTip content={t('security.tlsSessionResumptionTooltip')} /></Label>
             <Switch checked={value.tlsSessionResumption ?? false} onCheckedChange={v => update({ tlsSessionResumption: v })} />
           </div>
           {/* Certificates */}
@@ -337,45 +341,45 @@ export default function SecuritySettings({ value, onChange }: Props) {
         <div className="space-y-3 pl-2 border-l-2 border-muted">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs inline-flex items-center gap-1">Dest (目标) <FieldTip content="Reality 模拟的目标网站地址（域名:端口），需为支持 TLS 1.3 和 H2 的真实网站" /></Label>
+              <Label className="text-xs inline-flex items-center gap-1">{t('security.realityDest')} <FieldTip content={t('security.realityDestTooltip')} /></Label>
               <Button type="button" variant="ghost" size="sm" onClick={generateRandomTarget}>
-                <Shuffle className="h-3 w-3 mr-1" />随机目标
+                <Shuffle className="h-3 w-3 mr-1" />{t('security.randomTarget')}
               </Button>
             </div>
             <Input value={value.realityDest ?? ''} onChange={e => update({ realityDest: e.target.value })} placeholder="www.example.com:443" className="text-sm" />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs inline-flex items-center gap-1">Server Names (逗号分隔) <FieldTip content="允许的 SNI 列表，客户端握手时必须使用其中之一，通常与 Dest 对应" /></Label>
+            <Label className="text-xs inline-flex items-center gap-1">{t('security.realityServerNames')} <FieldTip content={t('security.realityServerNamesTooltip')} /></Label>
             <Input value={value.realityServerNames ?? ''} onChange={e => update({ realityServerNames: e.target.value })} placeholder="www.example.com,example.com" className="text-sm" />
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs inline-flex items-center gap-1">Private Key <FieldTip content="X25519 私钥，服务端保留。点击右侧按钮可自动生成密钥对" /></Label>
+              <Label className="text-xs inline-flex items-center gap-1">{t('security.realityPrivateKey')} <FieldTip content={t('security.realityPrivateKeyTooltip')} /></Label>
               <Button type="button" variant="ghost" size="sm" onClick={generateX25519}>
-                <RefreshCw className="h-3 w-3 mr-1" />生成密钥对
+                <RefreshCw className="h-3 w-3 mr-1" />{t('security.generateKeyPair')}
               </Button>
             </div>
-            <Input value={value.realityPrivateKey ?? ''} onChange={e => update({ realityPrivateKey: e.target.value })} placeholder="私钥" className="text-sm font-mono" />
+            <Input value={value.realityPrivateKey ?? ''} onChange={e => update({ realityPrivateKey: e.target.value })} placeholder={t('security.realityPrivateKeyPlaceholder')} className="text-sm font-mono" />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs inline-flex items-center gap-1">Public Key <FieldTip content="X25519 公钥，需分享给客户端使用" /></Label>
-            <Input value={value.realityPublicKey ?? ''} onChange={e => update({ realityPublicKey: e.target.value })} placeholder="公钥（分享给客户端）" className="text-sm font-mono" />
+            <Label className="text-xs inline-flex items-center gap-1">{t('security.realityPublicKey')} <FieldTip content={t('security.realityPublicKeyTooltip')} /></Label>
+            <Input value={value.realityPublicKey ?? ''} onChange={e => update({ realityPublicKey: e.target.value })} placeholder={t('security.realityPublicKeyPlaceholder')} className="text-sm font-mono" />
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-xs inline-flex items-center gap-1">Short IDs (逗号分隔) <FieldTip content="客户端可选的 Short ID 列表，用于区分不同客户端，长度为 0~16 位的偶数位 hex 字符串" /></Label>
+              <Label className="text-xs inline-flex items-center gap-1">{t('security.realityShortIds')} <FieldTip content={t('security.realityShortIdsTooltip')} /></Label>
               <Button type="button" variant="ghost" size="sm" onClick={generateShortIds}>
-                <RefreshCw className="h-3 w-3 mr-1" />生成
+                <RefreshCw className="h-3 w-3 mr-1" />{t('security.generateShortIds')}
               </Button>
             </div>
-            <Input value={value.realityShortIds ?? ''} onChange={e => update({ realityShortIds: e.target.value })} placeholder="多个不同长度的 hex" className="text-sm font-mono" />
+            <Input value={value.realityShortIds ?? ''} onChange={e => update({ realityShortIds: e.target.value })} placeholder={t('security.realityShortIdsPlaceholder')} className="text-sm font-mono" />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs inline-flex items-center gap-1">SpiderX <FieldTip content="Reality 爬虫的初始路径和查询参数，用于生成更真实的流量伪装" /></Label>
+            <Label className="text-xs inline-flex items-center gap-1">{t('security.realitySpiderX')} <FieldTip content={t('security.realitySpiderXTooltip')} /></Label>
             <Input value={value.realitySpiderX ?? ''} onChange={e => update({ realitySpiderX: e.target.value })} placeholder="/" className="text-sm" />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs inline-flex items-center gap-1">Fingerprint <FieldTip content="模拟指定浏览器的 TLS Client Hello 指纹" /></Label>
+            <Label className="text-xs inline-flex items-center gap-1">{t('security.realityFingerprint')} <FieldTip content={t('security.realityFingerprintTooltip')} /></Label>
             <Select value={value.realityFingerprint ?? 'chrome'} onValueChange={v => update({ realityFingerprint: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -386,7 +390,7 @@ export default function SecuritySettings({ value, onChange }: Props) {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label className="text-xs inline-flex items-center gap-1">Xver <FieldTip content="PROXY protocol 版本号，0 表示不使用" /></Label>
+            <Label className="text-xs inline-flex items-center gap-1">{t('security.realityXver')} <FieldTip content={t('security.realityXverTooltip')} /></Label>
             <Select value={String(value.realityXver ?? 0)} onValueChange={v => update({ realityXver: parseInt(v) })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -397,11 +401,11 @@ export default function SecuritySettings({ value, onChange }: Props) {
             </Select>
           </div>
           <div className="flex items-center justify-between">
-            <Label className="text-xs inline-flex items-center gap-1">Show <FieldTip content="启用后在日志中显示 Reality 的调试信息" /></Label>
+            <Label className="text-xs inline-flex items-center gap-1">{t('security.realityShow')} <FieldTip content={t('security.realityShowTooltip')} /></Label>
             <Switch checked={value.realityShow ?? false} onCheckedChange={v => update({ realityShow: v })} />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs inline-flex items-center gap-1">Max Time Diff (ms) <FieldTip content="允许客户端与服务端的最大时间差 (毫秒)，0 表示不限制" /></Label>
+            <Label className="text-xs inline-flex items-center gap-1">{t('security.realityMaxTimediff')} <FieldTip content={t('security.realityMaxTimediffTooltip')} /></Label>
             <Input
               type="number"
               value={value.realityMaxTimediff ?? 0}
@@ -412,11 +416,11 @@ export default function SecuritySettings({ value, onChange }: Props) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label className="text-xs inline-flex items-center gap-1">Min Client Ver <FieldTip content="允许的最低客户端 Xray 版本号" /></Label>
+              <Label className="text-xs inline-flex items-center gap-1">{t('security.realityMinClientVer')} <FieldTip content={t('security.realityMinClientVerTooltip')} /></Label>
               <Input value={value.realityMinClientVer ?? ''} onChange={e => update({ realityMinClientVer: e.target.value })} placeholder="" className="text-sm" />
             </div>
             <div className="space-y-2">
-              <Label className="text-xs inline-flex items-center gap-1">Max Client Ver <FieldTip content="允许的最高客户端 Xray 版本号" /></Label>
+              <Label className="text-xs inline-flex items-center gap-1">{t('security.realityMaxClientVer')} <FieldTip content={t('security.realityMaxClientVerTooltip')} /></Label>
               <Input value={value.realityMaxClientVer ?? ''} onChange={e => update({ realityMaxClientVer: e.target.value })} placeholder="" className="text-sm" />
             </div>
           </div>

@@ -9,9 +9,11 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { getUserPackageInfo } from '@/lib/api/user';
 import { useAuth } from '@/lib/hooks/use-auth';
+import { useTranslation } from '@/lib/i18n';
 
 export default function ProfilePage() {
   const { username, isAdmin } = useAuth();
+  const { t } = useTranslation();
   const router = useRouter();
   const [packageInfo, setPackageInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -30,7 +32,7 @@ export default function ProfilePage() {
     if (res.code === 0) {
       setPackageInfo(res.data);
     } else {
-      toast.error(res.msg || '加载用户信息失败');
+      toast.error(res.msg || t('profile.loadFailed'));
     }
     setLoading(false);
   }, []);
@@ -40,7 +42,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-muted-foreground">加载中...</p>
+        <p className="text-muted-foreground">{t('common.loading')}</p>
       </div>
     );
   }
@@ -53,34 +55,34 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold">个人中心</h2>
+      <h2 className="text-2xl font-bold">{t('profile.title')}</h2>
 
       <div className="grid gap-4 md:grid-cols-2">
         {/* User Info Card */}
         <Card>
           <CardHeader className="flex flex-row items-center gap-3 pb-2">
             <User className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">用户信息</CardTitle>
+            <CardTitle className="text-lg">{t('profile.userInfo')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">用户名</span>
+              <span className="text-muted-foreground">{t('profile.username')}</span>
               <span className="font-medium">{username}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">角色</span>
+              <span className="text-muted-foreground">{t('profile.role')}</span>
               <Badge variant={isAdmin ? 'default' : 'secondary'}>
-                {isAdmin ? '管理员' : '用户'}
+                {isAdmin ? t('profile.admin') : t('profile.normalUser')}
               </Badge>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">账号状态</span>
+              <span className="text-muted-foreground">{t('profile.accountStatus')}</span>
               {isExpired ? (
-                <Badge variant="destructive">已过期</Badge>
+                <Badge variant="destructive">{t('profile.expired')}</Badge>
               ) : isOverFlow ? (
-                <Badge variant="destructive">流量超限</Badge>
+                <Badge variant="destructive">{t('profile.overTraffic')}</Badge>
               ) : (
-                <Badge variant="default">正常</Badge>
+                <Badge variant="default">{t('profile.normal')}</Badge>
               )}
             </div>
           </CardContent>
@@ -90,21 +92,21 @@ export default function ProfilePage() {
         <Card>
           <CardHeader className="flex flex-row items-center gap-3 pb-2">
             <Database className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">流量使用</CardTitle>
+            <CardTitle className="text-lg">{t('profile.trafficUsage')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">已用流量</span>
+              <span className="text-muted-foreground">{t('profile.usedTraffic')}</span>
               <span className="font-medium">{formatBytes(usedFlow)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">总流量</span>
-              <span className="font-medium">{packageInfo?.flow ? `${packageInfo.flow} GB` : '无限'}</span>
+              <span className="text-muted-foreground">{t('profile.totalTraffic')}</span>
+              <span className="font-medium">{packageInfo?.flow ? `${packageInfo.flow} GB` : t('common.unlimited')}</span>
             </div>
             {totalFlow > 0 && (
               <div className="space-y-1">
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>使用进度</span>
+                  <span>{t('profile.usageProgress')}</span>
                   <span>{flowPercent.toFixed(1)}%</span>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
@@ -116,11 +118,11 @@ export default function ProfilePage() {
               </div>
             )}
             <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">上传</span>
+              <span className="text-muted-foreground">{t('profile.upload')}</span>
               <span>{formatBytes(packageInfo?.inFlow || 0)}</span>
             </div>
             <div className="flex justify-between items-center text-sm">
-              <span className="text-muted-foreground">下载</span>
+              <span className="text-muted-foreground">{t('profile.download')}</span>
               <span>{formatBytes(packageInfo?.outFlow || 0)}</span>
             </div>
           </CardContent>
@@ -130,17 +132,17 @@ export default function ProfilePage() {
         <Card>
           <CardHeader className="flex flex-row items-center gap-3 pb-2">
             <ArrowRightLeft className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">套餐信息</CardTitle>
+            <CardTitle className="text-lg">{t('profile.packageInfo')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">转发数量限制</span>
-              <span className="font-medium">{packageInfo?.num || '无限'}</span>
+              <span className="text-muted-foreground">{t('profile.forwardLimit')}</span>
+              <span className="font-medium">{packageInfo?.num || t('common.unlimited')}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">到期时间</span>
+              <span className="text-muted-foreground">{t('profile.expireTime')}</span>
               <span className="font-medium">
-                {packageInfo?.expTime ? new Date(packageInfo.expTime).toLocaleString() : '永不过期'}
+                {packageInfo?.expTime ? new Date(packageInfo.expTime).toLocaleString() : t('common.neverExpire')}
               </span>
             </div>
           </CardContent>
@@ -150,12 +152,12 @@ export default function ProfilePage() {
         <Card>
           <CardHeader className="flex flex-row items-center gap-3 pb-2">
             <Clock className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">快捷操作</CardTitle>
+            <CardTitle className="text-lg">{t('profile.quickActions')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <Button variant="outline" className="w-full justify-start" onClick={() => router.push('/change-password')}>
               <KeyRound className="mr-2 h-4 w-4" />
-              修改密码
+              {t('profile.changePassword')}
             </Button>
           </CardContent>
         </Card>

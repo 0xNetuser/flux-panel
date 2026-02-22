@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { getAllUsers, createUser, updateUser, deleteUser, resetUserFlow } from '@/lib/api/user';
 import { getNodeList } from '@/lib/api/node';
 import { useAuth } from '@/lib/hooks/use-auth';
+import { useTranslation } from '@/lib/i18n';
 
 interface NodeItem {
   id: number;
@@ -25,6 +26,7 @@ interface NodeItem {
 
 export default function UserPage() {
   const { isAdmin } = useAuth();
+  const { t } = useTranslation();
   const [users, setUsers] = useState<any[]>([]);
   const [nodes, setNodes] = useState<NodeItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,7 +96,7 @@ export default function UserPage() {
 
   const handleSubmit = async () => {
     if (!editingUser && (!form.user || !form.password)) {
-      toast.error('请填写用户名和密码');
+      toast.error(t('user.fillUsernameAndPassword'));
       return;
     }
     const data: any = {
@@ -116,7 +118,7 @@ export default function UserPage() {
     }
 
     if (res.code === 0) {
-      toast.success(editingUser ? '更新成功' : '创建成功');
+      toast.success(editingUser ? t('common.updateSuccess') : t('common.createSuccess'));
       setDialogOpen(false);
       loadData();
     } else {
@@ -125,16 +127,16 @@ export default function UserPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('确定删除此用户?')) return;
+    if (!confirm(t('user.confirmDelete'))) return;
     const res = await deleteUser(id);
-    if (res.code === 0) { toast.success('删除成功'); loadData(); }
+    if (res.code === 0) { toast.success(t('common.deleteSuccess')); loadData(); }
     else toast.error(res.msg);
   };
 
   const handleResetFlow = async (id: number) => {
-    if (!confirm('确定重置此用户的流量?')) return;
+    if (!confirm(t('user.confirmResetTraffic'))) return;
     const res = await resetUserFlow({ id, type: 0 });
-    if (res.code === 0) { toast.success('流量已重置'); loadData(); }
+    if (res.code === 0) { toast.success(t('user.trafficReset')); loadData(); }
     else toast.error(res.msg);
   };
 
@@ -165,8 +167,8 @@ export default function UserPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">用户管理</h2>
-        <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />创建用户</Button>
+        <h2 className="text-2xl font-bold">{t('user.title')}</h2>
+        <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />{t('user.createUser')}</Button>
       </div>
 
       <Card>
@@ -174,21 +176,21 @@ export default function UserPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>用户名</TableHead>
-                <TableHead>角色</TableHead>
-                <TableHead>权限</TableHead>
-                <TableHead>流量 (已用/总量)</TableHead>
-                <TableHead>转发数</TableHead>
-                <TableHead>到期时间</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead>操作</TableHead>
+                <TableHead>{t('user.username')}</TableHead>
+                <TableHead>{t('user.role')}</TableHead>
+                <TableHead>{t('user.permissions')}</TableHead>
+                <TableHead>{t('user.trafficUsedTotal')}</TableHead>
+                <TableHead>{t('user.forwardCount')}</TableHead>
+                <TableHead>{t('user.expireTime')}</TableHead>
+                <TableHead>{t('user.status')}</TableHead>
+                <TableHead>{t('user.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8">加载中...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8">{t('common.loading')}</TableCell></TableRow>
               ) : users.length === 0 ? (
-                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">暂无数据</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">{t('common.noData')}</TableCell></TableRow>
               ) : (
                 users.map((u) => {
                   const usedFlow = (u.inFlow || 0) + (u.outFlow || 0);
@@ -201,7 +203,7 @@ export default function UserPage() {
                       <TableCell className="font-medium">{u.user}</TableCell>
                       <TableCell>
                         <Badge variant={u.roleId === 0 ? 'default' : 'secondary'}>
-                          {u.roleId === 0 ? '管理员' : '用户'}
+                          {u.roleId === 0 ? t('user.admin') : t('user.normalUser')}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -215,19 +217,19 @@ export default function UserPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-sm">
-                        {formatBytes(usedFlow)} / {u.flow ? `${u.flow} GB` : '无限'}
+                        {formatBytes(usedFlow)} / {u.flow ? `${u.flow} GB` : t('common.unlimited')}
                       </TableCell>
-                      <TableCell>{u.num || '无限'}</TableCell>
+                      <TableCell>{u.num || t('common.unlimited')}</TableCell>
                       <TableCell className="text-sm">
-                        {u.expTime ? new Date(u.expTime).toLocaleDateString() : '永不过期'}
+                        {u.expTime ? new Date(u.expTime).toLocaleDateString() : t('common.neverExpire')}
                       </TableCell>
                       <TableCell>
                         {isExpired ? (
-                          <Badge variant="destructive">已过期</Badge>
+                          <Badge variant="destructive">{t('user.expired')}</Badge>
                         ) : isOverFlow ? (
-                          <Badge variant="destructive">流量超限</Badge>
+                          <Badge variant="destructive">{t('user.overTraffic')}</Badge>
                         ) : (
-                          <Badge variant="default">正常</Badge>
+                          <Badge variant="default">{t('user.normal')}</Badge>
                         )}
                       </TableCell>
                       <TableCell>
@@ -235,7 +237,7 @@ export default function UserPage() {
                           <Button variant="ghost" size="icon" onClick={() => handleEdit(u)} title="编辑">
                             <Edit2 className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleResetFlow(u.id)} title="重置流量">
+                          <Button variant="ghost" size="icon" onClick={() => handleResetFlow(u.id)} title={t('user.resetTraffic')}>
                             <RotateCcw className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="icon" onClick={() => handleDelete(u.id)} className="text-destructive" title="删除">
@@ -256,49 +258,49 @@ export default function UserPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingUser ? '编辑用户' : '创建用户'}</DialogTitle>
+            <DialogTitle>{editingUser ? t('user.editUser') : t('user.createUserTitle')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>用户名</Label>
+              <Label>{t('user.username')}</Label>
               <Input
                 value={form.user}
                 onChange={e => setForm(p => ({ ...p, user: e.target.value }))}
-                placeholder="用户名"
+                placeholder={t('user.usernamePlaceholder')}
                 disabled={!!editingUser}
               />
             </div>
             <div className="space-y-2">
-              <Label>密码{editingUser ? ' (留空不修改)' : ''}</Label>
+              <Label>{editingUser ? t('user.passwordHintEdit') : t('user.password')}</Label>
               <Input
                 type="password"
                 value={form.password}
                 onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
-                placeholder={editingUser ? '留空不修改' : '密码'}
+                placeholder={editingUser ? t('user.passwordPlaceholderEdit') : t('user.passwordPlaceholder')}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>流量 (GB)</Label>
+                <Label>{t('user.trafficGb')}</Label>
                 <Input
                   type="number"
                   value={form.flow}
                   onChange={e => setForm(p => ({ ...p, flow: e.target.value }))}
-                  placeholder="0 = 无限"
+                  placeholder={t('user.trafficPlaceholder')}
                 />
               </div>
               <div className="space-y-2">
-                <Label>转发数量</Label>
+                <Label>{t('user.forwardNum')}</Label>
                 <Input
                   type="number"
                   value={form.num}
                   onChange={e => setForm(p => ({ ...p, num: e.target.value }))}
-                  placeholder="0 = 无限"
+                  placeholder={t('user.forwardPlaceholder')}
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>到期时间</Label>
+              <Label>{t('user.expireTime')}</Label>
               <Input
                 type="datetime-local"
                 value={form.expTime}
@@ -310,10 +312,10 @@ export default function UserPage() {
 
             {/* Permission Settings */}
             <div className="space-y-3">
-              <Label className="text-base font-semibold">权限设置</Label>
+              <Label className="text-base font-semibold">{t('user.permissionSettings')}</Label>
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-center justify-between rounded-lg border p-3">
-                  <Label htmlFor="gost-switch" className="text-sm">GOST 转发</Label>
+                  <Label htmlFor="gost-switch" className="text-sm">{t('user.gostForward')}</Label>
                   <Switch
                     id="gost-switch"
                     checked={form.gostEnabled}
@@ -321,7 +323,7 @@ export default function UserPage() {
                   />
                 </div>
                 <div className="flex items-center justify-between rounded-lg border p-3">
-                  <Label htmlFor="xray-switch" className="text-sm">Xray 代理</Label>
+                  <Label htmlFor="xray-switch" className="text-sm">{t('user.xrayProxy')}</Label>
                   <Switch
                     id="xray-switch"
                     checked={form.xrayEnabled}
@@ -335,9 +337,9 @@ export default function UserPage() {
             {nodes.length > 0 && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <Label className="text-base font-semibold">节点权限</Label>
+                  <Label className="text-base font-semibold">{t('user.nodePermissions')}</Label>
                   <Button variant="outline" size="sm" onClick={toggleAllNodes}>
-                    {form.nodeIds.length === allNodeIds.length ? '取消全选' : '全选'}
+                    {form.nodeIds.length === allNodeIds.length ? t('user.deselectAll') : t('user.selectAll')}
                   </Button>
                 </div>
                 <div className="max-h-[160px] overflow-y-auto rounded-lg border p-2 space-y-1">
@@ -352,20 +354,20 @@ export default function UserPage() {
                       />
                       <span className="text-sm flex-1">{node.name}</span>
                       <Badge variant={node.status === 1 ? 'default' : 'secondary'} className="text-xs">
-                        {node.status === 1 ? '在线' : '离线'}
+                        {node.status === 1 ? t('common.online') : t('common.offline')}
                       </Badge>
                     </label>
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  已选 {form.nodeIds.length} / {nodes.length} 个节点。不选择任何节点表示允许访问全部节点。
+                  {t('user.selectedNodes', { selected: form.nodeIds.length, total: nodes.length })}
                 </p>
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSubmit}>{editingUser ? '更新' : '创建'}</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleSubmit}>{editingUser ? t('common.update') : t('common.create')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

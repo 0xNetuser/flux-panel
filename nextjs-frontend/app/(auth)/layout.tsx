@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
@@ -119,13 +118,18 @@ function SidebarContent({ pathname, isAdmin, gostEnabled, xrayEnabled, onNavigat
 }
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
   const { isAuthenticated, isAdmin, username, gostEnabled, xrayEnabled, loading } = useAuth();
   const isMobile = useIsMobile();
   const { t } = useTranslation();
   const { siteName } = useSiteConfig();
   const [sheetOpen, setSheetOpen] = useState(false);
   const [panelVersion, setPanelVersion] = useState('');
+  // Read pathname directly from browser — avoids Next.js internal router
+  // which can corrupt the URL to localhost during hydration/navigation.
+  const [pathname, setPathname] = useState('');
+  useEffect(() => {
+    setPathname(window.location.pathname.replace(/\/+$/, '') || '/');
+  }, []);
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {

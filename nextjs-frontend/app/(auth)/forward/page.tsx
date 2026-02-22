@@ -314,8 +314,8 @@ export default function ForwardPage() {
               <Select value={form.tunnelId} onValueChange={v => setForm(p => ({ ...p, tunnelId: v }))}>
                 <SelectTrigger><SelectValue placeholder={t('forward.selectTunnel')} /></SelectTrigger>
                 <SelectContent>
-                  {tunnels.map((t: any) => (
-                    <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>
+                  {tunnels.map((tun: any) => (
+                    <SelectItem key={tun.id} value={tun.id.toString()}>{tun.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

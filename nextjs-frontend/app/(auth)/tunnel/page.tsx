@@ -208,31 +208,31 @@ export default function TunnelPage() {
                   ) : tunnels.length === 0 ? (
                     <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">{t('common.noData')}</TableCell></TableRow>
                   ) : (
-                    tunnels.map((t) => (
-                      <TableRow key={t.id}>
-                        <TableCell className="font-medium">{t.name}</TableCell>
-                        <TableCell>{getNodeName(t.inNodeId)}</TableCell>
-                        <TableCell>{getNodeName(t.outNodeId)}</TableCell>
+                    tunnels.map((tun) => (
+                      <TableRow key={tun.id}>
+                        <TableCell className="font-medium">{tun.name}</TableCell>
+                        <TableCell>{getNodeName(tun.inNodeId)}</TableCell>
+                        <TableCell>{getNodeName(tun.outNodeId)}</TableCell>
                         <TableCell>
                           <Badge variant="outline">
-                            {t.type === 1 ? t('tunnel.portForward') : t('tunnel.tunnelForward')}
+                            {tun.type === 1 ? t('tunnel.portForward') : t('tunnel.tunnelForward')}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="secondary">{t.type === 1 ? 'TCP+UDP' : t.protocol?.toUpperCase()}</Badge>
+                          <Badge variant="secondary">{tun.type === 1 ? 'TCP+UDP' : tun.protocol?.toUpperCase()}</Badge>
                         </TableCell>
-                        <TableCell>{t.portSta} - {t.portEnd}</TableCell>
+                        <TableCell>{tun.portSta} - {tun.portEnd}</TableCell>
                         <TableCell>
-                          <Badge variant={t.status === 1 ? 'default' : 'secondary'}>
-                            {t.status === 1 ? t('tunnel.normal') : t('tunnel.stopped')}
+                          <Badge variant={tun.status === 1 ? 'default' : 'secondary'}>
+                            {tun.status === 1 ? t('tunnel.normal') : t('tunnel.stopped')}
                           </Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => handleEdit(t)}>
+                            <Button variant="ghost" size="icon" onClick={() => handleEdit(tun)}>
                               <Edit2 className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDelete(t.id)} className="text-destructive">
+                            <Button variant="ghost" size="icon" onClick={() => handleDelete(tun.id)} className="text-destructive">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
@@ -400,8 +400,8 @@ export default function TunnelPage() {
               <Select value={assignForm.tunnelId} onValueChange={v => setAssignForm(p => ({ ...p, tunnelId: v }))}>
                 <SelectTrigger><SelectValue placeholder={t('tunnel.selectTunnel')} /></SelectTrigger>
                 <SelectContent>
-                  {tunnels.map((t: any) => (
-                    <SelectItem key={t.id} value={t.id.toString()}>{t.name}</SelectItem>
+                  {tunnels.map((tun: any) => (
+                    <SelectItem key={tun.id} value={tun.id.toString()}>{tun.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

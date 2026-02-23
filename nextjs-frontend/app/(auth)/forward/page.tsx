@@ -80,7 +80,7 @@ export default function ForwardPage() {
 
   const handleCreate = () => {
     setEditingForward(null);
-    setForm({ name: '', tunnelId: '', remoteAddr: '', inPort: '', listenIp: '', strategy: 'round', interfaceName: '' });
+    setForm({ name: '', tunnelId: '', remoteAddr: '', inPort: '', listenIp: '::', strategy: 'round', interfaceName: '' });
     setDialogOpen(true);
   };
 
@@ -91,7 +91,7 @@ export default function ForwardPage() {
       tunnelId: forward.tunnelId?.toString(),
       remoteAddr: forward.remoteAddr?.includes(',') ? forward.remoteAddr.split(',').join('\n') : (forward.remoteAddr || ''),
       inPort: forward.inPort?.toString() || '',
-      listenIp: forward.listenIp || '',
+      listenIp: forward.listenIp || '::',
       strategy: forward.strategy || 'round',
       interfaceName: forward.interfaceName || '',
     });

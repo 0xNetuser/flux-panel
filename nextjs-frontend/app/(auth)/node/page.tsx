@@ -601,9 +601,7 @@ export default function NodePage() {
                 <div className="border-t pt-3">
                   <p className="text-sm font-medium mb-2 text-muted-foreground">{t('node.uninstallCommand')}</p>
                   <pre className="bg-muted p-4 rounded-md text-sm overflow-x-auto whitespace-pre-wrap break-all">
-                    {commandNode?.disguiseName
-                      ? `bash /etc/${commandNode.disguiseName}/uninstall.sh`
-                      : `systemctl stop gost-node && systemctl disable gost-node && rm -f /etc/systemd/system/gost-node.service && systemctl daemon-reload && rm -f /usr/local/bin/gost-node /usr/local/bin/xray && rm -rf /etc/gost`}
+                    {`bash /etc/${commandNode?.disguiseName || 'gost-node'}/uninstall.sh`}
                   </pre>
                 </div>
               </>

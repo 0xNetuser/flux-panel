@@ -305,19 +305,23 @@ func GenerateDockerInstallCommand(id int64, clientAddr string) dto.R {
 		imageTag = "latest"
 	}
 	imageRef := fmt.Sprintf("0xnetuser/node:%s", imageTag)
-	containerName := sanitizeContainerName(node.DisguiseName)
+	appName := node.DisguiseName
+	if appName == "" {
+		appName = fmt.Sprintf("svc-agent-%d", node.ID)
+	}
+	secName := node.XrayDisguiseName
+	if secName == "" {
+		secName = fmt.Sprintf("aux-agent-%d", node.ID)
+	}
+	containerName := sanitizeContainerName(appName)
 	if containerName == "" {
 		containerName = fmt.Sprintf("svc-agent-%d", node.ID)
 	}
 	labelValue := fmt.Sprintf("n-%d", node.ID)
-	nameEnv := ""
-	if node.DisguiseName != "" {
-		nameEnv += fmt.Sprintf(" -e APP_NAME=%s", shQuote(node.DisguiseName))
-	}
-	if node.XrayDisguiseName != "" {
-		nameEnv += fmt.Sprintf(" -e SEC_NAME=%s", shQuote(node.XrayDisguiseName))
-	}
 	secCfg := "agent.json"
+	nameEnv := ""
+	nameEnv += fmt.Sprintf(" -e APP_NAME=%s", shQuote(appName))
+	nameEnv += fmt.Sprintf(" -e SEC_NAME=%s", shQuote(secName))
 	nameEnv += fmt.Sprintf(" -e SEC_CFG=%s", shQuote(secCfg))
 	cmd := fmt.Sprintf(`ids="$( { docker ps -aq --filter label=app.scope=%s; docker ps -aq --filter name=^/flux-node$; docker ps -aq --filter name=^/%s$; } | sort -u )"; if [ -n "$ids" ]; then docker rm -f $ids; fi; mkdir -p ~/.flux && docker run -d --name %s --label app.scope=%s --restart unless-stopped --network host -v ~/.flux:/etc/node -e PANEL_ADDR=%s -e SECRET=%s%s %s`,
 		shQuote(labelValue), containerName, shQuote(containerName), shQuote(labelValue), shQuote(panelAddr), shQuote(node.Secret), nameEnv, shQuote(imageRef))

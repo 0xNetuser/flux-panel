@@ -51,6 +51,20 @@ export function SiteConfigProvider({ children }: { children: ReactNode }) {
     document.title = siteName;
   }, [siteName]);
 
+  useEffect(() => {
+    if (siteDesc) {
+      let meta = document.querySelector('meta[name="description"]') as HTMLMetaElement | null;
+      if (meta) {
+        meta.content = siteDesc;
+      } else {
+        meta = document.createElement('meta');
+        meta.name = 'description';
+        meta.content = siteDesc;
+        document.head.appendChild(meta);
+      }
+    }
+  }, [siteDesc]);
+
   return (
     <SiteConfigContext.Provider value={{ siteName, siteDesc, appName, refreshSiteConfig: refresh }}>
       {children}

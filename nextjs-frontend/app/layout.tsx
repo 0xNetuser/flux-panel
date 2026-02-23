@@ -18,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Flux Panel",
-  description: "GOST + Xray 转发管理面板",
+  title: "Panel",
+  description: "",
 };
 
 export default function RootLayout({

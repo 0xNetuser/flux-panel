@@ -307,6 +307,8 @@ jobs:
             --cache-to type=gha,mode=max \
             -t 0xnetuser/node:latest \
             -t 0xnetuser/node:${VERSION} \
+            -t 0xnetuser/gost-node:latest \
+            -t 0xnetuser/gost-node:${VERSION} \
             -f go-node/Dockerfile \
             ./go-node
 
@@ -349,6 +351,8 @@ jobs:
             --cache-to type=gha,mode=max \
             -t 0xnetuser/node-binary:latest \
             -t 0xnetuser/node-binary:${VERSION} \
+            -t 0xnetuser/gost-binary:latest \
+            -t 0xnetuser/gost-binary:${VERSION} \
             -f go-node/Dockerfile.binary \
             ./go-node
 

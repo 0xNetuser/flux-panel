@@ -306,7 +306,14 @@ export default function NodePage() {
                   <TableRow key={n.id}>
                     <TableCell className="font-medium">{n.name}</TableCell>
                     <TableCell className="text-sm whitespace-pre-line">{n.entryIps ? n.entryIps.split(',').join('\n') : (n.ip || '-')}</TableCell>
-                    <TableCell className="text-sm">{n.serverIp}</TableCell>
+                    <TableCell className="text-sm">
+                      <div>{n.serverIp}</div>
+                      {n.status === 1 && n.panelAddr && (
+                        <div className="text-xs text-muted-foreground truncate max-w-[180px]" title={n.panelAddr}>
+                          {t('monitor.panelAddr')}: {n.panelAddr}
+                        </div>
+                      )}
+                    </TableCell>
                     <TableCell>{n.portSta} - {n.portEnd}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">

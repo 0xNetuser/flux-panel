@@ -149,9 +149,12 @@ func ResumeRemoteService(nodeId int64, name string) *dto.GostResponse {
 	return WS.SendMsg(nodeId, data, "ResumeService")
 }
 
-func NodeUpdateBinary(nodeId int64) *dto.GostResponse {
-	// 节点端使用自身 config.json 中的 addr 构建下载地址，无需面板传入 panelAddr
-	return WS.SendMsgWithTimeout(nodeId, map[string]interface{}{}, "NodeUpdateBinary", 6*time.Minute)
+func NodeUpdateBinary(nodeId int64, panelAddr string) *dto.GostResponse {
+	// 新版节点使用自身 config.json 中的 addr 构建下载地址，
+	// 但仍传入 panelAddr 以兼容旧版节点
+	return WS.SendMsgWithTimeout(nodeId, map[string]interface{}{
+		"panelAddr": panelAddr,
+	}, "NodeUpdateBinary", 6*time.Minute)
 }
 
 func AddChains(nodeId int64, name string, remoteAddr string, protocol string, interfaceName string) *dto.GostResponse {

@@ -102,7 +102,8 @@ func NodeUpdateBinary(c *gin.Context) {
 		c.JSON(http.StatusOK, dto.Err("参数错误"))
 		return
 	}
-	result := pkg.NodeUpdateBinary(d.ID)
+	panelAddr := service.GetPanelAddress("")
+	result := pkg.NodeUpdateBinary(d.ID, panelAddr)
 	if result == nil || result.Msg != "OK" {
 		msg := "节点更新失败"
 		if result != nil {

@@ -483,6 +483,7 @@ const zh = {
   xrayInbound: {
     title: '入站管理',
     createInbound: '创建入站',
+    allNodes: '全部节点',
     remark: '备注',
     protocol: '协议',
     transportSecurity: '传输/安全',

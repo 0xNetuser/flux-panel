@@ -41,6 +41,7 @@ export default function XrayInboundPage() {
   const [editingInbound, setEditingInbound] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
   const [operatingIds, setOperatingIds] = useState<Set<number>>(new Set());
+  const [filterNodeId, setFilterNodeId] = useState('');
 
   // Client inline management
   const [expandedInbound, setExpandedInbound] = useState<number | null>(null);
@@ -361,7 +362,20 @@ export default function XrayInboundPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">{t('xrayInbound.title')}</h2>
-        <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />{t('xrayInbound.createInbound')}</Button>
+        <div className="flex items-center gap-2">
+          {nodes.length > 1 && (
+            <Select value={filterNodeId} onValueChange={setFilterNodeId}>
+              <SelectTrigger className="w-[180px]"><SelectValue placeholder={t('xrayInbound.allNodes')} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('xrayInbound.allNodes')}</SelectItem>
+                {nodes.map((n: any) => (
+                  <SelectItem key={n.id} value={n.id.toString()}>{n.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          <Button onClick={handleCreate}><Plus className="mr-2 h-4 w-4" />{t('xrayInbound.createInbound')}</Button>
+        </div>
       </div>
 
       <Card>
@@ -381,12 +395,13 @@ export default function XrayInboundPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8">{t('common.loading')}</TableCell></TableRow>
-              ) : inbounds.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">{t('common.noData')}</TableCell></TableRow>
-              ) : (
-                inbounds.map((ib) => (
+              {(() => {
+                const isFiltered = filterNodeId && filterNodeId !== 'all';
+                const filtered = isFiltered
+                  ? inbounds.filter(ib => ib.nodeId?.toString() === filterNodeId)
+                  : inbounds;
+
+                const renderInbound = (ib: any) => (
                   <Fragment key={ib.id}>
                     <TableRow className="cursor-pointer" onClick={() => handleToggleExpand(ib.id)}>
                       <TableCell className="w-8 px-2">
@@ -531,8 +546,43 @@ export default function XrayInboundPage() {
                       </TableRow>
                     )}
                   </Fragment>
-                ))
-              )}
+                );
+
+                if (loading) {
+                  return <TableRow><TableCell colSpan={9} className="text-center py-8">{t('common.loading')}</TableCell></TableRow>;
+                }
+                if (filtered.length === 0) {
+                  return <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">{t('common.noData')}</TableCell></TableRow>;
+                }
+
+                // Group by node when showing all (not filtered to specific node)
+                if (!isFiltered && nodes.length > 1) {
+                  const groups: Record<string, any[]> = {};
+                  const order: string[] = [];
+                  for (const ib of filtered) {
+                    const nid = String(ib.nodeId);
+                    if (!groups[nid]) {
+                      groups[nid] = [];
+                      order.push(nid);
+                    }
+                    groups[nid].push(ib);
+                  }
+                  return order.map(nid => {
+                    const groupInbounds = groups[nid];
+                    const nodeName = getNodeName(parseInt(nid));
+                    return [
+                      <TableRow key={`group-${nid}`} className="bg-muted/50 hover:bg-muted/50">
+                        <TableCell colSpan={9} className="py-1.5 text-xs font-semibold text-muted-foreground">
+                          {nodeName} ({groupInbounds.length})
+                        </TableCell>
+                      </TableRow>,
+                      ...groupInbounds.map(renderInbound),
+                    ];
+                  });
+                }
+
+                return filtered.map(renderInbound);
+              })()}
             </TableBody>
           </Table>
         </CardContent>

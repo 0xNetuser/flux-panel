@@ -485,6 +485,7 @@ const en: Translations = {
   xrayInbound: {
     title: 'Inbound Management',
     createInbound: 'Create Inbound',
+    allNodes: 'All Nodes',
     remark: 'Remark',
     protocol: 'Protocol',
     transportSecurity: 'Transport/Security',

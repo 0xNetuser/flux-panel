@@ -382,6 +382,14 @@ func DeleteXrayInbound(id int64, userId int64, roleId int) dto.R {
 
 	DB.Delete(&inbound)
 
+	// If no enabled inbounds remain on this node, stop Xray
+	var remaining int64
+	DB.Model(&model.XrayInbound{}).Where("node_id = ? AND enable = 1", inbound.NodeId).Count(&remaining)
+	if remaining == 0 {
+		log.Printf("[XrayInbound] 节点 %d 无剩余入站，自动停止 Xray", inbound.NodeId)
+		pkg.XrayStop(inbound.NodeId)
+	}
+
 	return dto.Ok("删除成功")
 }
 
@@ -453,6 +461,15 @@ func DisableXrayInbound(id int64, userId int64, roleId int) dto.R {
 		"enable":       0,
 		"updated_time": time.Now().UnixMilli(),
 	})
+
+	// If no enabled inbounds remain on this node, stop Xray
+	var remaining int64
+	DB.Model(&model.XrayInbound{}).Where("node_id = ? AND enable = 1", inbound.NodeId).Count(&remaining)
+	if remaining == 0 {
+		log.Printf("[XrayInbound] 节点 %d 无剩余启用入站，自动停止 Xray", inbound.NodeId)
+		pkg.XrayStop(inbound.NodeId)
+	}
+
 	return dto.Ok("已禁用")
 }
 

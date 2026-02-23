@@ -37,8 +37,11 @@ func GetNodeHealthList() dto.R {
 				item["cpuUsage"] = sysInfo.CPUUsage
 				item["memUsage"] = sysInfo.MemoryUsage
 				item["uptime"] = sysInfo.Uptime
+				// Keep legacy fields and add vRunning/vVersion expected by frontend
 				item["xrayRunning"] = sysInfo.XrayRunning
 				item["xrayVersion"] = sysInfo.XrayVersion
+				item["vRunning"] = sysInfo.XrayRunning
+				item["vVersion"] = sysInfo.XrayVersion
 				item["interfaces"] = sysInfo.Interfaces
 				item["bytesReceived"] = sysInfo.BytesReceived
 				item["bytesTransmitted"] = sysInfo.BytesTransmitted

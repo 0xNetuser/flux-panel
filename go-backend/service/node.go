@@ -82,6 +82,9 @@ func GetAllNodes() dto.R {
 			"xrayEnabled": n.XrayEnabled,
 			"xrayVersion": n.XrayVersion,
 			"xrayStatus":  n.XrayStatus,
+			// Frontend expects vVersion/vStatus
+			"vVersion": n.XrayVersion,
+			"vStatus":  n.XrayStatus,
 			"createdTime": n.CreatedTime,
 			"updatedTime": n.UpdatedTime,
 			"status":           status,
@@ -103,6 +106,7 @@ func GetAllNodes() dto.R {
 				item["panelAddr"] = info.PanelAddr
 				if info.XrayVersion != "" {
 					item["xrayVersion"] = info.XrayVersion
+					item["vVersion"] = info.XrayVersion
 				}
 			}
 		}

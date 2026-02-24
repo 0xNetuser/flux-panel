@@ -81,22 +81,34 @@ if [ ! -f "$RUNTIME_CONFIG" ]; then
   echo "{}" > "$RUNTIME_CONFIG"
 fi
 
-# Restore persisted binaries (generic + customized)
-if [ -f /etc/node/node-svc ]; then
-  cp /etc/node/node-svc /usr/local/bin/node-svc
-  chmod +x /usr/local/bin/node-svc
-fi
-if [ -f /etc/node/svc-runtime ]; then
-  cp /etc/node/svc-runtime /usr/local/bin/svc-runtime
-  chmod +x /usr/local/bin/svc-runtime
-fi
-if [ -f "/etc/node/$BIN_NAME" ]; then
-  cp "/etc/node/$BIN_NAME" "/usr/local/bin/$BIN_NAME"
-  chmod +x "/usr/local/bin/$BIN_NAME"
-fi
-if [ -f "/etc/node/$AUX_NAME" ]; then
-  cp "/etc/node/$AUX_NAME" "/usr/local/bin/$AUX_NAME"
-  chmod +x "/usr/local/bin/$AUX_NAME"
+# Detect image update: compare image binary checksum with persisted marker.
+# If the image was updated (docker compose pull), clear persisted binaries
+# so the new image binary takes effect instead of the old persisted one.
+IMAGE_HASH=$(md5sum /usr/local/bin/node-svc 2>/dev/null | cut -d' ' -f1)
+STORED_HASH=$(cat /etc/node/.image_hash 2>/dev/null || echo "")
+if [ "$IMAGE_HASH" != "$STORED_HASH" ]; then
+  # New image detected, remove persisted binaries
+  rm -f /etc/node/node-svc /etc/node/svc-runtime
+  rm -f "/etc/node/$BIN_NAME" "/etc/node/$AUX_NAME"
+  echo "$IMAGE_HASH" > /etc/node/.image_hash
+else
+  # Same image, restore persisted binaries (from panel binary-only update)
+  if [ -f /etc/node/node-svc ]; then
+    cp /etc/node/node-svc /usr/local/bin/node-svc
+    chmod +x /usr/local/bin/node-svc
+  fi
+  if [ -f /etc/node/svc-runtime ]; then
+    cp /etc/node/svc-runtime /usr/local/bin/svc-runtime
+    chmod +x /usr/local/bin/svc-runtime
+  fi
+  if [ -f "/etc/node/$BIN_NAME" ]; then
+    cp "/etc/node/$BIN_NAME" "/usr/local/bin/$BIN_NAME"
+    chmod +x "/usr/local/bin/$BIN_NAME"
+  fi
+  if [ -f "/etc/node/$AUX_NAME" ]; then
+    cp "/etc/node/$AUX_NAME" "/usr/local/bin/$AUX_NAME"
+    chmod +x "/usr/local/bin/$AUX_NAME"
+  fi
 fi
 
 if [ "$BIN_NAME" != "node-svc" ]; then

@@ -42,7 +42,8 @@ const navItems: NavItem[] = [
   // System
   { path: '/node', labelKey: 'nav.node', icon: <Server className="h-4 w-4" />, adminOnly: true, section: 'system', sectionKey: 'nav.system' },
   { path: '/user', labelKey: 'nav.user', icon: <Users className="h-4 w-4" />, adminOnly: true, section: 'system', sectionKey: 'nav.system' },
-  { path: '/monitor', labelKey: 'nav.monitor', icon: <Activity className="h-4 w-4" />, adminOnly: true, section: 'system', sectionKey: 'nav.system' },
+  { path: '/monitor/node', labelKey: 'nav.nodeMonitor', icon: <Server className="h-4 w-4" />, adminOnly: true, section: 'system', sectionKey: 'nav.system' },
+  { path: '/monitor/network', labelKey: 'nav.networkMonitor', icon: <Activity className="h-4 w-4" />, adminOnly: true, section: 'system', sectionKey: 'nav.system' },
   { path: '/config', labelKey: 'nav.config', icon: <Settings className="h-4 w-4" />, adminOnly: true, section: 'system', sectionKey: 'nav.system' },
 ];
 

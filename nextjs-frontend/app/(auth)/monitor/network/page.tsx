@@ -6,9 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Server, Cpu, HardDrive, Network, RefreshCw, Filter } from 'lucide-react';
+import { RefreshCw, Filter } from 'lucide-react';
 import { useAuth } from '@/lib/hooks/use-auth';
-import { getNodeHealth, getLatencyHistory, getTrafficOverview, getForwardFlowHistory, getXrayTrafficOverview, getXrayInboundFlowHistory } from '@/lib/api/monitor';
+import { getLatencyHistory, getTrafficOverview, getForwardFlowHistory, getXrayTrafficOverview, getXrayInboundFlowHistory } from '@/lib/api/monitor';
 import { post } from '@/lib/api/client';
 import { useTranslation } from '@/lib/i18n';
 import {
@@ -25,43 +25,9 @@ function formatBytes(bytes: number) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
-function formatUptime(seconds: number) {
-  const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  if (d > 0) return `${d}d ${h}h`;
-  const m = Math.floor((seconds % 3600) / 60);
-  return `${h}h ${m}m`;
-}
-
 function formatTime(ts: number) {
   const d = new Date(ts * 1000);
   return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-}
-
-interface NodeHealth {
-  id: number;
-  name: string;
-  serverIp: string;
-  online: boolean;
-  version: string;
-  cpuUsage?: number;
-  memUsage?: number;
-  uptime?: number;
-  vRunning?: boolean;
-  vVersion?: string;
-  interfaces?: { name: string; ips: string[] }[];
-  bytesReceived?: number;
-  bytesTransmitted?: number;
-  panelAddr?: string;
-  runtime?: string;
-}
-
-function formatSpeed(bytesPerSec: number) {
-  if (bytesPerSec <= 0) return '0 B/s';
-  const k = 1024;
-  const sizes = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
-  const i = Math.floor(Math.log(Math.abs(bytesPerSec)) / Math.log(k));
-  return parseFloat((bytesPerSec / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[Math.min(i, sizes.length - 1)];
 }
 
 interface ForwardItem {
@@ -89,10 +55,9 @@ interface LatencyRecord {
   recordTime: number;
 }
 
-export default function MonitorPage() {
+export default function NetworkMonitorPage() {
   const { isAdmin } = useAuth();
   const { t } = useTranslation();
-  const [nodes, setNodes] = useState<NodeHealth[]>([]);
   const [forwards, setForwards] = useState<ForwardItem[]>([]);
   const [inbounds, setInbounds] = useState<InboundItem[]>([]);
 
@@ -104,6 +69,7 @@ export default function MonitorPage() {
   const [gostForwardChartData, setGostForwardChartData] = useState<any[]>([]);
   const [gostFilterOpen, setGostFilterOpen] = useState(false);
   const gostFilterRef = useRef<HTMLDivElement>(null);
+  const [gostHidden, setGostHidden] = useState<Set<string>>(new Set());
 
   // Xray traffic state
   const [xrayTrafficData, setXrayTrafficData] = useState<any[]>([]);
@@ -113,6 +79,7 @@ export default function MonitorPage() {
   const [xrayInboundChartData, setXrayInboundChartData] = useState<any[]>([]);
   const [xrayFilterOpen, setXrayFilterOpen] = useState(false);
   const xrayFilterRef = useRef<HTMLDivElement>(null);
+  const [xrayHidden, setXrayHidden] = useState<Set<string>>(new Set());
 
   // Latency state
   const [latencyRange, setLatencyRange] = useState('6');
@@ -121,6 +88,7 @@ export default function MonitorPage() {
   const [latencyStatsData, setLatencyStatsData] = useState<Record<number, { avg: number; last: number; successRate: number }>>({});
   const [latencyFilterOpen, setLatencyFilterOpen] = useState(false);
   const latencyFilterRef = useRef<HTMLDivElement>(null);
+  const [latencyHidden, setLatencyHidden] = useState<Set<string>>(new Set());
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -128,100 +96,17 @@ export default function MonitorPage() {
   const forwardsInitialized = useRef(false);
   const inboundsInitialized = useRef(false);
 
-  // Real-time speed tracking
-  const [nodeSpeeds, setNodeSpeeds] = useState<Record<number, { uploadSpeed: number; downloadSpeed: number }>>({});
-  const prevBytesRef = useRef<Record<number, { rx: number; tx: number; time: number }>>({});
-
-  // WebSocket for real-time system info updates
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    const wsBase = process.env.NEXT_PUBLIC_API_BASE || window.location.origin;
-    const wsUrl = wsBase.replace(/^http/, 'ws') + '/system-info?type=0';
-
-    let ws: WebSocket | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout>;
-
-    const connect = () => {
-      ws = new WebSocket(wsUrl, [token]);
-
-      ws.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === 'info' && msg.data) {
-            const sysData = typeof msg.data === 'string' ? JSON.parse(msg.data) : msg.data;
-            const nodeId = parseInt(msg.id, 10);
-
-            if (sysData.bytes_received !== undefined && sysData.bytes_transmitted !== undefined) {
-              const now = Date.now() / 1000;
-              const rx = sysData.bytes_received;
-              const tx = sysData.bytes_transmitted;
-
-              const prev = prevBytesRef.current[nodeId];
-              if (prev) {
-                const dt = now - prev.time;
-                if (dt > 0) {
-                  if (rx >= prev.rx && tx >= prev.tx) {
-                    setNodeSpeeds(s => ({
-                      ...s,
-                      [nodeId]: {
-                        downloadSpeed: (rx - prev.rx) / dt,
-                        uploadSpeed: (tx - prev.tx) / dt,
-                      }
-                    }));
-                  } else {
-                    setNodeSpeeds(s => ({
-                      ...s,
-                      [nodeId]: { downloadSpeed: 0, uploadSpeed: 0 }
-                    }));
-                  }
-                }
-              }
-              prevBytesRef.current[nodeId] = { rx, tx, time: now };
-
-              setNodes(prev => prev.map(n =>
-                n.id === nodeId
-                  ? { ...n, bytesReceived: rx, bytesTransmitted: tx, cpuUsage: sysData.cpu_usage, memUsage: sysData.memory_usage, uptime: sysData.uptime }
-                  : n
-              ));
-            }
-          }
-        } catch (e) {
-          console.warn('Failed to parse WebSocket message:', e);
-        }
-      };
-
-      ws.onclose = () => {
-        reconnectTimer = setTimeout(connect, 5000);
-      };
-
-      ws.onerror = () => {
-        ws?.close();
-      };
-    };
-
-    connect();
-
-    return () => {
-      clearTimeout(reconnectTimer);
-      ws?.close();
-    };
-  }, []);
-
   const loadData = useCallback(async () => {
     if (initialLoad.current) setLoading(true);
     setRefreshing(true);
 
-    const [healthRes, gostTrafficRes, xrayTrafficRes, forwardRes, inboundRes] = await Promise.all([
-      getNodeHealth(),
+    const [gostTrafficRes, xrayTrafficRes, forwardRes, inboundRes] = await Promise.all([
       getTrafficOverview(gostGranularity, gostGranularity === 'day' ? 168 : 24),
       getXrayTrafficOverview(xrayGranularity, xrayGranularity === 'day' ? 168 : 24),
       post('/forward/list', {}),
       post('/v/inbound/list', {}),
     ]);
 
-    if (healthRes.code === 0) setNodes(healthRes.data || []);
     if (gostTrafficRes.code === 0) {
       setGostTrafficData((gostTrafficRes.data || []).map((d: any) => ({
         ...d,
@@ -414,6 +299,15 @@ export default function MonitorPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  const handleLegendClick = (setter: React.Dispatch<React.SetStateAction<Set<string>>>) => (e: any) => {
+    const key = e.dataKey || e.value;
+    setter(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  };
+
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -425,136 +319,11 @@ export default function MonitorPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">{t('monitor.title')}</h2>
+        <h2 className="text-2xl font-bold">{t('monitor.networkMonitorTitle')}</h2>
         <Button variant="outline" size="sm" onClick={loadData} disabled={refreshing}>
           <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
           {t('monitor.refresh')}
         </Button>
-      </div>
-
-      {/* Node Health Cards */}
-      <div>
-        <h3 className="text-lg font-semibold mb-3">{t('monitor.nodeStatus')}</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {nodes.map((node) => (
-            <Card key={node.id}>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Server className="h-4 w-4" />
-                    {node.name}
-                  </CardTitle>
-                  <Badge variant={node.online ? 'default' : 'secondary'}>
-                    {node.online ? t('common.online') : t('common.offline')}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">{node.serverIp}</span>
-                  {node.online && node.runtime && (
-                    <Badge variant={node.runtime === 'docker' ? 'outline' : 'secondary'} className="text-xs px-1.5 py-0">
-                      {node.runtime === 'docker' ? t('monitor.docker') : t('monitor.host')}
-                    </Badge>
-                  )}
-                </div>
-                {node.online && node.panelAddr && (
-                  <div className="text-xs text-muted-foreground truncate" title={node.panelAddr}>
-                    {t('monitor.panelAddr')}: {node.panelAddr}
-                  </div>
-                )}
-                {node.online && (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1"><Cpu className="h-3 w-3" />CPU</span>
-                      <span>{node.cpuUsage?.toFixed(1)}%</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1"><HardDrive className="h-3 w-3" />{t('monitor.memory')}</span>
-                      <span>{node.memUsage?.toFixed(1)}%</span>
-                    </div>
-                    {node.uptime !== undefined && (
-                      <div className="flex items-center justify-between">
-                        <span>{t('monitor.uptime')}</span>
-                        <span>{formatUptime(node.uptime)}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <span>GOST</span>
-                      <Badge variant="default" className="text-xs">{t('monitor.running')}</Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span>Xray</span>
-                      {node.vRunning ? (
-                        <Badge variant="default" className="text-xs">
-                          {node.vVersion?.match(/Xray\s+([\d.]+)/)?.[1] ? `Xray ${node.vVersion.match(/Xray\s+([\d.]+)/)![1]}` : (node.vVersion || t('monitor.running'))}
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-xs">{t('monitor.notRunning')}</Badge>
-                      )}
-                    </div>
-                    {/* Real-time speed */}
-                    {(nodeSpeeds[node.id] || node.bytesReceived !== undefined) && (
-                      <div className="pt-1 border-t space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground flex items-center gap-1">
-                            <Network className="h-3 w-3" />{t('monitor.realTimeSpeed')}
-                          </span>
-                        </div>
-                        {nodeSpeeds[node.id] && (
-                          <div className="grid grid-cols-2 gap-1 text-xs">
-                            <div className="flex items-center gap-1">
-                              <span className="text-green-500">{t('monitor.upload')}</span>
-                              <span>{formatSpeed(nodeSpeeds[node.id].uploadSpeed)}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span className="text-blue-500">{t('monitor.download')}</span>
-                              <span>{formatSpeed(nodeSpeeds[node.id].downloadSpeed)}</span>
-                            </div>
-                          </div>
-                        )}
-                        {node.bytesTransmitted !== undefined && node.bytesReceived !== undefined && (
-                          <div className="grid grid-cols-2 gap-1 text-xs text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <span>{t('monitor.totalUpload')}</span>
-                              <span>{formatBytes(node.bytesTransmitted)}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <span>{t('monitor.totalDownload')}</span>
-                              <span>{formatBytes(node.bytesReceived)}</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {node.interfaces && node.interfaces.length > 0 && (
-                      <div className="pt-1 border-t">
-                        <div className="flex items-center gap-1 text-muted-foreground mb-1">
-                          <Network className="h-3 w-3" />
-                          <span className="text-xs">{t('monitor.nic')}</span>
-                        </div>
-                        <div className="space-y-0.5">
-                          {node.interfaces.map((iface) => (
-                            <div key={iface.name} className="text-xs font-mono">
-                              <span className="text-foreground">{iface.name}</span>
-                              <span className="text-muted-foreground ml-1">{iface.ips.join(', ')}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-                {node.version && (
-                  <div className="text-xs text-muted-foreground">v{node.version}</div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-          {nodes.length === 0 && !loading && (
-            <p className="text-muted-foreground col-span-full text-center py-8">{t('monitor.noNodes')}</p>
-          )}
-        </div>
       </div>
 
       {/* GOST Traffic Chart */}
@@ -646,11 +415,17 @@ export default function MonitorPage() {
                   <XAxis dataKey="time" fontSize={12} />
                   <YAxis fontSize={12} tickFormatter={(v) => formatBytes(v)} />
                   <Tooltip formatter={(v) => formatBytes(Number(v))} />
-                  <Legend />
+                  <Legend
+                    onClick={handleLegendClick(setGostHidden)}
+                    wrapperStyle={{ fontSize: 12, maxHeight: 60, overflowY: 'auto', cursor: 'pointer' }}
+                    formatter={(value) => (
+                      <span style={{ color: gostHidden.has(value as string) ? '#ccc' : undefined }}>{value}</span>
+                    )}
+                  />
                   {forwards
                     .filter(f => gostSelectedForwards.has(f.id))
                     .map((f, i) => (
-                      <Line key={f.id} type="monotone" dataKey={f.name} stroke={CHART_COLORS[i % CHART_COLORS.length]} dot={false} />
+                      <Line key={f.id} type="monotone" dataKey={f.name} stroke={CHART_COLORS[i % CHART_COLORS.length]} dot={false} hide={gostHidden.has(f.name)} />
                     ))}
                 </LineChart>
               </ResponsiveContainer>
@@ -750,11 +525,17 @@ export default function MonitorPage() {
                   <XAxis dataKey="time" fontSize={12} />
                   <YAxis fontSize={12} tickFormatter={(v) => formatBytes(v)} />
                   <Tooltip formatter={(v) => formatBytes(Number(v))} />
-                  <Legend />
+                  <Legend
+                    onClick={handleLegendClick(setXrayHidden)}
+                    wrapperStyle={{ fontSize: 12, maxHeight: 60, overflowY: 'auto', cursor: 'pointer' }}
+                    formatter={(value) => (
+                      <span style={{ color: xrayHidden.has(value as string) ? '#ccc' : undefined }}>{value}</span>
+                    )}
+                  />
                   {inbounds
                     .filter(ib => xraySelectedInbounds.has(ib.id))
                     .map((ib, i) => (
-                      <Line key={ib.id} type="monotone" dataKey={ib.remark || `#${ib.id}`} stroke={CHART_COLORS[i % CHART_COLORS.length]} dot={false} />
+                      <Line key={ib.id} type="monotone" dataKey={ib.remark || `#${ib.id}`} stroke={CHART_COLORS[i % CHART_COLORS.length]} dot={false} hide={xrayHidden.has(ib.remark || `#${ib.id}`)} />
                     ))}
                 </LineChart>
               </ResponsiveContainer>
@@ -829,7 +610,13 @@ export default function MonitorPage() {
                   <XAxis dataKey="time" fontSize={11} />
                   <YAxis fontSize={11} unit="ms" />
                   <Tooltip formatter={(v: any) => (v != null ? `${v}ms` : t('monitor.timeout'))} />
-                  <Legend />
+                  <Legend
+                    onClick={handleLegendClick(setLatencyHidden)}
+                    wrapperStyle={{ fontSize: 12, maxHeight: 60, overflowY: 'auto', cursor: 'pointer' }}
+                    formatter={(value) => (
+                      <span style={{ color: latencyHidden.has(value as string) ? '#ccc' : undefined }}>{value}</span>
+                    )}
+                  />
                   {forwards
                     .filter((f) => f.status === 1 && selectedForwards.has(f.id))
                     .map((f, i) => (
@@ -840,6 +627,7 @@ export default function MonitorPage() {
                         stroke={CHART_COLORS[i % CHART_COLORS.length]}
                         dot={false}
                         connectNulls={false}
+                        hide={latencyHidden.has(f.name)}
                       />
                     ))}
                 </LineChart>

@@ -91,6 +91,8 @@ const en: Translations = {
     node: 'Nodes',
     user: 'Users',
     monitor: 'Monitor',
+    nodeMonitor: 'Nodes',
+    networkMonitor: 'Network',
     config: 'Settings',
     system: 'System',
     changePassword: 'Change Password',
@@ -376,6 +378,8 @@ const en: Translations = {
   },
   monitor: {
     title: 'Status Monitor',
+    nodeMonitorTitle: 'Node Monitor',
+    networkMonitorTitle: 'Network Monitor',
     refresh: 'Refresh',
     nodeStatus: 'Node Status',
     memory: 'Memory',

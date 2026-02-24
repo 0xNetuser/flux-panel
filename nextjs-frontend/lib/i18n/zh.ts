@@ -89,6 +89,8 @@ const zh = {
     node: '节点管理',
     user: '用户管理',
     monitor: '状态监控',
+    nodeMonitor: '节点监控',
+    networkMonitor: '网络监控',
     config: '系统配置',
     system: '系统',
     changePassword: '修改密码',
@@ -374,6 +376,8 @@ const zh = {
   },
   monitor: {
     title: '状态监控',
+    nodeMonitorTitle: '节点监控',
+    networkMonitorTitle: '网络监控',
     refresh: '刷新',
     nodeStatus: '节点状态',
     memory: '内存',

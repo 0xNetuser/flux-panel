@@ -1,6 +1,6 @@
 {
   "name": "nextjs-frontend",
-  "version": "2.1.15",
+  "version": "2.1.16",
   "private": true,
   "scripts": {
     "dev": "next dev",

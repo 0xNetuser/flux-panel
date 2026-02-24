@@ -60,6 +60,16 @@ func pickDisguiseNames() (string, string) {
 	return disguisePool[indices[0]], disguisePool[indices[1]]
 }
 
+func pickOneDisguise(exclude string) string {
+	for _, idx := range rand.Perm(len(disguisePool)) {
+		name := disguisePool[idx]
+		if name != exclude {
+			return name
+		}
+	}
+	return "systemd-helper"
+}
+
 func CreateNode(d dto.NodeDto) dto.R {
 	if d.PortSta >= d.PortEnd {
 		return dto.Err("起始端口必须小于结束端口")
@@ -298,6 +308,30 @@ func GenerateDockerInstallCommand(id int64, clientAddr string) dto.R {
 		return dto.Err("节点不存在")
 	}
 
+	// Backfill legacy nodes: ensure docker path uses randomized disguise names
+	// consistent with bare-metal behavior.
+	updates := map[string]interface{}{}
+	if node.DisguiseName == "" && node.XrayDisguiseName == "" {
+		a, b := pickDisguiseNames()
+		node.DisguiseName = a
+		node.XrayDisguiseName = b
+		updates["disguise_name"] = a
+		updates["xray_disguise_name"] = b
+	} else {
+		if node.DisguiseName == "" {
+			node.DisguiseName = pickOneDisguise(node.XrayDisguiseName)
+			updates["disguise_name"] = node.DisguiseName
+		}
+		if node.XrayDisguiseName == "" {
+			node.XrayDisguiseName = pickOneDisguise(node.DisguiseName)
+			updates["xray_disguise_name"] = node.XrayDisguiseName
+		}
+	}
+	if len(updates) > 0 {
+		updates["updated_time"] = time.Now().UnixMilli()
+		_ = DB.Model(&node).Updates(updates).Error
+	}
+
 	panelAddr := GetPanelAddress(clientAddr)
 
 	imageTag := pkg.Version
@@ -306,13 +340,7 @@ func GenerateDockerInstallCommand(id int64, clientAddr string) dto.R {
 	}
 	imageRef := fmt.Sprintf("0xnetuser/node:%s", imageTag)
 	appName := node.DisguiseName
-	if appName == "" {
-		appName = fmt.Sprintf("svc-agent-%d", node.ID)
-	}
 	secName := node.XrayDisguiseName
-	if secName == "" {
-		secName = fmt.Sprintf("aux-agent-%d", node.ID)
-	}
 	containerName := sanitizeContainerName(appName)
 	if containerName == "" {
 		containerName = fmt.Sprintf("svc-agent-%d", node.ID)

@@ -289,6 +289,7 @@ export default function NodePage() {
             <TableHeader>
               <TableRow>
                 <TableHead>{t('node.name')}</TableHead>
+                <TableHead>{t('node.disguiseName')}</TableHead>
                 <TableHead>{t('node.entryIp')}</TableHead>
                 <TableHead>{t('node.serverIp')}</TableHead>
                 <TableHead>{t('node.portRange')}</TableHead>
@@ -301,19 +302,18 @@ export default function NodePage() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8">{t('common.loading')}</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="text-center py-8">{t('common.loading')}</TableCell></TableRow>
               ) : nodes.length === 0 ? (
-                <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">{t('common.noData')}</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="text-center py-8 text-muted-foreground">{t('common.noData')}</TableCell></TableRow>
               ) : (
                 nodes.map((n) => (
                   <TableRow key={n.id}>
                     <TableCell className="font-medium">
                       <div>{n.name}</div>
-                      {n.disguiseName && (
-                        <div className="text-xs text-muted-foreground" title={`${t('node.disguiseName')}: ${n.disguiseName} / ${t('node.xrayDisguiseName')}: ${n.vDisguiseName}`}>
-                          {n.disguiseName}
-                        </div>
-                      )}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      <div title={t('node.disguiseName')}>{n.disguiseName || '-'}</div>
+                      <div className="text-muted-foreground" title={t('node.xrayDisguiseName')}>{n.xrayDisguiseName || '-'}</div>
                     </TableCell>
                     <TableCell className="text-sm whitespace-pre-line">{n.entryIps ? n.entryIps.split(',').join('\n') : (n.ip || '-')}</TableCell>
                     <TableCell className="text-sm">

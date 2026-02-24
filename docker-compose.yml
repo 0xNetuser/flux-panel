@@ -25,14 +25,14 @@ services:
       retries: 10
 
   node-binary-init:
-    image: 0xnetuser/node-binary:2.1.17
+    image: 0xnetuser/node-binary:2.1.18
     container_name: node-binary-init
     volumes:
       - node_binary:/data/node
     restart: "no"
 
   backend:
-    image: 0xnetuser/go-backend:2.1.17
+    image: 0xnetuser/go-backend:2.1.18
     container_name: go-backend
     restart: unless-stopped
     environment:
@@ -65,7 +65,7 @@ services:
       start_period: 10s
 
   frontend:
-    image: 0xnetuser/nextjs-frontend:2.1.17
+    image: 0xnetuser/nextjs-frontend:2.1.18
     container_name: nextjs-frontend
     restart: unless-stopped
     ports:

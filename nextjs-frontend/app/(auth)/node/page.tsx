@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +30,22 @@ function compareVersions(a: string, b: string): number {
   return 0;
 }
 
+function formatBytes(bytes: number) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(Math.abs(bytes)) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function formatSpeed(bytesPerSec: number) {
+  if (bytesPerSec <= 0) return '0 B/s';
+  const k = 1024;
+  const sizes = ['B/s', 'KB/s', 'MB/s', 'GB/s'];
+  const i = Math.floor(Math.log(Math.abs(bytesPerSec)) / Math.log(k));
+  return parseFloat((bytesPerSec / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[Math.min(i, sizes.length - 1)];
+}
+
 export default function NodePage() {
   const { isAdmin } = useAuth();
   const { t } = useTranslation();
@@ -47,6 +63,101 @@ export default function NodePage() {
   const [panelVersion, setPanelVersion] = useState('');
 
   const initialLoad = useRef(true);
+
+  // Real-time speed tracking via WebSocket
+  const [nodeSpeeds, setNodeSpeeds] = useState<Record<number, { uploadSpeed: number; downloadSpeed: number }>>({});
+  const prevBytesRef = useRef<Record<number, { rx: number; tx: number; time: number }>>({});
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const wsBase = process.env.NEXT_PUBLIC_API_BASE || window.location.origin;
+    const wsUrl = wsBase.replace(/^http/, 'ws') + '/system-info?type=0';
+
+    let ws: WebSocket | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout>;
+
+    const connect = () => {
+      ws = new WebSocket(wsUrl, [token]);
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'info' && msg.data) {
+            const sysData = typeof msg.data === 'string' ? JSON.parse(msg.data) : msg.data;
+            const nodeId = parseInt(msg.id, 10);
+
+            if (sysData.bytes_received !== undefined && sysData.bytes_transmitted !== undefined) {
+              const now = Date.now() / 1000;
+              const rx = sysData.bytes_received;
+              const tx = sysData.bytes_transmitted;
+
+              const prev = prevBytesRef.current[nodeId];
+              if (prev) {
+                const dt = now - prev.time;
+                if (dt > 0) {
+                  if (rx >= prev.rx && tx >= prev.tx) {
+                    setNodeSpeeds(s => ({
+                      ...s,
+                      [nodeId]: {
+                        downloadSpeed: (rx - prev.rx) / dt,
+                        uploadSpeed: (tx - prev.tx) / dt,
+                      }
+                    }));
+                  } else {
+                    setNodeSpeeds(s => ({
+                      ...s,
+                      [nodeId]: { downloadSpeed: 0, uploadSpeed: 0 }
+                    }));
+                  }
+                }
+              }
+              prevBytesRef.current[nodeId] = { rx, tx, time: now };
+
+              // Update bytesReceived/bytesTransmitted on nodes
+              setNodes(prev => prev.map(n =>
+                n.id === nodeId
+                  ? { ...n, bytesReceived: rx, bytesTransmitted: tx, cpuUsage: sysData.cpu_usage, memUsage: sysData.memory_usage, uptime: sysData.uptime }
+                  : n
+              ));
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to parse WebSocket message:', e);
+        }
+      };
+
+      ws.onclose = () => {
+        reconnectTimer = setTimeout(connect, 5000);
+      };
+
+      ws.onerror = () => {
+        ws?.close();
+      };
+    };
+
+    connect();
+
+    return () => {
+      clearTimeout(reconnectTimer);
+      ws?.close();
+    };
+  }, []);
+
+  // Sort nodes by group for separator rows
+  const sortedNodes = useMemo(() => {
+    return [...nodes].sort((a, b) => {
+      const ga = a.groupName || '';
+      const gb = b.groupName || '';
+      if (ga === '' && gb !== '') return 1;
+      if (ga !== '' && gb === '') return -1;
+      if (ga !== gb) return ga.localeCompare(gb);
+      return 0;
+    });
+  }, [nodes]);
+
+  const hasGroups = useMemo(() => nodes.some(n => n.groupName && n.groupName.length > 0), [nodes]);
 
   const loadData = useCallback(async () => {
     if (initialLoad.current) setLoading(true);
@@ -278,6 +389,130 @@ export default function NodePage() {
     );
   }
 
+  const renderTableRows = () => {
+    const rows: React.ReactNode[] = [];
+    let lastGroup: string | null = null;
+    const totalCols = 17;
+    for (const n of sortedNodes) {
+      const group = n.groupName || '';
+      if (hasGroups && group !== lastGroup) {
+        rows.push(
+          <TableRow key={`group-${group}`} className="bg-muted/50 hover:bg-muted/50">
+            <TableCell colSpan={totalCols} className="py-1.5 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              {group || t('monitor.ungrouped')}
+            </TableCell>
+          </TableRow>
+        );
+        lastGroup = group;
+      }
+      const isOnline = n.status === 1;
+      rows.push(
+        <TableRow key={n.id}>
+          <TableCell className="font-medium text-sm">{n.name}</TableCell>
+          <TableCell className="text-xs">
+            <div title={t('node.disguiseName')}>{n.disguiseName || '-'}</div>
+            <div className="text-muted-foreground" title={t('node.xrayDisguiseName')}>{n.xrayDisguiseName || '-'}</div>
+          </TableCell>
+          <TableCell className="text-sm whitespace-pre-line">{n.entryIps ? n.entryIps.split(',').join('\n') : (n.ip || '-')}</TableCell>
+          <TableCell className="text-sm">
+            <div>{n.serverIp}</div>
+            {isOnline && n.panelAddr && (
+              <div className="text-xs text-muted-foreground truncate max-w-[180px]" title={n.panelAddr}>
+                {t('monitor.panelAddr')}: {n.panelAddr}
+              </div>
+            )}
+          </TableCell>
+          <TableCell className="text-sm">{n.portSta} - {n.portEnd}</TableCell>
+          <TableCell>
+            <div className="flex items-center gap-1">
+              <Badge variant={isOnline ? 'default' : 'destructive'} className="text-xs">
+                {isOnline ? t('common.online') : t('common.offline')}
+              </Badge>
+              {isOnline && n.runtime && (
+                <Badge variant={n.runtime === 'docker' ? 'outline' : 'secondary'} className="text-xs">
+                  {n.runtime === 'docker' ? 'D' : 'H'}
+                </Badge>
+              )}
+            </div>
+          </TableCell>
+          <TableCell className="text-sm">
+            {isOnline ? <Badge variant="default" className="text-xs">{t('monitor.running')}</Badge> : '-'}
+          </TableCell>
+          <TableCell className="text-sm">
+            {isOnline ? (
+              n.vRunning ? (
+                <Badge variant="default" className="text-xs">{t('monitor.running')}</Badge>
+              ) : (
+                <Badge variant="secondary" className="text-xs">{t('monitor.notRunning')}</Badge>
+              )
+            ) : '-'}
+          </TableCell>
+          <TableCell className="text-sm">
+            {n.version || '-'}
+            {n.version && panelVersion && n.version !== panelVersion && n.version !== 'dev' && compareVersions(n.version, panelVersion) < 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="ml-1 h-5 px-1.5 text-xs text-orange-600 border-orange-400 hover:bg-orange-50"
+                onClick={() => handleUpdateBinary(n)}
+                disabled={updatingId === n.id}
+              >
+                {updatingId === n.id ? (
+                  <RefreshCw className="mr-1 h-3 w-3 animate-spin" />
+                ) : (
+                  <Download className="mr-1 h-3 w-3" />
+                )}
+                {updatingId === n.id ? t('node.updatingBinary') : t('node.updateBinary')}
+              </Button>
+            )}
+          </TableCell>
+          <TableCell className="text-sm">
+            {isOnline && n.cpuUsage != null ? `${n.cpuUsage.toFixed(1)}%` : '-'} / {isOnline && n.memUsage != null ? `${n.memUsage.toFixed(1)}%` : '-'}
+          </TableCell>
+          <TableCell className="text-sm text-green-600">
+            {isOnline && nodeSpeeds[n.id] ? formatSpeed(nodeSpeeds[n.id].uploadSpeed) : '-'}
+          </TableCell>
+          <TableCell className="text-sm text-blue-600">
+            {isOnline && nodeSpeeds[n.id] ? formatSpeed(nodeSpeeds[n.id].downloadSpeed) : '-'}
+          </TableCell>
+          <TableCell className="text-sm">
+            {isOnline && n.bytesTransmitted != null ? formatBytes(n.bytesTransmitted) : '-'}
+          </TableCell>
+          <TableCell className="text-sm">
+            {isOnline && n.bytesReceived != null ? formatBytes(n.bytesReceived) : '-'}
+          </TableCell>
+          <TableCell className="text-sm">{formatUptime(n.uptime)}</TableCell>
+          <TableCell>
+            <div className="flex gap-1">
+              <Button variant="ghost" size="icon" onClick={() => handleEdit(n)} title="编辑">
+                <Edit2 className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setIfaceNode(n)} title={t('node.nicInfo')} disabled={!n.interfaces?.length}>
+                <Network className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => handleXrayVersionSwitch(n)} title={t('node.xrayVersionTitle')}>
+                <ArrowUpDown className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => handleReconcile(n.id)} disabled={reconcilingId === n.id} title={t('node.syncConfig')}>
+                <RefreshCw className={`h-4 w-4 ${reconcilingId === n.id ? 'animate-spin' : ''}`} />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => handleInstallCommand(n)} title={t('node.installCommand')}>
+                <Terminal className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => handleDockerCommand(n.id)} title={t('node.dockerCommand')}>
+                <Container className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => handleDelete(n.id)} className="text-destructive" title="删除">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </TableCell>
+        </TableRow>
+      );
+    }
+    return rows;
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -291,106 +526,30 @@ export default function NodePage() {
             <TableHeader>
               <TableRow>
                 <TableHead>{t('node.name')}</TableHead>
-                <TableHead>{t('node.groupName')}</TableHead>
                 <TableHead>{t('node.disguiseName')}</TableHead>
                 <TableHead>{t('node.entryIp')}</TableHead>
                 <TableHead>{t('node.serverIp')}</TableHead>
                 <TableHead>{t('node.portRange')}</TableHead>
                 <TableHead>{t('node.status')}</TableHead>
+                <TableHead>GOST</TableHead>
+                <TableHead>Xray</TableHead>
                 <TableHead>{t('node.version')}</TableHead>
                 <TableHead>{t('node.cpuMem')}</TableHead>
+                <TableHead>{t('monitor.upload')}</TableHead>
+                <TableHead>{t('monitor.download')}</TableHead>
+                <TableHead>{t('monitor.totalUpload')}</TableHead>
+                <TableHead>{t('monitor.totalDownload')}</TableHead>
                 <TableHead>{t('node.uptime')}</TableHead>
                 <TableHead>{t('node.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow><TableCell colSpan={11} className="text-center py-8">{t('common.loading')}</TableCell></TableRow>
+                <TableRow><TableCell colSpan={17} className="text-center py-8">{t('common.loading')}</TableCell></TableRow>
               ) : nodes.length === 0 ? (
-                <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">{t('common.noData')}</TableCell></TableRow>
+                <TableRow><TableCell colSpan={17} className="text-center py-8 text-muted-foreground">{t('common.noData')}</TableCell></TableRow>
               ) : (
-                nodes.map((n) => (
-                  <TableRow key={n.id}>
-                    <TableCell className="font-medium">
-                      <div>{n.name}</div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{n.groupName || '-'}</TableCell>
-                    <TableCell className="text-xs">
-                      <div title={t('node.disguiseName')}>{n.disguiseName || '-'}</div>
-                      <div className="text-muted-foreground" title={t('node.xrayDisguiseName')}>{n.xrayDisguiseName || '-'}</div>
-                    </TableCell>
-                    <TableCell className="text-sm whitespace-pre-line">{n.entryIps ? n.entryIps.split(',').join('\n') : (n.ip || '-')}</TableCell>
-                    <TableCell className="text-sm">
-                      <div>{n.serverIp}</div>
-                      {n.status === 1 && n.panelAddr && (
-                        <div className="text-xs text-muted-foreground truncate max-w-[180px]" title={n.panelAddr}>
-                          {t('monitor.panelAddr')}: {n.panelAddr}
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>{n.portSta} - {n.portEnd}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Badge variant={n.status === 1 ? 'default' : 'destructive'}>
-                          {n.status === 1 ? t('common.online') : t('common.offline')}
-                        </Badge>
-                        {n.status === 1 && n.runtime && (
-                          <Badge variant={n.runtime === 'docker' ? 'outline' : 'secondary'} className="text-xs">
-                            {n.runtime === 'docker' ? t('monitor.docker') : t('monitor.host')}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {n.version || '-'}
-                      {n.version && panelVersion && n.version !== panelVersion && n.version !== 'dev' && compareVersions(n.version, panelVersion) < 0 && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="ml-1 h-5 px-1.5 text-xs text-orange-600 border-orange-400 hover:bg-orange-50"
-                          onClick={() => handleUpdateBinary(n)}
-                          disabled={updatingId === n.id}
-                        >
-                          {updatingId === n.id ? (
-                            <RefreshCw className="mr-1 h-3 w-3 animate-spin" />
-                          ) : (
-                            <Download className="mr-1 h-3 w-3" />
-                          )}
-                          {updatingId === n.id ? t('node.updatingBinary') : t('node.updateBinary')}
-                        </Button>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {n.cpuUsage != null ? `${n.cpuUsage.toFixed(1)}%` : '-'} / {n.memUsage != null ? `${n.memUsage.toFixed(1)}%` : '-'}
-                    </TableCell>
-                    <TableCell className="text-sm">{formatUptime(n.uptime)}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => handleEdit(n)} title="编辑">
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => setIfaceNode(n)} title={t('node.nicInfo')} disabled={!n.interfaces?.length}>
-                          <Network className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleXrayVersionSwitch(n)} title={t('node.xrayVersionTitle')}>
-                          <ArrowUpDown className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleReconcile(n.id)} disabled={reconcilingId === n.id} title={t('node.syncConfig')}>
-                          <RefreshCw className={`h-4 w-4 ${reconcilingId === n.id ? 'animate-spin' : ''}`} />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleInstallCommand(n)} title={t('node.installCommand')}>
-                          <Terminal className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDockerCommand(n.id)} title={t('node.dockerCommand')}>
-                          <Container className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(n.id)} className="text-destructive" title="删除">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                renderTableRows()
               )}
             </TableBody>
           </Table>

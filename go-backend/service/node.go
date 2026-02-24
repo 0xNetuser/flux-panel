@@ -149,6 +149,7 @@ func GetAllNodes() dto.R {
 				item["interfaces"] = info.Interfaces
 				item["runtime"] = info.Runtime
 				item["panelAddr"] = info.PanelAddr
+				item["vRunning"] = info.XrayRunning
 				if info.XrayVersion != "" {
 					item["xrayVersion"] = info.XrayVersion
 					item["vVersion"] = info.XrayVersion

@@ -59,14 +59,37 @@ export default function NodeMonitorPage() {
   const [nodes, setNodes] = useState<NodeHealth[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
+  const [viewMode, setViewMode] = useState<'card' | 'table'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('monitor_node_view') as 'card' | 'table') || 'card';
+    }
+    return 'card';
+  });
   const initialLoad = useRef(true);
+
+  // Persist view mode
+  const handleViewMode = (mode: 'card' | 'table') => {
+    setViewMode(mode);
+    localStorage.setItem('monitor_node_view', mode);
+  };
 
   // Real-time speed tracking
   const [nodeSpeeds, setNodeSpeeds] = useState<Record<number, { uploadSpeed: number; downloadSpeed: number }>>({});
   const prevBytesRef = useRef<Record<number, { rx: number; tx: number; time: number }>>({});
 
-  // Group nodes by groupName
+  // Group nodes by groupName — sorted with named groups first, ungrouped last
+  const sortedNodes = useMemo(() => {
+    return [...nodes].sort((a, b) => {
+      const ga = a.groupName || '';
+      const gb = b.groupName || '';
+      if (ga === '' && gb !== '') return 1;
+      if (ga !== '' && gb === '') return -1;
+      if (ga !== gb) return ga.localeCompare(gb);
+      return 0;
+    });
+  }, [nodes]);
+
+  // For card view: group into sections
   const groupedNodes = useMemo(() => {
     const groups = new Map<string, NodeHealth[]>();
     for (const node of nodes) {
@@ -74,18 +97,14 @@ export default function NodeMonitorPage() {
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(node);
     }
-    // Sort: named groups first (alphabetically), ungrouped last
-    const sorted = Array.from(groups.entries()).sort(([a], [b]) => {
+    return Array.from(groups.entries()).sort(([a], [b]) => {
       if (a === '' && b !== '') return 1;
       if (a !== '' && b === '') return -1;
       return a.localeCompare(b);
     });
-    return sorted;
   }, [nodes]);
 
-  const hasGroups = useMemo(() => {
-    return nodes.some(n => n.groupName && n.groupName.length > 0);
-  }, [nodes]);
+  const hasGroups = useMemo(() => nodes.some(n => n.groupName && n.groupName.length > 0), [nodes]);
 
   // WebSocket for real-time system info updates
   useEffect(() => {
@@ -178,7 +197,6 @@ export default function NodeMonitorPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Auto-refresh every 30 seconds
   useEffect(() => {
     const timer = setInterval(() => { loadData(); }, 30000);
     return () => clearInterval(timer);
@@ -249,7 +267,6 @@ export default function NodeMonitorPage() {
                 <Badge variant="secondary" className="text-xs">{t('monitor.notRunning')}</Badge>
               )}
             </div>
-            {/* Real-time speed */}
             {(nodeSpeeds[node.id] || node.bytesReceived !== undefined) && (
               <div className="pt-1 border-t space-y-1">
                 <div className="flex items-center justify-between text-xs">
@@ -308,71 +325,71 @@ export default function NodeMonitorPage() {
     </Card>
   );
 
-  const renderTableRow = (node: NodeHealth) => (
-    <TableRow key={node.id}>
-      <TableCell className="font-medium">{node.name}</TableCell>
-      <TableCell>
-        <Badge variant={node.online ? 'default' : 'secondary'}>
-          {node.online ? t('common.online') : t('common.offline')}
-        </Badge>
-        {node.online && node.runtime && (
-          <Badge variant={node.runtime === 'docker' ? 'outline' : 'secondary'} className="text-xs ml-1">
-            {node.runtime === 'docker' ? t('monitor.docker') : t('monitor.host')}
-          </Badge>
-        )}
-      </TableCell>
-      <TableCell className="text-sm">{node.serverIp}</TableCell>
-      <TableCell className="text-sm">{node.online && node.cpuUsage != null ? `${node.cpuUsage.toFixed(1)}%` : '-'}</TableCell>
-      <TableCell className="text-sm">{node.online && node.memUsage != null ? `${node.memUsage.toFixed(1)}%` : '-'}</TableCell>
-      <TableCell className="text-sm">
-        {node.online && nodeSpeeds[node.id] ? (
-          <div className="space-y-0.5">
-            <div><span className="text-green-500">{t('monitor.upload')}</span> {formatSpeed(nodeSpeeds[node.id].uploadSpeed)}</div>
-            <div><span className="text-blue-500">{t('monitor.download')}</span> {formatSpeed(nodeSpeeds[node.id].downloadSpeed)}</div>
-          </div>
-        ) : '-'}
-      </TableCell>
-      <TableCell className="text-sm">{node.online && node.uptime !== undefined ? formatUptime(node.uptime) : '-'}</TableCell>
-      <TableCell className="text-sm">{node.version || '-'}</TableCell>
-    </TableRow>
-  );
-
-  const renderGroupSection = (groupName: string, groupNodes: NodeHealth[]) => (
-    <div key={groupName || '__ungrouped'}>
-      {hasGroups && (
-        <h3 className="text-lg font-semibold mb-3 mt-2">
-          {groupName || t('monitor.ungrouped')}
-        </h3>
-      )}
-      {viewMode === 'card' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {groupNodes.map(renderNodeCard)}
-        </div>
-      ) : (
-        <Card className="mb-4">
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('common.name')}</TableHead>
-                  <TableHead>{t('common.status')}</TableHead>
-                  <TableHead>IP</TableHead>
-                  <TableHead>CPU</TableHead>
-                  <TableHead>{t('monitor.memory')}</TableHead>
-                  <TableHead>{t('monitor.realTimeSpeed')}</TableHead>
-                  <TableHead>{t('monitor.uptime')}</TableHead>
-                  <TableHead>{t('node.version')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {groupNodes.map(renderTableRow)}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
+  // Table: render a group header row when group changes
+  const renderTableRows = () => {
+    const rows: React.ReactNode[] = [];
+    let lastGroup: string | null = null;
+    for (const node of sortedNodes) {
+      const group = node.groupName || '';
+      if (hasGroups && group !== lastGroup) {
+        rows.push(
+          <TableRow key={`group-${group}`} className="bg-muted/50 hover:bg-muted/50">
+            <TableCell colSpan={13} className="py-1.5 px-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              {group || t('monitor.ungrouped')}
+            </TableCell>
+          </TableRow>
+        );
+        lastGroup = group;
+      }
+      rows.push(
+        <TableRow key={node.id}>
+          <TableCell className="font-medium text-sm">{node.name}</TableCell>
+          <TableCell>
+            <div className="flex items-center gap-1">
+              <Badge variant={node.online ? 'default' : 'secondary'} className="text-xs">
+                {node.online ? t('common.online') : t('common.offline')}
+              </Badge>
+              {node.online && node.runtime && (
+                <Badge variant={node.runtime === 'docker' ? 'outline' : 'secondary'} className="text-xs">
+                  {node.runtime === 'docker' ? 'D' : 'H'}
+                </Badge>
+              )}
+            </div>
+          </TableCell>
+          <TableCell className="text-sm">{node.serverIp}</TableCell>
+          <TableCell className="text-sm">{node.online && node.cpuUsage != null ? `${node.cpuUsage.toFixed(1)}%` : '-'}</TableCell>
+          <TableCell className="text-sm">{node.online && node.memUsage != null ? `${node.memUsage.toFixed(1)}%` : '-'}</TableCell>
+          <TableCell className="text-sm">
+            {node.online ? <Badge variant="default" className="text-xs">{t('monitor.running')}</Badge> : '-'}
+          </TableCell>
+          <TableCell className="text-sm">
+            {node.online ? (
+              node.vRunning ? (
+                <Badge variant="default" className="text-xs">{t('monitor.running')}</Badge>
+              ) : (
+                <Badge variant="secondary" className="text-xs">{t('monitor.notRunning')}</Badge>
+              )
+            ) : '-'}
+          </TableCell>
+          <TableCell className="text-sm text-green-600">
+            {node.online && nodeSpeeds[node.id] ? formatSpeed(nodeSpeeds[node.id].uploadSpeed) : '-'}
+          </TableCell>
+          <TableCell className="text-sm text-blue-600">
+            {node.online && nodeSpeeds[node.id] ? formatSpeed(nodeSpeeds[node.id].downloadSpeed) : '-'}
+          </TableCell>
+          <TableCell className="text-sm">
+            {node.online && node.bytesTransmitted != null ? formatBytes(node.bytesTransmitted) : '-'}
+          </TableCell>
+          <TableCell className="text-sm">
+            {node.online && node.bytesReceived != null ? formatBytes(node.bytesReceived) : '-'}
+          </TableCell>
+          <TableCell className="text-sm">{node.online && node.uptime !== undefined ? formatUptime(node.uptime) : '-'}</TableCell>
+          <TableCell className="text-sm">{node.version || '-'}</TableCell>
+        </TableRow>
+      );
+    }
+    return rows;
+  };
 
   return (
     <div className="space-y-6">
@@ -382,14 +399,14 @@ export default function NodeMonitorPage() {
           <div className="flex rounded-md border overflow-hidden">
             <button
               className={`px-3 py-1.5 text-xs flex items-center gap-1 ${viewMode === 'card' ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted'}`}
-              onClick={() => setViewMode('card')}
+              onClick={() => handleViewMode('card')}
             >
               <LayoutGrid className="h-3.5 w-3.5" />
               {t('monitor.cardView')}
             </button>
             <button
               className={`px-3 py-1.5 text-xs flex items-center gap-1 ${viewMode === 'table' ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted'}`}
-              onClick={() => setViewMode('table')}
+              onClick={() => handleViewMode('table')}
             >
               <TableProperties className="h-3.5 w-3.5" />
               {t('monitor.tableView')}
@@ -404,9 +421,47 @@ export default function NodeMonitorPage() {
 
       {nodes.length === 0 && !loading ? (
         <p className="text-muted-foreground text-center py-8">{t('monitor.noNodes')}</p>
+      ) : viewMode === 'table' ? (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('common.name')}</TableHead>
+                  <TableHead>{t('common.status')}</TableHead>
+                  <TableHead>IP</TableHead>
+                  <TableHead>CPU</TableHead>
+                  <TableHead>{t('monitor.memory')}</TableHead>
+                  <TableHead>GOST</TableHead>
+                  <TableHead>Xray</TableHead>
+                  <TableHead>{t('monitor.upload')}</TableHead>
+                  <TableHead>{t('monitor.download')}</TableHead>
+                  <TableHead>{t('monitor.totalUpload')}</TableHead>
+                  <TableHead>{t('monitor.totalDownload')}</TableHead>
+                  <TableHead>{t('monitor.uptime')}</TableHead>
+                  <TableHead>{t('node.version')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {renderTableRows()}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       ) : (
         <div className="space-y-4">
-          {groupedNodes.map(([groupName, groupNodes]) => renderGroupSection(groupName, groupNodes))}
+          {groupedNodes.map(([groupName, groupNodes]) => (
+            <div key={groupName || '__ungrouped'}>
+              {hasGroups && (
+                <p className="px-1 pt-2 pb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  {groupName || t('monitor.ungrouped')}
+                </p>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {groupNodes.map(renderNodeCard)}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>

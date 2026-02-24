@@ -112,7 +112,8 @@ func init() {
 }
 
 func main() {
-	// Migrate legacy gost.json → runtime.json (backward compat)
+	// Migrate legacy config files (backward compat)
+	// gost.json → runtime.json
 	if _, err := os.Stat("runtime.json"); os.IsNotExist(err) {
 		if _, err := os.Stat("gost.json"); err == nil {
 			os.Rename("gost.json", "runtime.json")
@@ -126,6 +127,16 @@ func main() {
 		fmt.Printf("❌ 配置加载失败: %v\n", err)
 		fmt.Println("请确保当前目录存在 config.json 文件")
 		os.Exit(1)
+	}
+
+	// xray_config.json → v_cfg target (e.g. service.json)
+	if config.XrayCfg != "" && config.XrayCfg != "xray_config.json" {
+		if _, err := os.Stat(config.XrayCfg); os.IsNotExist(err) {
+			if _, err := os.Stat("xray_config.json"); err == nil {
+				os.Rename("xray_config.json", config.XrayCfg)
+			}
+		}
+		os.Remove("xray_config.json")
 	}
 
 	fmt.Printf("✅ 配置加载成功 - addr: %s\n", config.Addr)

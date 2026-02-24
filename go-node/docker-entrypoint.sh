@@ -65,11 +65,20 @@ else
   fi
 fi
 
+# Migrate legacy config files before cleanup
+if [ -f /etc/node/gost.json ] && [ ! -f "$RUNTIME_CONFIG" ]; then
+  mv /etc/node/gost.json "$RUNTIME_CONFIG"
+fi
+if [ -f /etc/node/xray_config.json ] && [ ! -f "/etc/node/$AUX_CFG" ]; then
+  mv /etc/node/xray_config.json "/etc/node/$AUX_CFG"
+fi
+# Clean up legacy persisted files from old versions
+rm -f /etc/node/gost /etc/node/gost-node /etc/node/xray
+rm -f /etc/node/gost.json /etc/node/xray_config.json
+
 # Ensure runtime config exists
 if [ ! -f "$RUNTIME_CONFIG" ]; then
   echo "{}" > "$RUNTIME_CONFIG"
-else
-  :
 fi
 
 # Restore persisted binaries (generic + customized)

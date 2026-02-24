@@ -1016,11 +1016,11 @@ func (w *WebSocketReporter) getOrInitXrayManager() *xray.XrayManager {
 	if w.xrayManager == nil {
 		bin := w.xrayBin
 		if bin == "" {
-			bin = "svc-runtime"
+			bin = "xray" // backward compat: old nodes without v_bin config
 		}
 		cfg := w.xrayCfg
 		if cfg == "" {
-			cfg = "service.json"
+			cfg = "xray_config.json" // backward compat: old nodes without v_cfg config
 		}
 		w.xrayManager = xray.NewXrayManager(bin, cfg, "127.0.0.1:10085")
 	}

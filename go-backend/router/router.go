@@ -87,6 +87,7 @@ func Setup(r *gin.Engine) {
 		auth.POST("/node/reconcile", middleware.Admin(), handler.NodeReconcile)
 		auth.POST("/node/update-binary", middleware.Admin(), handler.NodeUpdateBinary)
 		auth.POST("/node/update-order", middleware.Admin(), handler.NodeUpdateOrder)
+		auth.POST("/node/set-protocol", middleware.Admin(), handler.NodeSetProtocol)
 
 		// Tunnel
 		auth.POST("/tunnel/create", middleware.Admin(), handler.TunnelCreate)

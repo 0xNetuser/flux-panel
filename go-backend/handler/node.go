@@ -62,6 +62,15 @@ func NodeUpdate(c *gin.Context) {
 	c.JSON(http.StatusOK, service.UpdateNode(d))
 }
 
+func NodeSetProtocol(c *gin.Context) {
+	var d dto.NodeSetProtocolDto
+	if err := c.ShouldBindJSON(&d); err != nil {
+		c.JSON(http.StatusOK, dto.Err("参数错误"))
+		return
+	}
+	c.JSON(http.StatusOK, service.SetNodeProtocol(d))
+}
+
 func NodeDelete(c *gin.Context) {
 	var d struct {
 		ID int64 `json:"id" binding:"required"`

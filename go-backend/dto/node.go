@@ -20,3 +20,10 @@ type NodeUpdateDto struct {
 	PortEnd   *int    `json:"portEnd"`
 	GroupName *string `json:"groupName"`
 }
+
+type NodeSetProtocolDto struct {
+	ID    int64 `json:"id" binding:"required"`
+	Http  int   `json:"http"`
+	Tls   int   `json:"tls"`
+	Socks int   `json:"socks"`
+}

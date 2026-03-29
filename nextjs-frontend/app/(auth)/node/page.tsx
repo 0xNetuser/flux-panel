@@ -158,6 +158,7 @@ export default function NodePage() {
 
   const handleProtocolToggle = async (field: 'http' | 'tls' | 'socks', value: boolean) => {
     if (!editingNode) return;
+    const oldForm = { ...protocolForm };
     const newForm = { ...protocolForm, [field]: value ? 1 : 0 };
     setProtocolForm(newForm);
     setProtocolSaving(true);
@@ -170,11 +171,11 @@ export default function NodePage() {
         ));
       } else {
         toast.error(res.msg || t('node.protocolUpdateFailed'));
-        setProtocolForm(protocolForm); // revert
+        setProtocolForm(oldForm);
       }
     } catch {
       toast.error(t('node.protocolUpdateFailed'));
-      setProtocolForm(protocolForm); // revert
+      setProtocolForm(oldForm);
     } finally {
       setProtocolSaving(false);
     }
@@ -591,7 +592,7 @@ export default function NodePage() {
                     <div className="flex items-center gap-6">
                       <label className="flex items-center gap-2 text-sm">
                         <Switch
-                          className="scale-90"
+                          size="sm"
                           checked={protocolForm.http === 1}
                           onCheckedChange={(v) => handleProtocolToggle('http', v)}
                           disabled={protocolSaving}
@@ -600,7 +601,7 @@ export default function NodePage() {
                       </label>
                       <label className="flex items-center gap-2 text-sm">
                         <Switch
-                          className="scale-90"
+                          size="sm"
                           checked={protocolForm.tls === 1}
                           onCheckedChange={(v) => handleProtocolToggle('tls', v)}
                           disabled={protocolSaving}
@@ -609,7 +610,7 @@ export default function NodePage() {
                       </label>
                       <label className="flex items-center gap-2 text-sm">
                         <Switch
-                          className="scale-90"
+                          size="sm"
                           checked={protocolForm.socks === 1}
                           onCheckedChange={(v) => handleProtocolToggle('socks', v)}
                           disabled={protocolSaving}

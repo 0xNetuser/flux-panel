@@ -208,11 +208,6 @@ func UpdateNode(d dto.NodeUpdateDto) dto.R {
 }
 
 func SetNodeProtocol(d dto.NodeSetProtocolDto) dto.R {
-	// Validate values
-	if (d.Http != 0 && d.Http != 1) || (d.Tls != 0 && d.Tls != 1) || (d.Socks != 0 && d.Socks != 1) {
-		return dto.Err("协议屏蔽值必须为 0 或 1")
-	}
-
 	var node model.Node
 	if err := DB.First(&node, d.ID).Error; err != nil {
 		return dto.Err("节点不存在")

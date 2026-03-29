@@ -23,7 +23,7 @@ type NodeUpdateDto struct {
 
 type NodeSetProtocolDto struct {
 	ID    int64 `json:"id" binding:"required"`
-	Http  int   `json:"http"`
-	Tls   int   `json:"tls"`
-	Socks int   `json:"socks"`
+	Http  int   `json:"http" binding:"oneof=0 1"`
+	Tls   int   `json:"tls" binding:"oneof=0 1"`
+	Socks int   `json:"socks" binding:"oneof=0 1"`
 }

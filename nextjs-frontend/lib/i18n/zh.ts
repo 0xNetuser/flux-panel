@@ -323,6 +323,11 @@ const zh = {
     xrayDisguiseName: 'Xray 伪装名',
     groupName: '分组',
     groupNamePlaceholder: '例如: 香港、美国',
+    protocolBlock: '协议屏蔽',
+    protocolBlockDesc: '开启后将屏蔽节点上对应协议的流量，需节点在线',
+    protocolUpdateSuccess: '协议屏蔽已更新',
+    protocolUpdateFailed: '协议屏蔽更新失败',
+    nodeOfflineCannotSet: '节点离线，无法修改协议屏蔽设置',
   },
   user: {
     title: '用户管理',

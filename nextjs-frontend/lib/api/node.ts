@@ -15,3 +15,4 @@ export const checkNodeStatus = (nodeId?: number) => post('/node/check-status', n
 export const reconcileNode = (id: number) => post('/node/reconcile', { id });
 export const updateNodeBinary = (id: number) => post('/node/update-binary', { id });
 export const updateNodeOrder = (items: { id: number; inx: number }[]) => post('/node/update-order', { items });
+export const setNodeProtocol = (data: { id: number; http: number; tls: number; socks: number }) => post('/node/set-protocol', data);

@@ -11,11 +11,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Trash2, Edit2, Terminal, Container, Copy, Eye, EyeOff, RefreshCw, ArrowUpDown, Network, Download, Check, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import { getNodeList, createNode, updateNode, deleteNode, getNodeInstallCommand, getNodeDockerCommand, reconcileNode, updateNodeBinary } from '@/lib/api/node';
+import { getNodeList, createNode, updateNode, deleteNode, getNodeInstallCommand, getNodeDockerCommand, reconcileNode, updateNodeBinary, setNodeProtocol } from '@/lib/api/node';
 import { switchXrayVersion, getXrayVersions } from '@/lib/api/xray-node';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getVersion } from '@/lib/api/system';
+import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/lib/hooks/use-auth';
 import { useTranslation } from '@/lib/i18n';
 
@@ -45,6 +46,8 @@ export default function NodePage() {
   const [commandIPv6, setCommandIPv6] = useState(false);
   const [showSecret, setShowSecret] = useState(false);
   const [panelVersion, setPanelVersion] = useState('');
+  const [protocolForm, setProtocolForm] = useState({ http: 0, tls: 0, socks: 0 });
+  const [protocolSaving, setProtocolSaving] = useState(false);
 
   const initialLoad = useRef(true);
 
@@ -149,7 +152,32 @@ export default function NodePage() {
       groupName: node.groupName || '',
     });
     setShowSecret(false);
+    setProtocolForm({ http: node.http || 0, tls: node.tls || 0, socks: node.socks || 0 });
     setDialogOpen(true);
+  };
+
+  const handleProtocolToggle = async (field: 'http' | 'tls' | 'socks', value: boolean) => {
+    if (!editingNode) return;
+    const newForm = { ...protocolForm, [field]: value ? 1 : 0 };
+    setProtocolForm(newForm);
+    setProtocolSaving(true);
+    try {
+      const res = await setNodeProtocol({ id: editingNode.id, ...newForm });
+      if (res.code === 0) {
+        toast.success(t('node.protocolUpdateSuccess'));
+        setNodes(prev => prev.map(n =>
+          n.id === editingNode.id ? { ...n, ...newForm } : n
+        ));
+      } else {
+        toast.error(res.msg || t('node.protocolUpdateFailed'));
+        setProtocolForm(protocolForm); // revert
+      }
+    } catch {
+      toast.error(t('node.protocolUpdateFailed'));
+      setProtocolForm(protocolForm); // revert
+    } finally {
+      setProtocolSaving(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -553,6 +581,47 @@ export default function NodePage() {
               </div>
               {editingNode && <p className="text-xs text-muted-foreground">{t('node.secretReadonly')}</p>}
             </div>
+            {editingNode && (
+              <div className="space-y-2">
+                <Label>{t('node.protocolBlock')}</Label>
+                {editingNode.status !== 1 ? (
+                  <p className="text-xs text-muted-foreground">{t('node.nodeOfflineCannotSet')}</p>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-6">
+                      <label className="flex items-center gap-2 text-sm">
+                        <Switch
+                          className="scale-90"
+                          checked={protocolForm.http === 1}
+                          onCheckedChange={(v) => handleProtocolToggle('http', v)}
+                          disabled={protocolSaving}
+                        />
+                        HTTP
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <Switch
+                          className="scale-90"
+                          checked={protocolForm.tls === 1}
+                          onCheckedChange={(v) => handleProtocolToggle('tls', v)}
+                          disabled={protocolSaving}
+                        />
+                        TLS
+                      </label>
+                      <label className="flex items-center gap-2 text-sm">
+                        <Switch
+                          className="scale-90"
+                          checked={protocolForm.socks === 1}
+                          onCheckedChange={(v) => handleProtocolToggle('socks', v)}
+                          disabled={protocolSaving}
+                        />
+                        SOCKS
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{t('node.protocolBlockDesc')}</p>
+                  </>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>

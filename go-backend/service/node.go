@@ -207,6 +207,43 @@ func UpdateNode(d dto.NodeUpdateDto) dto.R {
 	return dto.Ok("节点更新成功")
 }
 
+func SetNodeProtocol(d dto.NodeSetProtocolDto) dto.R {
+	// Validate values
+	if (d.Http != 0 && d.Http != 1) || (d.Tls != 0 && d.Tls != 1) || (d.Socks != 0 && d.Socks != 1) {
+		return dto.Err("协议屏蔽值必须为 0 或 1")
+	}
+
+	var node model.Node
+	if err := DB.First(&node, d.ID).Error; err != nil {
+		return dto.Err("节点不存在")
+	}
+
+	// Update DB
+	if err := DB.Model(&node).Updates(map[string]interface{}{
+		"http":         d.Http,
+		"tls":          d.Tls,
+		"socks":        d.Socks,
+		"updated_time": time.Now().UnixMilli(),
+	}).Error; err != nil {
+		return dto.Err("更新协议屏蔽失败")
+	}
+
+	// Push to node via WebSocket if online
+	if pkg.WS != nil && pkg.WS.IsNodeOnline(d.ID) {
+		resp := pkg.WS.SendMsg(d.ID, map[string]interface{}{
+			"http":  d.Http,
+			"tls":   d.Tls,
+			"socks": d.Socks,
+		}, "SetProtocol")
+		if resp != nil && resp.Msg != "OK" {
+			log.Printf("SetProtocol push to node %d: %s", d.ID, resp.Msg)
+			return dto.Ok("已保存，但推送到节点失败: " + resp.Msg)
+		}
+	}
+
+	return dto.Ok("协议屏蔽已更新")
+}
+
 func DeleteNode(id int64) dto.R {
 	var node model.Node
 	if err := DB.First(&node, id).Error; err != nil {

@@ -325,6 +325,11 @@ const en: Translations = {
     xrayDisguiseName: 'Xray Disguise',
     groupName: 'Group',
     groupNamePlaceholder: 'e.g. Hong Kong, US',
+    protocolBlock: 'Protocol Blocking',
+    protocolBlockDesc: 'Block specified protocol traffic on this node (node must be online)',
+    protocolUpdateSuccess: 'Protocol blocking updated',
+    protocolUpdateFailed: 'Failed to update protocol blocking',
+    nodeOfflineCannotSet: 'Node is offline, cannot modify protocol blocking',
   },
   user: {
     title: 'User Management',
